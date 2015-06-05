@@ -1,0 +1,21 @@
+khd kwm on
+khd mode default color 0xFFD5C4A1
+
+shift + ctrl - r          : khd -e "reload"
+
+shift + ctrl - backspace  : kwmc space -t bsp
+shift + ctrl - space      : kwmc space -t monocle
+shift + ctrl - f          : kwmc space -t float
+
+shift + ctrl - return     : kwmc window -z fullscreen
+
+shift + ctrl - h          : kwmc window -f west
+shift + ctrl - l          : kwmc window -f east
+shift + ctrl - j          : kwmc window -f south
+shift + ctrl - k          : kwmc window -f north
+
+shift + ctrl - p          : kwmc window -f prev
+shift + ctrl - n          : kwmc window -f next
+
+shift + ctrl - i          : kwmc window -s prev
+shift + ctrl - o          : kwmc window -s next
