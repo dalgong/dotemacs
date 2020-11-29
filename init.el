@@ -954,6 +954,16 @@
 (use-package icomplete
   :if (eq completion-framework 'icomplete)
   :hook (after-init . fido-mode))
+(use-package icomplete-vertical
+  :if (eq completion-framework 'icomplete)
+  :ensure
+  :hook (after-init . icomplete-vertical-mode)
+  :bind (:map icomplete-minibuffer-map
+              ("<down>" . icomplete-forward-completions)
+              ("C-n" . icomplete-forward-completions)
+              ("<up>" . icomplete-backward-completions)
+              ("C-p" . icomplete-backward-completions)
+              ("C-v" . icomplete-vertical-toggle)))
 (use-package ido
   :if (eq completion-framework 'ido)
   :custom
