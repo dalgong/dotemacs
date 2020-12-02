@@ -417,9 +417,9 @@
                         ((string= status "RW")
                          (propertize " RW " 'face 'diff-added))
                         (t
-                         (propertize status 'face 'default)))
+                         status))
                   (propertize " " 'display `(raise ,space-up))
-                  (propertize name 'face 'font-lock-keyword-face)
+                  name
                   (propertize " " 'display `(raise ,space-down))
                   primary))
            (right secondary)
@@ -434,7 +434,7 @@
                                buffer-name
                                (concat "(" mode-name
                                        (if branch (concat ", "
-                                                          (propertize branch 'face 'italic)))
+                                                          (propertize branch 'face '(italic :inherit header-line))))
                                        ")" )
                                position)))
   (defun vc-branch ()
@@ -938,6 +938,7 @@
   (helm-selection-line ((t :inherit hl-line)))
   :config
   (when (eq completion-framework 'helm)
+    (helm-mode t)
     (bind-keys
      ("M-T"       . helm-semantic-or-imenu)
      ("M-y"       . helm-show-kill-ring)
@@ -960,13 +961,13 @@
   (dash-docs-browser-func 'eww))
 (use-package helm-files
   :if (eq completion-framework 'helm)
-  :bind (:map helm-find-files-map
+  :bind (([remap find-file] . helm-find-files)
+         :map ctl-x-map
+         ("C-r"   . helm-recentf)
+         :map helm-find-files-map
          ("<backspace>" . maybe-helm-find-files-up-one-level)
          ("/"           . maybe-helm-execute-persistent-action))
   :config
-  (when (eq completion-framework 'helm)
-    (bind-keys
-     ([remap find-file] . helm-find-files)))
   (defun maybe-helm-find-files-up-one-level (arg)
     (interactive "p")
     (if (string-match "/$" helm-pattern)
@@ -1628,10 +1629,6 @@
 
 (when simple-modeline-mode
   (custom-set-faces
-   '(mode-line          ((t (:inherit default))))
-   '(mode-line-inactive ((t (:inherit default))))
-   '(header-line        ((((background dark))
-                          :background "#3f3f3f" :foreground "#dcdccc" :box nil)
-                         (t :background "grey75" :foreground "black" :box nil)))))
+   '(header-line        ((t :inherit diff-added)))))
 
 ;; end of .emacs.el

@@ -19,13 +19,13 @@
   (setq file-name-handler-alist nil)
   (line-number-mode -1)
   (tooltip-mode -1)
-  (defvar use-dark-mode t)
   (setq widget-image-enable nil)
+  (setq load-prefer-newer t)
   (setq default-frame-alist `(
-                              ,@(and use-dark-mode
-                                     '((background-mode  . dark)
-                                       (background-color . "#3f3f3f")
-                                       (foreground-color . "#dcdccc")))
+                              ;; ,@(and use-dark-mode
+                              ;;        '((background-mode  . dark)
+                              ;;          (background-color . "#3f3f3f")
+                              ;;          (foreground-color . "#dcdccc")))
                               ;; (undecorated . t)
                               (tool-bar-lines . 0)
                               (vertical-scroll-bars . nil)))
