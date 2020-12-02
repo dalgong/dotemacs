@@ -20,6 +20,7 @@
   (line-number-mode -1)
   (tooltip-mode -1)
   (defvar use-dark-mode t)
+  (setq widget-image-enable nil)
   (setq default-frame-alist `(
                               ,@(and use-dark-mode
                                      '((background-mode  . dark)
@@ -33,7 +34,9 @@
   (setq window-system-default-frame-alist
         (let ((window-frame-parameters `((alpha            . (100 95))
                                          ;; (font             . "Cousine-14:antialias=true:hinting=true")
-                                         (font             . "Anonymous Pro-16:antialias=true:hinting=true")
+                                         ;; (font             . "Anonymous Pro-16:antialias=true:hinting=true")
+                                         (font             . "IBM Plex Mono-14:antialias=true:hinting=true")
+                                         ;; (font             . "Go Mono-14:antialias=true:hinting=true")
                                          ;; (cursor-color     . "red")
                                          ;; (border-color     . "grey30")
                                          (left-fringe      . 0)

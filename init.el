@@ -19,6 +19,7 @@
 
 (defvar completion-framework 'helm)      ; '(ivy helm ido icomplete)
 (defvar shell-variant 'shell)            ; '(eshell shell)
+(defvar simple-modeline-mode nil)
 (eval-and-compile
   (defmacro csetq (sym val)
     `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val)))
@@ -396,9 +397,84 @@
   (defun pulse-line (&rest _)
     (pulse-momentary-highlight-one-line (point)))
   (dolist (c '(scroll-up-command scroll-down-command
-               cua-scroll-up cua-scroll-down
-               recenter-top-bottom other-window ivy-switch-buffer))
-    (advice-add c :after #'pulse-line)))
+                                 cua-scroll-up cua-scroll-down
+                                 recenter-top-bottom other-window ivy-switch-buffer))
+    (advice-add c :after #'pulse-line))
+  
+  (defun simple-modeline-status ()
+    (let ((read-only   buffer-read-only)
+          (modified    (and buffer-file-name (buffer-modified-p))))
+      (cond (modified  "**") (read-only "RO") (t "RW"))))
+  (defun simple-modeline-compose (status name primary secondary &optional pad)
+    (let* ((pad            (or pad 1))
+           (space-up       +0.15)
+           (space-down     -0.20)
+           (left (concat
+                  (cond ((string= status "RO")
+                         (propertize " RO " 'face 'diff-error))
+                        ((string= status "**")
+                         (propertize " ** " 'face 'diff-added))
+                        ((string= status "RW")
+                         (propertize " RW " 'face 'diff-added))
+                        (t
+                         (propertize status 'face 'default)))
+                  (propertize " " 'display `(raise ,space-up))
+                  (propertize name 'face 'font-lock-keyword-face)
+                  (propertize " " 'display `(raise ,space-down))
+                  primary))
+           (right secondary)
+           (available-width (- (window-body-width) (length left) pad)))
+      (format (format "%%s%%%ds" available-width) left right)))
+  (defun simple-modeline-default-mode ()
+    (let ((buffer-name (format-mode-line "%b"))
+          (mode-name   (format-mode-line "%m"))
+          (branch      (vc-branch))
+          (position    (format-mode-line "%l:%c")))
+      (simple-modeline-compose (simple-modeline-status)
+                               buffer-name
+                               (concat "(" mode-name
+                                       (if branch (concat ", "
+                                                          (propertize branch 'face 'italic)))
+                                       ")" )
+                               position)))
+  (defun vc-branch ()
+    (if vc-mode
+        (let ((backend (vc-backend buffer-file-name)))
+          (concat "#" (substring-no-properties vc-mode
+                                               (+ (if (eq backend 'Hg) 2 3) 2))))  nil))
+  (defun shorten-directory (dir max-length)
+    (let ((path (reverse (split-string (abbreviate-file-name dir) "/")))
+          (output ""))
+      (when (and path (equal "" (car path)))
+        (setq path (cdr path)))
+      (while (and path (< (length output) (- max-length 4)))
+        (setq output (concat (car path) "/" output))
+        (setq path (cdr path)))
+      (when path
+        (setq output (concat "…/" output)))
+      output))
+  (when simple-modeline-mode
+    (setq-default mode-line-format nil)
+    (setq-default header-line-format
+                  '((:eval
+                     (cond ((derived-mode-p 'term-mode)
+                            (simple-modeline-compose " >_ "
+                                                     "Terminal"
+                                                     (concat "(" shell-file-name ")")
+                                                     (shorten-directory default-directory 32)))
+                           (t
+                            (simple-modeline-default-mode))))))
+    (add-hook 'window-configuration-change-hook
+              (defun simple-modeline-update-windows ()
+                (dolist (window (window-list))
+                  (with-selected-window window
+                    (if (and nil (or (one-window-p t)
+	                             (eq (window-in-direction 'below) (minibuffer-window))
+	                             (not (window-in-direction 'below))))
+	                (with-current-buffer (window-buffer window)
+	                  (setq mode-line-format "%-"))
+	              (with-current-buffer (window-buffer window)
+ 	                (setq mode-line-format nil)))))))))
 (use-package files
   :custom
   (backup-by-copying-when-linked t)
@@ -1549,5 +1625,13 @@
    '(mode-line-inactive ((t (:foreground "grey20" :background "grey90" :box nil))))
    '(vertical-border    ((t (:foreground "grey30" :background "grey90" :box nil))))
    '(line-number-current-line ((t (:inherit hl-line))))))
+
+(when simple-modeline-mode
+  (custom-set-faces
+   '(mode-line          ((t (:inherit default))))
+   '(mode-line-inactive ((t (:inherit default))))
+   '(header-line        ((((background dark))
+                          :background "#3f3f3f" :foreground "#dcdccc" :box nil)
+                         (t :background "grey75" :foreground "black" :box nil)))))
 
 ;; end of .emacs.el
