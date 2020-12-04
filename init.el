@@ -17,6 +17,7 @@
     (package-refresh-contents)
     (package-install 'use-package)))
 
+(defvar use-dark-mode t)
 (defvar completion-framework 'helm)      ; '(ivy helm ido icomplete)
 (defvar shell-variant 'shell)            ; '(eshell shell)
 (defvar simple-modeline-mode nil)
