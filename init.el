@@ -1370,6 +1370,7 @@
      (emacs-lisp . t) 
      (shell . t))))
 (use-package osc52
+  :if (getenv "TMUX")
   :hook (after-init . osc52-set-cut-function)
   :config
   (add-hook 'after-make-frame-functions (lambda (_) (osc52-set-cut-function))))
