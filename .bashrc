@@ -17,7 +17,7 @@ export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/library"
 
 # go
 export GOPATH=$HOME/gocode
-export PATH=$PATH:$HOME/go/bin:$GOPATH/bin:$HOME/local/bin:$HOME/.fzf/bin
+export PATH=$HOME/go/bin:$GOPATH/bin:$HOME/local/bin:$HOME/.fzf/bin:$PATH
 
 alias ls='ls -BCF'
 alias mv='mv -i'
