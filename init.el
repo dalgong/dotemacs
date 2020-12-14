@@ -18,8 +18,8 @@
     (package-install 'use-package)))
 
 (defvar use-dark-mode t)
-(defvar completion-framework 'helm)      ; '(ivy helm ido icomplete)
-(defvar shell-variant 'shell)            ; '(eshell shell)
+(defvar completion-framework 'icomplete)      ; '(ivy helm ido icomplete)
+(defvar shell-variant 'shell)           ; '(eshell shell)
 
 (when (and t (file-directory-p "~/work/nano-emacs"))
   ;; git clone https://github.com/rougier/nano-emacs.git
@@ -68,6 +68,8 @@
   (frame-resize-pixelwise t)
   (help-char ?^)
   (history-length 1000)
+  (completion-styles '(initials partial-completion flex))
+  (completion-cycle-threshold 10)
   (idle-update-delay 1)
   (indent-tabs-mode nil)
   (inhibit-startup-screen t)
@@ -971,6 +973,7 @@
   :if (eq completion-framework 'icomplete)
   :hook (after-init . fido-mode))
 (use-package icomplete-vertical
+  :disabled
   :if (eq completion-framework 'icomplete)
   :ensure
   :hook (after-init . icomplete-vertical-mode)
@@ -1435,6 +1438,9 @@
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
+(use-package smex
+  :ensure
+  :hook (after-init . smex-initialize))
 (eval-and-compile
   (defmacro use-package-when (pkg cond &rest body)
     `(use-package ,pkg
