@@ -5,6 +5,7 @@ shopt -s histappend
 shopt -s cdable_vars
 
 HISTCONTROL=ignoredups:ignorespace
+PS0='\r`printf "%*s" $(($COLUMNS - 20)) ""`\t \d\n'
 PS1='\h:\w \$ '
 export PROMPT_COMMAND='history -a'
 export FIGNORE=".svn:.o:~:.class:#"
