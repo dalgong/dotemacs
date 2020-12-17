@@ -53,7 +53,10 @@
   (backup-by-copying t)
   (backup-directory-alist '(("." . "~/z/backups")))
   (bidi-display-reordering nil)
+  (bidi-inhibit-bpa t)
+  (bidi-paragraph-direction 'left-to-right)
   (blink-matching-paren t)
+  (calc-display-trail nil)
   (create-lockfiles nil)
   (delete-old-versions t)
   (disabled-command-function nil)
@@ -65,6 +68,7 @@
   (even-window-heights nil)
   (fast-but-imprecise-scrolling t)
   (fit-window-to-buffer-horizontally t)
+  (font-lock-maximum-decoration '((c-mode . 2) (c++-mode . 2) (t . t)))
   (frame-resize-pixelwise t)
   (help-char ?^)
   (history-length 1000)
@@ -105,8 +109,10 @@
   (ns-tool-bar-size-mode 'regular)
   (ns-use-thin-smoothing t)
   (prefix-help-command 'dispatch-command-with-prefix)
+  (process-adaptive-read-buffering nil)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
+  (read-process-output-max (* 1024 1024))
   (resize-mini-windows 'grow-only)
   (ring-bell-function 'ignore)
   (scroll-conservatively 1)
@@ -751,6 +757,8 @@
     (ediff-window-setup-function #'ediff-setup-windows-plain)))
 (use-package eldoc
   :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
+(use-package elfeed
+  :bind (("C-x !" . elfeed)))
 (use-package eshell
  :if (eq shell-variant 'eshell)
  :bind (("C-`"  . eshell)
@@ -776,9 +784,11 @@
   :hook (eshell-mode . esh-autosuggest-mode))
 (use-package evil
   :disabled
+  :ensure
+  :hook (after-init . evil-mode)
   :custom
   (evil-default-state 'emacs)
-  :hook (after-init . evil-mode))
+  (evil-ex-search-highlight-all nil))
 (use-package exec-path-from-shell
   :ensure
   :hook (after-init . exec-path-from-shell-initialize)
@@ -867,6 +877,7 @@
   (helm-display-header-line nil)
   (helm-echo-input-in-header-line nil)
   (helm-ff-file-name-history-use-recentf t)
+  (helm-ff-keep-cached-candidates nil)
   (helm-M-x-fuzzy-match t)
   (helm-mini-default-sources
    '(helm-source-buffers-list
@@ -1458,6 +1469,8 @@
 (use-package undo-tree
   :ensure
   :diminish
+  :custom
+  (undo-tree-mode-lighter "")
   :hook (after-init . global-undo-tree-mode))
 (use-package uniquify
   :defer t
