@@ -40,7 +40,7 @@
                                          ;; (cursor-color     . "red")
                                          ;; (border-color     . "grey30")
                                          (left-fringe      . 0)
-                                         (right-fringe     . 9)
+                                         (right-fringe     . 0)
                                          ;; (mouse-color      . "Grey")
                                          (ns-transparent-titlebar . t)
                                          (internal-border-width . 8)
