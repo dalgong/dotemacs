@@ -790,6 +790,7 @@
   (evil-default-state 'emacs)
   (evil-ex-search-highlight-all nil))
 (use-package exec-path-from-shell
+  :if (eq system-type 'darwin)
   :ensure
   :hook (after-init . exec-path-from-shell-initialize)
   :custom
