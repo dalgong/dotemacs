@@ -5,8 +5,10 @@ shopt -s histappend
 shopt -s cdable_vars
 
 HISTCONTROL=ignoredups:ignorespace
-PS0='\r`printf "%*s" $(($COLUMNS - 20)) ""`\t \d\n'
-PS1='\h:\w \$ '
+if [[ -z $EMACS_BASH_COMPLETE ]];then
+    PS0='\r`printf "%*s" $(($COLUMNS - 20)) ""`\t \d\n'
+    PS1='\h:\w \$ '
+fi
 export PROMPT_COMMAND='history -a'
 export FIGNORE=".svn:.o:~:.class:#"
 HISTSIZE=10000

@@ -467,7 +467,9 @@
                   (apply o args)))))
 (use-package bash-completion
   :ensure
-  :hook (after-init . bash-completion-setup))
+  :hook (after-init . bash-completion-setup)
+  :custom
+  (bash-completion-use-separate-processes t))
 (use-package browse-url
   :functions browse-url-url-at-point
   :config
