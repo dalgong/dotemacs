@@ -683,12 +683,20 @@
 (use-package dired
   :bind (("C-x C-j" . dired-jump)
          :map dired-mode-map
-         ("l" . dired-up-directory))
+         ("^" . dired-up-directory-inplace))
   :custom
   (dired-no-confirm t)
   (dired-use-ls-dired nil)
   (dired-recursive-copies 'always)
-  (dired-recursive-deletes 'always))
+  (dired-recursive-deletes 'always)
+  :config
+  (defun dired-up-directory-inplace ()
+    (interactive)
+    (find-alternate-file ".."))
+  (advice-add #'dired-find-file-other-window :around
+              (defun force-horizontal-split (o &rest args)
+                (let ((split-width-threshold (frame-width)))
+                  (apply o args)))))
 (use-package dired-aux
   :after dired
   :bind (:map dired-mode-map
@@ -703,7 +711,14 @@
   :after dired
   :bind (:map dired-mode-map
               ("i" . dired-subtree-insert)
-              (";" . dired-subtree-remove)))
+              (";" . dired-subtree-remove))
+  :custom-face
+  (dired-subtree-depth-1-face ((t :inherit default)))
+  (dired-subtree-depth-2-face ((t :inherit default)))
+  (dired-subtree-depth-3-face ((t :inherit default)))
+  (dired-subtree-depth-4-face ((t :inherit default)))
+  (dired-subtree-depth-5-face ((t :inherit default)))
+  (dired-subtree-depth-6-face ((t :inherit default))))
 (use-package dired-x
   :after dired
   :hook (dired-mode . dired-extra-startup))
