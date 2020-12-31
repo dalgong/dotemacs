@@ -168,6 +168,7 @@
          ("?"                  . goto-line*-dispatch)
          ("n"                  . next-error)
          ("p"                  . previous-error)
+         ("M-f"                . project-find-file)
          ("M-o"                . open-dwim)
 
          :map help-map
@@ -429,6 +430,7 @@
   (confirm-kill-emacs nil)
   (confirm-nonexistent-file-or-buffer nil)
   (require-final-newline t)
+  (server-client-instructions nil)
   :config
   (put 'backup-inhibited 'safe-local-variable 'booleanp)
   (defvar server-buffer-clients nil)
@@ -1287,7 +1289,6 @@
 (use-package ivy-xref
   :if (eq completion-framework 'ivy)
   :ensure
-  :functions (ivy-xref-show-xrefs ivy-xref-show-defs)
   :after xref
   :custom
   (xref-show-xrefs-function 'ivy-xref-show-xrefs)
