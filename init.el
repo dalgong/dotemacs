@@ -21,7 +21,7 @@
 (defvar completion-framework 'icomplete)      ; '(ivy helm ido icomplete)
 (defvar shell-variant 'shell)           ; '(eshell shell)
 
-(when (and t (file-directory-p "~/work/nano-emacs"))
+(when (and nil (file-directory-p "~/work/nano-emacs"))
   ;; git clone https://github.com/rougier/nano-emacs.git
   (add-hook 'emacs-startup-hook
             (defun load-nano-emacs-setup ()
