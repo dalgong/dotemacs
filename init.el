@@ -175,6 +175,7 @@
          ("1"                  . byte-compile-file)
          ("2"                  . package-list-packages-no-fetch)
          ("3"                  . package-install)
+         ("C-b"                . describe-personal-keybindings)
 
          :map ctl-x-map
          ("k"                  . kill-this-buffer)
@@ -491,19 +492,12 @@
 (use-package cc-mode
   :custom
   (c-electric-flag nil)
+  :bind (:map c-mode-base-map ("TAB" . company-indent-or-complete-common))
   :hook (c-mode-common . set-outline-regexp)
   :config
   (defun set-outline-regexp ()
     (require 'outline)
     (setq outline-regexp "\\s-*\\S-"))
-  ;; c-tab-always-indent does not support 'complete of tab-always-indent.
-  (defun may-complete-symbol (o &rest args)
-    (let ((op (point)))
-      (apply o args)
-      (when (and (eq this-command 'c-indent-line-or-region)
-                 (eq op (point)))
-        (call-interactively 'company-complete))))
-  (advice-add 'c-indent-line :around #'may-complete-symbol)
   (defun do-self-insert-command (_1 &rest _2)
     (interactive)
     (call-interactively 'self-insert-command))
@@ -822,7 +816,8 @@
       (unless (member name exec-path-from-shell-variables)
         (setenv name (mapconcat #'identity values "="))))))
 (use-package flx
-  :ensure)
+  :ensure
+  :after ivy)
 (use-package gcmh
   :ensure
   :diminish
@@ -1353,6 +1348,8 @@
   :custom
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 300))
+(use-package remind-bindings
+  :bind (:map help-map ("C-k" . remind-bindings-togglebuffer)))
 (use-package racer
   :ensure
   :bind (:map rust-mode-map ("C-h d" . racer-describe))
@@ -1389,69 +1386,14 @@
   (save-place-forget-unreadable-files nil))
 (use-package shell
   :if (eq shell-variant 'shell)
-  :bind (("C-`"  . shell)
-         ("C-\\" . shell)
-         ("C-;"  . shell)
-         :map ctl-x-map
-         (","    . shell*)
-         :map ctl-x-4-map
-         (","    . shell-other-window*)
-         :map shell-mode-map
-         ([remap read-only-mode] . shell-toggle-compile-mode)
-         ("M-T" . counsel-switch-to-shell-buffer)
-         ("<M-right>" . next-shell-buffer)
-         ("<M-left>"  . prev-shell-buffer))
+  :bind (:map shell-mode-map
+              ([remap read-only-mode] . shell-toggle-compile-mode)
+              ("M-T" . counsel-switch-to-shell-buffer))
   :config
-  (defun shell* ()
-    (interactive)
-    (progn (setq unread-command-events
-                 (nconc (listify-key-sequence "\exshell\015")
-                        unread-command-events))
-           (call-interactively 'recursive-edit*)))
-  (defun shell-other-window* ()
-    (interactive)
-    (progn (setq unread-command-events
-                 (nconc (listify-key-sequence "\eo\exshell\015")
-                        unread-command-events))
-           (call-interactively 'recursive-edit*)))
   (defun shell-toggle-compile-mode ()
     (interactive)
     (setq buffer-read-only t)
     (compilation-mode))
-  (defun next-shell-buffer (arg)
-    (interactive "p")
-    (let* ((shell-buffer-p (lambda (b)
-                             (eq 'shell-mode
-                                 (buffer-local-value 'major-mode b))))
-           (by-buffer-name (lambda (a b)
-                             (string< (buffer-name a) (buffer-name b))))
-           (shell-buffers
-            (sort (cl-remove-if-not shell-buffer-p (buffer-list)) by-buffer-name))
-           (pos (cl-position (current-buffer) shell-buffers)))
-      (when pos
-        (set-window-buffer
-         (selected-window)
-         (nth (% (+ arg pos (length shell-buffers))
-                 (length shell-buffers))
-              shell-buffers)))))
-  (defun prev-shell-buffer (arg)
-    (interactive "p")
-    (next-shell-buffer (- arg)))
-  (advice-add 'shell :around 'shell-dwim)
-  (defun shell-dwim (o &rest args)
-    (if (not (and (eq major-mode 'shell-mode)
-                  (called-interactively-p 'interactive)
-                  (null current-prefix-arg)))
-        (let ((d default-directory)
-              (b (apply o args)))
-          (unless (process-running-child-p (get-buffer-process b))
-            (with-current-buffer b
-              (insert "cd " d)
-              (comint-send-input))))
-      (bury-buffer)
-      (unless (one-window-p 'nomini)
-        (delete-window)
-        (other-window -1))))
   (defun use-region-if-active (o &rest args)
     (let ((s (and (memq this-command '(compile shell-command async-shell-command))
                   (get-current-active-selection))))
@@ -1465,6 +1407,13 @@
                   r))
           (mapconcat #'identity (nreverse r) "\n")))))
   (advice-add 'read-shell-command :around #'use-region-if-active))
+(use-package shell-pop
+  :ensure
+  :bind (("C-`"  . shell-pop)
+         ("C-\\" . shell-pop)
+         ("C-;"  . shell-pop))
+  :custom
+  (shell-pop-full-span t))
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
