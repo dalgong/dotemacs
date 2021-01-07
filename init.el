@@ -680,6 +680,7 @@
   :bind (("C-x C-j" . dired-jump)
          :map dired-mode-map
          ("^" . dired-up-directory-inplace))
+  :hook (dired-mode . dired-hide-details-mode)
   :custom
   (dired-no-confirm t)
   (dired-use-ls-dired nil)
@@ -967,6 +968,10 @@
             :buffer "*helm recursive files*"
             :ff-transformer-show-only-basename nil
             :case-fold-search helm-file-name-case-fold-search))))
+(use-package helm-rtags
+  :if (eq completion-framework 'helm)
+  :custom
+  (rtags-display-result-backend 'helm))
 (use-package helm-swoop
   :if (eq completion-framework 'helm)
   :ensure
@@ -1281,6 +1286,11 @@
   :if (eq completion-framework 'ivy)
   :ensure
   :hook (after-init . ivy-rich-mode))
+(use-package ivy-rtags
+  :if (eq completion-framework 'ivy)
+  :after rtags
+  :custom
+  (rtags-display-result-backend 'ivy))
 (use-package ivy-xref
   :if (eq completion-framework 'ivy)
   :ensure
@@ -1354,6 +1364,17 @@
   :ensure
   :bind (:map rust-mode-map ("C-h d" . racer-describe))
   :hook (rust-mode . racer-mode))
+(use-package rtags
+  :after company
+  :custom
+  (rtags-completions-enabled t)
+  :config
+  (add-to-list 'company-backends 'company-rtags)
+  (rtags-enable-standard-keybindings)
+  (use-package cmake-ide
+    :ensure
+    :config
+    (cmake-ide-setup)))
 (use-package python
   :mode ("\\.py\\'" . python-mode)
   :interpreter ("python" . python-mode)
