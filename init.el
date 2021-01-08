@@ -706,9 +706,7 @@
 (use-package dired-subtree
   :ensure
   :after dired
-  :bind (:map dired-mode-map
-              ("i" . dired-subtree-insert)
-              (";" . dired-subtree-remove))
+  :bind (:map dired-mode-map ("TAB" . dired-subtree-toggle))
   :custom-face
   (dired-subtree-depth-1-face ((t :inherit default)))
   (dired-subtree-depth-2-face ((t :inherit default)))
