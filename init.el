@@ -39,6 +39,9 @@
     `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val)))
 (use-package bind-key
   :ensure)
+(use-package use-package-chords
+  :ensure
+  :hook (after-init . key-chord-mode))
 (use-package diminish
   :ensure
   :config
@@ -134,11 +137,11 @@
   (x-selection-timeout 100)
   (window-resize-pixelwise t)
   :init (defvar goto-line*-map (make-sparse-keymap))
-  :bind (("M-0"                . delete-window)
-         ("M-1"                . delete-other-windows)
-         ("M-2"                . split-window-below)
-         ("M-3"                . split-window-right)
-         ([C-tab]              . other-window)
+  :chords (("!!" . shell-command)
+           ("@@" . recursive-edit)
+           ("##" . delete-window)
+           ("&&" . async-shell-command))
+  :bind (([C-tab]              . other-window)
          ([C-up]               . windmove-up)
          ([C-down]             . windmove-down)
          ([C-left]             . windmove-left)
@@ -182,13 +185,6 @@
          ("O"                  . ff-find-other-file)
 
          :map mode-specific-map
-         ("`"                  . shell-command)
-         ("1"                  . shell-command)
-         ("7"                  . async-shell-command)
-         ("\\"                 . shell-command-on-region)
-         ("9"                  . compile)
-         ("0"                  . recompile)
-         ("-"                  . recursive-edit*)
          ("j"                  . join-region-into-one-line)
          ("b"                  . bury-buffer)
          ("q"                  . quick-calc)
@@ -379,10 +375,12 @@
             (rename-buffer (if (string= tag "") (concat s e)
                              (format "%s<%s>%s" s tag e))
                            t))))))
-  (defun recursive-edit* ()
-    (interactive)
-    (save-window-excursion
-      (recursive-edit)))
+  (advice-add #'recursive-edit :around
+              (defun recursive-edit-with-window-excursion (o)
+                (if (called-interactively-p 'interactive)
+                    (save-window-excursion
+                      (funcall o))
+                  (funcall o))))
 
   (advice-add 'async-shell-command :before
               (defun uniqify-running-shell-command (&rest _)
@@ -461,6 +459,7 @@
               ("C-x '" . ahs-change-range)))
 (use-package avy
   :ensure
+  :chords ("''" . avy-goto-char-timer)
   :bind ("C-'" . avy-goto-char-timer)
   :config
   (advice-add 'avy-goto-char-timer :around
@@ -567,6 +566,8 @@
   :diminish compilation-in-progress
   :hook ((compilation-mode . run-before-compile)
          (compilation-filter . apply-xterm-color-filter))
+  :chords (("%%" . compile)
+           ("^^" . recompile))
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
          :map compilation-mode-map
@@ -656,6 +657,7 @@
          :map mode-specific-map
          ("/" . dabbrev-expand))
   :custom
+  (abbrev-suggest t)
   (dabbrev-case-fold-search nil)
   :config
   (advice-add 'dabbrev--find-expansion :around
@@ -1294,6 +1296,7 @@
   :ensure
   :after xref
   :custom
+  (xref-search-program 'ripgrep)
   (xref-show-xrefs-function 'ivy-xref-show-xrefs)
   (xref-show-definitions-function #'ivy-xref-show-defs))
 (use-package jka-cmpr-hook
@@ -1428,9 +1431,7 @@
   (advice-add 'read-shell-command :around #'use-region-if-active))
 (use-package shell-pop
   :ensure
-  :bind (("C-`"  . shell-pop)
-         ("C-\\" . shell-pop)
-         ("C-;"  . shell-pop))
+  :chords (("``" . shell-pop))
   :custom
   (shell-pop-full-span t))
 (use-package smerge-mode
