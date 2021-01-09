@@ -20,6 +20,7 @@
 (defvar use-dark-mode t)
 (defvar completion-framework 'icomplete)      ; '(ivy helm ido icomplete)
 (defvar shell-variant 'shell)           ; '(eshell shell)
+(defvar goto-line*-map (make-sparse-keymap))
 
 (when (and nil (file-directory-p "~/work/nano-emacs"))
   ;; git clone https://github.com/rougier/nano-emacs.git
@@ -136,11 +137,9 @@
   (version-control t)
   (x-selection-timeout 100)
   (window-resize-pixelwise t)
-  :init (defvar goto-line*-map (make-sparse-keymap))
   :chords (("!!" . shell-command)
            ("@@" . recursive-edit)
-           ("##" . delete-window)
-           ("&&" . async-shell-command))
+           ("##" . delete-window))
   :bind (([C-tab]              . other-window)
          ([C-up]               . windmove-up)
          ([C-down]             . windmove-down)
