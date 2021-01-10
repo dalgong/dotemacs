@@ -13,36 +13,26 @@
     (condition-case _ (package-initialize)
       (error (package-refresh-contents)
              (package-initialize))))
-  (unless (require 'use-package nil t)
-    (package-refresh-contents)
-    (package-install 'use-package)))
+  (dolist (p '(use-package diminish bind-key))
+    (unless (require p nil t)
+      (package-refresh-contents)
+      (package-install p))))
 
 (defvar use-dark-mode t)
 (defvar completion-framework 'icomplete)      ; '(ivy helm ido icomplete)
 (defvar shell-variant 'shell)           ; '(eshell shell)
-(defvar goto-line*-map (make-sparse-keymap))
 
-(when (and nil (file-directory-p "~/work/nano-emacs"))
-  ;; git clone https://github.com/rougier/nano-emacs.git
-  (add-hook 'emacs-startup-hook
-            (defun load-nano-emacs-setup ()
-              (add-to-list 'load-path (expand-file-name "~/work/nano-emacs"))
-              (require 'nano-faces)
-              (nano-faces)
-              (if use-dark-mode
-                  (require 'nano-theme-dark)
-                (require 'nano-theme-light))
-              (require 'nano-modeline)
-              (set-face-background 'mode-line 'unspecified)
-              (set-face-background 'mode-line-inactive 'unspecified))))
+(eval-when-compile
+  (require 'use-package nil t)
+  (require 'bind-key nil t)
+  (require 'key-chord nil t))
 (eval-and-compile
   (defmacro csetq (sym val)
-    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val)))
-(use-package bind-key
-  :ensure)
-(use-package use-package-chords
-  :ensure
-  :hook (after-init . key-chord-mode))
+    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val))
+  (use-package use-package-chords
+    :ensure
+    :config
+    (key-chord-mode 1)))
 (use-package diminish
   :ensure
   :config
@@ -137,9 +127,7 @@
   (version-control t)
   (x-selection-timeout 100)
   (window-resize-pixelwise t)
-  :chords (("!!" . shell-command)
-           ("@@" . recursive-edit)
-           ("##" . delete-window))
+  :chords ("!!" . shell-command)
   :bind (([C-tab]              . other-window)
          ([C-up]               . windmove-up)
          ([C-down]             . windmove-down)
@@ -152,7 +140,6 @@
          ("C-,"                . previous-error)
          ("C-RET"              . open-dwim)
          ("M-SPC"              . cycle-spacing)
-         ("M-g"                . goto-line*)
          ("M-K"                . kill-this-buffer)
          ("M-o"                . other-window)
          ("M-q"                . fill-paragraph)
@@ -165,14 +152,6 @@
          ("M-n"                . forward-paragraph)
          ("M-p"                . backward-paragraph)
 
-         :map goto-line*-map
-         ("^"                  . goto-line*-dispatch)
-         ("?"                  . goto-line*-dispatch)
-         ("n"                  . next-error)
-         ("p"                  . previous-error)
-         ("M-f"                . project-find-file)
-         ("M-o"                . open-dwim)
-
          :map help-map
          ("1"                  . byte-compile-file)
          ("2"                  . package-list-packages-no-fetch)
@@ -184,6 +163,7 @@
          ("O"                  . ff-find-other-file)
 
          :map mode-specific-map
+         ("C-_"                . recursive-edit)
          ("j"                  . join-region-into-one-line)
          ("b"                  . bury-buffer)
          ("q"                  . quick-calc)
@@ -322,46 +302,6 @@
       (unwind-protect (fill-paragraph nil t)
         (beginning-of-line)
         (setq fill-column old-fill-column))))
-  (defvar goto-line*-modes '(display-line-numbers-mode hl-line-mode))
-  (defvar goto-line*-buffer nil)
-  (defvar goto-line*-old-values nil)
-  (defvar goto-line*-timer nil)
-  (cl-flet ((safe-eval (symbol) (if (and (boundp symbol) (symbol-value symbol)) 1 -1))
-            (safe-call (fn v) (and (fboundp fn) (funcall fn v))))
-    (defun goto-line*-setup ()
-      (unless (fboundp 'display-line-numbers-mode)
-        (require 'linum)
-        (fset 'display-line-numbers-mode 'linum-mode))
-      (with-current-buffer goto-line*-buffer
-        (setq goto-line*-buffer (current-buffer)
-              goto-line*-old-values (mapcar #'safe-eval goto-line*-modes))
-        (cl-mapc #'safe-call goto-line*-modes '(1 1))))
-    (defun goto-line*-cleanup ()
-      (when  goto-line*-timer
-        (cancel-timer goto-line*-timer)
-        (setq goto-line*-timer nil))
-      (with-current-buffer goto-line*-buffer
-        (cl-mapc #'safe-call goto-line*-modes goto-line*-old-values)
-        (setq goto-line*-buffer nil
-              goto-line*-old-values nil)))
-    (defun goto-line* ()
-      (interactive)
-      (setq goto-line*-buffer (current-buffer)
-            goto-line*-timer (run-with-timer .3 nil #'goto-line*-setup))
-      (let (cmd k)
-        (unwind-protect
-            (unless (setq cmd (and (setq k (let ((overriding-local-map goto-line*-map))
-                                             (read-key-sequence "Goto line: ")))
-                                   (lookup-key goto-line*-map k)))
-              (setq unread-command-events
-                    (nconc (listify-key-sequence k) unread-command-events))
-              (call-interactively 'goto-line))
-          (goto-line*-cleanup))
-        (when cmd (call-interactively cmd)))))
-  (defun goto-line*-dispatch ()
-    (interactive)
-    (dispatch-command-from-keymap goto-line*-map '(goto-line*-dispatch)))
-
   (defun rename-uniquely* ()
     (interactive)
     (let ((tag (read-string "tag: "))
@@ -374,6 +314,16 @@
             (rename-buffer (if (string= tag "") (concat s e)
                              (format "%s<%s>%s" s tag e))
                            t))))))
+  (advice-add #'goto-line :around
+              (defun show-line-numbers (o &rest args)
+                (interactive
+                 (lambda (spec)
+                   (let ((ov (if (ignore-errors display-line-numbers-mode) 1 -1)))
+                     (display-line-numbers-mode 1)
+                     (unwind-protect
+                         (advice-eval-interactive-spec spec)
+                       (display-line-numbers-mode ov)))))
+                (apply o args)))
   (advice-add #'recursive-edit :around
               (defun recursive-edit-with-window-excursion (o)
                 (if (called-interactively-p 'interactive)
@@ -412,14 +362,13 @@
                                                 (split-string (car r) " "))
                                         "+")))))
                 r))
-  (advice-add 'display-startup-echo-area-message :override
-              (lambda (&rest _) "Silent startup!"))
+  (advice-add 'display-startup-echo-area-message :override #'ignore)
   (setq mode-line-modes (remove ")" (remove "(" mode-line-modes)))
   (defun pulse-line (&rest _)
     (pulse-momentary-highlight-one-line (point)))
-  (dolist (c '(scroll-up-command scroll-down-command
-                                 cua-scroll-up cua-scroll-down
-                                 recenter-top-bottom other-window ivy-switch-buffer))
+  (dolist (c '( scroll-up-command scroll-down-command
+                cua-scroll-up cua-scroll-down
+                recenter-top-bottom other-window ivy-switch-buffer))
     (advice-add c :after #'pulse-line)))
 (use-package files
   :custom
@@ -724,9 +673,6 @@
   :custom
   (display-line-numbers-width 3)
   (display-line-numbers-widen t))
-(use-package docker
-  :ensure
-  :bind (:map goto-line*-map ("M-d" . docker)))
 (use-package easy-kill
   :ensure
   :bind (([remap kill-ring-save]              . easy-kill)
@@ -845,7 +791,7 @@
            "go build -v && go test -v && go vet"))))
 (use-package goto-last-change
   :ensure
-  :bind (:map goto-line*-map ("." . goto-last-change)))
+  :bind (:map help-map ("C-_" . goto-last-change)))
 (use-package helm
   :if (eq completion-framework 'helm)
   :ensure)
@@ -1572,6 +1518,17 @@
    '(mode-line-inactive ((t (:foreground "grey20" :background "grey90" :box nil))))
    '(vertical-border    ((t (:foreground "grey30" :background "grey90" :box nil))))
    '(line-number-current-line ((t (:inherit hl-line))))))
-
-
+(when (and nil (file-directory-p "~/work/nano-emacs"))
+  ;; git clone https://github.com/rougier/nano-emacs.git
+  (add-hook 'emacs-startup-hook
+            (defun load-nano-emacs-setup ()
+              (add-to-list 'load-path (expand-file-name "~/work/nano-emacs"))
+              (require 'nano-faces)
+              (nano-faces)
+              (if use-dark-mode
+                  (require 'nano-theme-dark)
+                (require 'nano-theme-light))
+              (require 'nano-modeline)
+              (set-face-background 'mode-line 'unspecified)
+              (set-face-background 'mode-line-inactive 'unspecified))))
 ;; end of .emacs.el
