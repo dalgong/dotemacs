@@ -1,5 +1,5 @@
 ;; -*- lexical-binding: t -*-
-(defvar use-dark-mode (not window-system))
+(defvar use-dark-mode nil)
 (defvar completion-framework 'icomplete)      ; '(ivy helm ido icomplete)
 (defvar shell-variant 'shell)           ; '(eshell shell)
 

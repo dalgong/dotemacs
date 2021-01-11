@@ -1378,7 +1378,11 @@
   :ensure
   :chords (("``" . shell-pop))
   :custom
-  (shell-pop-full-span t))
+  (shell-pop-full-span nil)
+  (use-package vterm
+    :ensure
+    :config
+    (csetq shell-pop-shell-type '("vterm" "*shell*" #'vterm))))
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
@@ -1422,10 +1426,11 @@
   :diminish
   :hook (after-init . volatile-highlights-mode))
 (use-package which-key
+  :ensure
   :hook (after-init . which-key-mode)
   :diminish which-key-mode
   :custom
-  (which-key-idle-delay 0.3))
+  (which-key-idle-delay 1))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
