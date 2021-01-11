@@ -1421,6 +1421,11 @@
   :ensure
   :diminish
   :hook (after-init . volatile-highlights-mode))
+(use-package which-key
+  :hook (after-init . which-key-mode)
+  :diminish which-key-mode
+  :custom
+  (which-key-idle-delay 0.3))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
