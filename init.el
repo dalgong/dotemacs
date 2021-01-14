@@ -1228,6 +1228,7 @@
       (isearch-exit)
       (swiper-all query))))
 (use-package ivy-rich
+  :disabled
   :if (eq completion-framework 'ivy)
   :ensure
   :hook (after-init . ivy-rich-mode))
@@ -1380,6 +1381,7 @@
   :custom
   (shell-pop-full-span nil)
   (use-package vterm
+    :disabled
     :ensure
     :config
     (csetq shell-pop-shell-type '("vterm" "*shell*" #'vterm))))
