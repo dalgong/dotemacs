@@ -45,7 +45,7 @@
   (async-shell-command-buffer 'rename-buffer)
   (auto-window-vscroll nil)
   (backup-by-copying t)
-  (backup-directory-alist '(("." . "~/z/backups")))
+  (backup-directory-alist '(("." . "~/.cache/emacs/backups")))
   (bidi-display-reordering nil)
   (bidi-inhibit-bpa t)
   (bidi-paragraph-direction 'left-to-right)
@@ -127,7 +127,7 @@
   (version-control t)
   (x-selection-timeout 100)
   (window-resize-pixelwise t)
-  :chords ("!!" . shell-command)
+  :hook (after-init . find-function-setup-keys)
   :bind (([C-tab]              . other-window)
          ([C-up]               . windmove-up)
          ([C-down]             . windmove-down)
@@ -139,7 +139,6 @@
          ("C-."                . next-error)
          ("C-,"                . previous-error)
          ("C-RET"              . open-dwim)
-         ("M-SPC"              . cycle-spacing)
          ("M-K"                . kill-this-buffer)
          ("M-o"                . other-window)
          ("M-q"                . fill-paragraph)
@@ -157,25 +156,57 @@
          ("2"                  . package-list-packages-no-fetch)
          ("3"                  . package-install)
          ("C-b"                . describe-personal-keybindings)
+         ("="                  . quick-calc)
 
          :map ctl-x-map
          ("k"                  . kill-this-buffer)
          ("O"                  . ff-find-other-file)
 
          :map mode-specific-map
+         ("SPC"                . cycle-spacing)
          ("C-_"                . recursive-edit)
-         ("j"                  . join-region-into-one-line)
          ("b"                  . bury-buffer)
-         ("q"                  . quick-calc)
-         ("u"                  . rename-uniquely*)           
+         ("q"                  . delete-other-window)
+         ("r"                  . replace-regexp)
+         ("s"                  . replace-string)
+         ("u"                  . rename-uniquely)           
+         ("D"                  . toggle-debug-on-error)
          ("E"                  . erase-buffer)
+         ("x"                  . shell-command)
+         ("X"                  . async-shell-command)
 
          :map isearch-mode-map
-         ("M-s ?" . isearch-mode-map-dispatch))
-  :bind-keymap
-  ("M-4" . ctl-x-4-map)
+         ("C-h"                . isearch-mode-map-dispatch))
   :config
-  (find-function-setup-keys)
+  (advice-add 'display-startup-echo-area-message :override #'ignore)
+  (advice-add #'goto-line :around #'show-line-numbers)
+  (advice-add #'recursive-edit :around #'preseve-window-configuration-if-interactive)
+  (advice-add 'split-window-right :after #'call-other-window-if-interactive)
+  (advice-add 'split-window-below :after #'call-other-window-if-interactive)
+  (defun show-line-numbers (o &rest args)
+    (interactive
+     (lambda (spec)
+       (let ((ov (if (ignore-errors display-line-numbers-mode) 1 -1)))
+         (display-line-numbers-mode 1)
+         (unwind-protect
+             (advice-eval-interactive-spec spec)
+           (display-line-numbers-mode ov)))))
+    (apply o args))
+  (defun call-other-window-if-interactive (&rest _)
+    (when (called-interactively-p 'interactive)
+      (other-window 1)))
+  (defun preseve-window-configuration-if-interactive (o)
+    (let ((wc (and (called-interactively-p 'interactive)
+                   (current-window-configuration))))
+      (unwind-protect (funcall o)
+        (and wc (set-window-configuration wc)))))
+  (defun delete-other-window ()
+    (interactive)
+    (unless (one-window-p 'nomini)
+      (other-window 1)
+      (if current-prefix-arg
+          (progn (bury-buffer) (other-window -1))
+        (delete-window (selected-window)))))
   (defun open-dwim (path)
     (interactive
      (save-excursion
@@ -284,92 +315,7 @@
                  (cons (region-beginning) (region-end))
                (and (fboundp 'easy-kill--bounds)
                     (ignore-errors (funcall 'easy-kill--bounds))))))
-      (and p (car p) (buffer-substring-no-properties (car p) (cdr p)))))
-
-  (defun call-other-window-if-interactive (&rest _)
-    (when (called-interactively-p 'interactive)
-      (other-window 1)))
-  (advice-add 'split-window-right :after #'call-other-window-if-interactive)
-  (advice-add 'split-window-below :after #'call-other-window-if-interactive)
-
-  (advice-add 'kill-this-buffer :around
-              (defun kill-this-buffer-really (_ &rest _r)
-                (kill-buffer (current-buffer))))
-  (defun join-region-into-one-line ()
-    (interactive)
-    (let ((old-fill-column fill-column))
-      (setq fill-column most-positive-fixnum)
-      (unwind-protect (fill-paragraph nil t)
-        (beginning-of-line)
-        (setq fill-column old-fill-column))))
-  (defun rename-uniquely* ()
-    (interactive)
-    (let ((tag (read-string "tag: "))
-          (buffer-name (buffer-name)))
-      (when (string-match "^\\([^<>]*\\)\\(<[^>]*>\\)?\\(.*\\)$" buffer-name)
-        (let ((s (match-string 1 buffer-name))
-              (e (match-string 3 buffer-name)))
-          (if (and (string= tag "") (null (match-string 2 buffer-name)))
-              (rename-uniquely)
-            (rename-buffer (if (string= tag "") (concat s e)
-                             (format "%s<%s>%s" s tag e))
-                           t))))))
-  (advice-add #'goto-line :around
-              (defun show-line-numbers (o &rest args)
-                (interactive
-                 (lambda (spec)
-                   (let ((ov (if (ignore-errors display-line-numbers-mode) 1 -1)))
-                     (display-line-numbers-mode 1)
-                     (unwind-protect
-                         (advice-eval-interactive-spec spec)
-                       (display-line-numbers-mode ov)))))
-                (apply o args)))
-  (advice-add #'recursive-edit :around
-              (defun recursive-edit-with-window-excursion (o)
-                (if (called-interactively-p 'interactive)
-                    (save-window-excursion
-                      (funcall o))
-                  (funcall o))))
-
-  (advice-add 'async-shell-command :before
-              (defun uniqify-running-shell-command (&rest _)
-                (let ((buf (get-buffer "*Async Shell Command*")))
-                  (if buf
-                      (let ((proc (get-buffer-process buf)))
-                        (if (and proc (eq 'run (process-status proc)))
-                            (with-current-buffer buf
-                              (rename-uniquely))))))))
-  (advice-add 'bounds-of-thing-at-point :around
-              (defun handle-paragraph (o thing)
-                (if (eq thing 'paragraph)
-                    (save-excursion
-                      (let ((p (progn (forward-paragraph) (point))))
-                        (backward-paragraph)
-                        (cons (point) p)))
-                  (funcall o thing))))
-  (advice-add 'browse-url-interactive-arg :filter-return
-              (defun google-if-not-a-url (r)
-                (and r (car r)
-                     (not (string-match "^https?://" (car r)))
-                     (> (length (car r)) 0)
-                     (setcar r
-                             (if (string-match "^[a-z0-9]+/" (car r))
-                                 (concat "http://" (car r))
-                               (concat "https://www.google.com/search?q="
-                                       (mapconcat
-                                        #'identity
-                                        (mapcar #'url-hexify-string
-                                                (split-string (car r) " "))
-                                        "+")))))
-                r))
-  (advice-add 'display-startup-echo-area-message :override #'ignore)
-  (setq mode-line-modes (remove ")" (remove "(" mode-line-modes)))
-  (defun pulse-line (&rest _)
-    (pulse-momentary-highlight-one-line (point)))
-  (dolist (c '( scroll-up-command scroll-down-command
-                cua-scroll-up cua-scroll-down
-                recenter-top-bottom other-window ivy-switch-buffer))
-    (advice-add c :after #'pulse-line)))
+      (and p (car p) (buffer-substring-no-properties (car p) (cdr p))))))
 (use-package files
   :custom
   (backup-by-copying-when-linked t)
@@ -521,7 +467,7 @@
          :map compilation-mode-map
          ("M-{" . nil)
          ("M-}" . nil)
-         ("." . rename-uniquely*)
+         ("." . rename-uniquely)
          ("t" . toggle-truncate-lines)
          ([remap read-only-mode] . compilation-toggle-shell-mode))
   :custom
@@ -630,7 +576,6 @@
   :bind (("C-x C-j" . dired-jump)
          :map dired-mode-map
          ("^" . dired-up-directory-inplace))
-  :hook (dired-mode . dired-hide-details-mode)
   :custom
   (dired-no-confirm t)
   (dired-use-ls-dired nil)
@@ -813,7 +758,6 @@
          :map help-map
          ("SPC"       . helm-all-mark-rings)
          ("/"         . helm-dabbrev)
-         ("="         . helm-calcul-expression)
          ("C-z"       . helm-toggle-suspend-update)
          ("a"         . helm-apropos)
          ("b"         . helm-descbinds)
@@ -1277,6 +1221,7 @@
               ("C-TAB" . nil)
               ("C-c ;" . nil))
   :custom
+  (org-agenda-span 'fortnight)
   (org-hide-leading-stars t)
   (org-hide-emphasis-markers t)
   (org-odd-levels-only nil)
@@ -1379,12 +1324,7 @@
   :ensure
   :chords (("``" . shell-pop))
   :custom
-  (shell-pop-full-span nil)
-  (use-package vterm
-    :disabled
-    :ensure
-    :config
-    (csetq shell-pop-shell-type '("vterm" "*shell*" #'vterm))))
+  (shell-pop-full-span nil))
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
@@ -1405,12 +1345,23 @@
          ("t" . tab-switcher))
   :custom
   (tab-bar-show nil))
-(use-package undo-tree
-  :ensure
-  :diminish
+(use-package tramp
+  :defer t
   :custom
-  (undo-tree-mode-lighter "")
-  :hook (after-init . global-undo-tree-mode))
+  (tramp-auto-save-directory "~/.cache/emacs/backups")
+  (tramp-persistency-file-name "~/.emacs.d/data/tramp")
+  (tramp-default-method "ssh")
+  (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
+  :config
+  (put 'temporary-file-directory 'standard-value '("/tmp")))
+(use-package tramp-sh
+  :custom
+  (tramp-ssh-controlmaster-options
+   (concat
+    "-o ControlPath=~/.ssh/sockets/%%u@%%h:%%p "
+    "-o ControlMaster=auto -o ControlPersist=yes"))
+  :config
+  (add-to-list 'tramp-remote-path "~/bin"))
 (use-package uniquify
   :defer t
   :custom
