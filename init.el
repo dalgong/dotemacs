@@ -19,8 +19,7 @@
       (package-install p))))
 
 (defvar use-dark-mode t)
-(defvar completion-framework 'icomplete)      ; '(ivy helm ido icomplete)
-(defvar shell-variant 'shell)           ; '(eshell shell)
+(defvar completion-framework 'ivy)      ; '(ivy helm)
 
 (eval-when-compile
   (require 'use-package nil t)
@@ -663,29 +662,6 @@
   :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
 (use-package elfeed
   :bind (("C-x !" . elfeed)))
-(use-package eshell
- :if (eq shell-variant 'eshell)
- :bind (("C-`"  . eshell)
-        ("C-\\" . eshell)
-        ("C-;"  . eshell))
- :hook (eshell-mode . eshell-smart-initialize)
- :custom
- (helm-show-completion-display-function #'helm-show-completion-default-display-function)
- (eshell-hist-ignoredups t)
- :config
- (require 'em-smart)
- (advice-add 'eshell-list-history :override 'helm-eshell-history)
- (advice-add 'eshell-source-file :around
-             (defun source-bash-if-shell (o file &rest args)
-               (if (string-match "[.]sh\\'" file)
-                   (throw 'eshell-replace-command
-                          (eshell-parse-command
-                           "/bin/bash"
-                           (list "-c" (concat ". " (mapconcat #'identity (cons file (car args)) " ")))))
-                 (apply o file args)))))
-(use-package esh-autosuggest
-  :ensure
-  :hook (eshell-mode . esh-autosuggest-mode))
 (use-package evil
   :disabled
   :ensure
@@ -889,69 +865,6 @@
   :custom
   (ibuffer-expert t)
   (ibuffer-show-empty-filter-groups nil))
-(use-package icomplete
-  :if (eq completion-framework 'icomplete)
-  :hook (after-init . fido-mode))
-(use-package icomplete-vertical
-  :disabled
-  :if (eq completion-framework 'icomplete)
-  :ensure
-  :hook (after-init . icomplete-vertical-mode)
-  :bind (:map icomplete-minibuffer-map
-              ("<down>" . icomplete-forward-completions)
-              ("C-n" . icomplete-forward-completions)
-              ("<up>" . icomplete-backward-completions)
-              ("C-p" . icomplete-backward-completions)
-              ("C-v" . icomplete-vertical-toggle)))
-(use-package ido
-  :if (eq completion-framework 'ido)
-  :custom
-  (ido-auto-merge-work-directories-length -1)
-  (ido-auto-merge-delay-time 999999)
-  (ido-create-new-buffer 'always)
-  (ido-enable-flex-matching t)
-  (ido-enable-tramp-completion nil)
-  ;; (ido-everywhere t)
-  (ido-mode t)
-  (ido-max-file-prompt-width 0.15)
-  (ido-work-directory-match-only t)
-  (ido-record-ftp-work-directories nil)
-  ;; (ido-use-faces t)
-  (ido-use-filename-at-point nil)
-  (ido-use-url-at-point nil)
-  (ido-use-virtual-buffers t)
-  :config
-  (ido-mode 1)
-  (advice-add 'ido-switch-buffer :around
-              (defun ido-switch-buffer-maybe-other-window (o &rest args)
-                (if current-prefix-arg
-                    (call-interactively 'ido-switch-buffer-other-window)
-                  (apply o args))))
-  (advice-add 'ido-init-completion-maps :after
-              (defun override-next-prev-keys-with-C-n/p (&rest _)
-                (bind-keys :map ido-common-completion-map
-                           ("C-n" . ido-next-match)
-                           ("C-p" . ido-prev-match))))
-  (defun ido-fallback-to-helm-file ()
-    (interactive)
-    (ido-fallback-command 'helm-find-files))
-  (defun ido-fallback-to-helm-buffer ()
-    (interactive)
-    (ido-fallback-command 'helm-buffers-list))
-  (defun ido-fallback-to-ffap ()
-    (interactive)
-    (ido-fallback-command 'ffap))
-  (bind-keys :map ido-common-completion-map
-             ("M-."   . ido-fallback-to-ffap)
-             :map ido-file-dir-completion-map
-             ("M-P"   . ido-fallback-to-helm-file)
-             :map ido-buffer-completion-map
-             ("M-P"   . ido-fallback-to-helm-buffer))
-  (use-package flx-ido
-    :ensure
-    :after ido
-    :config
-    (flx-ido-mode 1)))
 (use-package iedit
   :ensure
   :bind (:map mode-specific-map
@@ -1250,8 +1163,6 @@
   :custom
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 300))
-(use-package remind-bindings
-  :bind (:map help-map ("C-k" . remind-bindings-togglebuffer)))
 (use-package racer
   :ensure
   :bind (:map rust-mode-map ("C-h d" . racer-describe))
@@ -1298,7 +1209,6 @@
   :custom
   (save-place-forget-unreadable-files nil))
 (use-package shell
-  :if (eq shell-variant 'shell)
   :bind (:map shell-mode-map
               ([remap read-only-mode] . shell-toggle-compile-mode)
               ("M-T" . counsel-switch-to-shell-buffer))
@@ -1383,7 +1293,8 @@
   :hook (after-init . which-key-mode)
   :diminish which-key-mode
   :custom
-  (which-key-idle-delay 1))
+  (which-key-idle-delay 1)
+  (which-key-popup-type 'minibuffer))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
@@ -1424,74 +1335,58 @@
             (remove 'ansi-color-process-output comint-output-filter-functions))
       (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t))))
 
-(if use-dark-mode
-    (progn (custom-set-variables
-            '(frame-background-mode 'dark))
-           (custom-set-faces
-            '(header-line        ((t (:inherit mode-line))))
-            '(mode-line          ((t (:foreground "#3f3f3f" :background "#dcdccc" :box nil))))
-            '(mode-line-inactive ((t (:foreground "grey20" :background "grey30" :box nil))))
-            '(region             ((t (:background "#6f6f6f"))))
-            '(vertical-border    ((t (:foreground "grey30" :background "grey30" :box nil))))
-            '(hl-line                  ((t (:background "#4f4f4f"))))
-            '(line-number-current-line ((t (:inherit hl-line))))
-            '(diff-added                  ((t :foreground "green"  :background "gray10")))
-            '(diff-removed                ((t :foreground "yellow" :background "gray10")))
-            '(ediff-current-diff-A        ((t :background "gray20" :inherit diff-added)))
-            '(ediff-current-diff-B        ((t :background "gray20" :inherit diff-added)))
-            '(ediff-current-diff-C        ((t :background "gray20" :inherit diff-added)))
-            '(ediff-current-diff-Ancestor ((t :background "gray20" :inherit diff-added)))
-            '(ediff-fine-diff-A           ((t :background "gray30" :inherit diff-added)))
-            '(ediff-fine-diff-B           ((t :background "gray30" :inherit diff-added)))
-            '(ediff-fine-diff-C           ((t :background "gray30" :inherit diff-added)))
-            '(ediff-fine-diff-Ancestor    ((t :background "gray30" :inherit diff-added)))
-            '(ediff-even-diff-A           ((t :background "gray10")))
-            '(ediff-even-diff-B           ((t :background "gray10")))
-            '(ediff-even-diff-C           ((t :background "gray10")))
-            '(ediff-even-diff-Ancestor    ((t :background "gray10")))
-            '(ediff-odd-diff-A            ((t :background "gray15")))
-            '(ediff-odd-diff-B            ((t :background "gray15")))
-            '(ediff-odd-diff-C            ((t :background "gray15")))
-            '(ediff-odd-diff-Ancestor     ((t :background "gray15")))
-            '(diff-refine-added           ((t :background "gray30" :bold t :inherit diff-added)))
-            '(diff-refine-change          ((t :background "gray30" :bold t :inherit diff-changed)))
-            '(diff-refine-removed         ((t :background "gray30" :bold t :inherit diff-removed)))
-            '(ivy-current-match ((t (:inherit secondary-selection))))
-            '(helm-ff-prefix                   ((t :inherit dired-header)))
-            '(helm-ff-executable               ((t :inherit dired-perm-write)))
-            '(helm-ff-suid                     ((t :inherit dired-set-id)))
-            '(helm-ff-directory                ((t :inherit dired-directory)))
-            '(helm-ff-dotted-directory         ((t :inherit helm-ff-directory)))
-            '(helm-ff-dotted-symlink-directory ((t :inherit helm-ff-symlink)))
-            '(helm-ff-symlink                  ((t :inherit dired-symlink)))
-            '(helm-ff-invalid-symlink          ((t :inherit error)))
-            '(helm-ff-denied                   ((t :inherit error)))
-            '(helm-ff-file                     ((t :inherit default)))
-            '(helm-ff-truename                 ((t :inherit dired-flagged)))
-            '(helm-ff-dirs                     ((t :inherit dired-directory)))
-            '(helm-ff-socket                   ((t :inherit dired-special)))
-            '(helm-ff-pipe                     ((t :inherit dired-special)))
-            '(helm-ff-file-extension           ((t :inherit font-lock-type-face)))
-            '(helm-ff-backup-file              ((t :inherit dired-ignored)))))
-  (custom-set-variables
-   '(frame-background-mode 'light))
-  (custom-set-faces
-   '(header-line        ((t (:inherit mode-line))))
-   '(mode-line          ((t (:background "grey75" :foreground "black" :box nil))))
-   '(mode-line-inactive ((t (:foreground "grey20" :background "grey90" :box nil))))
-   '(vertical-border    ((t (:foreground "grey30" :background "grey90" :box nil))))
-   '(line-number-current-line ((t (:inherit hl-line))))))
-(when (and nil (file-directory-p "~/work/nano-emacs"))
-  ;; git clone https://github.com/rougier/nano-emacs.git
-  (add-hook 'emacs-startup-hook
-            (defun load-nano-emacs-setup ()
-              (add-to-list 'load-path (expand-file-name "~/work/nano-emacs"))
-              (require 'nano-faces)
-              (nano-faces)
-              (if use-dark-mode
-                  (require 'nano-theme-dark)
-                (require 'nano-theme-light))
-              (require 'nano-modeline)
-              (set-face-background 'mode-line 'unspecified)
-              (set-face-background 'mode-line-inactive 'unspecified))))
-;; end of .emacs.el
+(custom-set-variables
+ `(frame-background-mode ',(if use-dark-mode 'dark 'light)))
+(apply #'custom-set-faces
+       (if use-dark-mode
+           '('(header-line        ((t (:inherit mode-line))))
+             '(mode-line          ((t (:foreground "#3f3f3f" :background "#dcdccc" :box nil))))
+             '(mode-line-inactive ((t (:foreground "grey20" :background "grey30" :box nil))))
+             '(region             ((t (:background "#6f6f6f"))))
+             '(vertical-border    ((t (:foreground "grey30" :background "grey30" :box nil))))
+             '(hl-line                  ((t (:background "#4f4f4f"))))
+             '(line-number-current-line ((t (:inherit hl-line))))
+             '(diff-added                  ((t :foreground "green"  :background "gray10")))
+             '(diff-removed                ((t :foreground "yellow" :background "gray10")))
+             '(ediff-current-diff-A        ((t :background "gray20" :inherit diff-added)))
+             '(ediff-current-diff-B        ((t :background "gray20" :inherit diff-added)))
+             '(ediff-current-diff-C        ((t :background "gray20" :inherit diff-added)))
+             '(ediff-current-diff-Ancestor ((t :background "gray20" :inherit diff-added)))
+             '(ediff-fine-diff-A           ((t :background "gray30" :inherit diff-added)))
+             '(ediff-fine-diff-B           ((t :background "gray30" :inherit diff-added)))
+             '(ediff-fine-diff-C           ((t :background "gray30" :inherit diff-added)))
+             '(ediff-fine-diff-Ancestor    ((t :background "gray30" :inherit diff-added)))
+             '(ediff-even-diff-A           ((t :background "gray10")))
+             '(ediff-even-diff-B           ((t :background "gray10")))
+             '(ediff-even-diff-C           ((t :background "gray10")))
+             '(ediff-even-diff-Ancestor    ((t :background "gray10")))
+             '(ediff-odd-diff-A            ((t :background "gray15")))
+             '(ediff-odd-diff-B            ((t :background "gray15")))
+             '(ediff-odd-diff-C            ((t :background "gray15")))
+             '(ediff-odd-diff-Ancestor     ((t :background "gray15")))
+             '(diff-refine-added           ((t :background "gray30" :bold t :inherit diff-added)))
+             '(diff-refine-change          ((t :background "gray30" :bold t :inherit diff-changed)))
+             '(diff-refine-removed         ((t :background "gray30" :bold t :inherit diff-removed)))
+             '(ivy-current-match ((t (:inherit secondary-selection))))
+             '(helm-ff-prefix                   ((t :inherit dired-header)))
+             '(helm-ff-executable               ((t :inherit dired-perm-write)))
+             '(helm-ff-suid                     ((t :inherit dired-set-id)))
+             '(helm-ff-directory                ((t :inherit dired-directory)))
+             '(helm-ff-dotted-directory         ((t :inherit helm-ff-directory)))
+             '(helm-ff-dotted-symlink-directory ((t :inherit helm-ff-symlink)))
+             '(helm-ff-symlink                  ((t :inherit dired-symlink)))
+             '(helm-ff-invalid-symlink          ((t :inherit error)))
+             '(helm-ff-denied                   ((t :inherit error)))
+             '(helm-ff-file                     ((t :inherit default)))
+             '(helm-ff-truename                 ((t :inherit dired-flagged)))
+             '(helm-ff-dirs                     ((t :inherit dired-directory)))
+             '(helm-ff-socket                   ((t :inherit dired-special)))
+             '(helm-ff-pipe                     ((t :inherit dired-special)))
+             '(helm-ff-file-extension           ((t :inherit font-lock-type-face)))
+             '(helm-ff-backup-file              ((t :inherit dired-ignored))))
+         '(custom-set-faces
+           '(header-line        ((t (:inherit mode-line))))
+           '(mode-line          ((t (:background "grey75" :foreground "black" :box nil))))
+           '(mode-line-inactive ((t (:foreground "grey20" :background "grey90" :box nil))))
+           '(vertical-border    ((t (:foreground "grey30" :background "grey90" :box nil))))
+           '(line-number-current-line ((t (:inherit hl-line)))))))
