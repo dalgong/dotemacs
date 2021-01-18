@@ -18,9 +18,6 @@
       (package-refresh-contents)
       (package-install p))))
 
-(defvar use-dark-mode t)
-(defvar completion-framework 'ivy)      ; '(ivy helm)
-
 (eval-when-compile
   (require 'use-package nil t)
   (require 'bind-key nil t)
@@ -660,6 +657,8 @@
     (ediff-window-setup-function #'ediff-setup-windows-plain)))
 (use-package eldoc
   :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
+(use-package electric-pair
+  :hook (after-init . electric-pair-mode))
 (use-package elfeed
   :bind (("C-x !" . elfeed)))
 (use-package evil
@@ -714,8 +713,16 @@
   :ensure
   :bind (:map help-map ("C-_" . goto-last-change)))
 (use-package helm
-  :if (eq completion-framework 'helm)
-  :ensure)
+  :disabled
+  :ensure
+  :hook (after-init . helm-mode)
+  :bind (("M-T"       . helm-semantic-or-imenu)
+         ("M-y"       . helm-show-kill-ring)
+         ("M-x"       . helm-M-x)
+         ([remap find-file] . helm-find-files)
+         ([remap switch-to-buffer] . helm-mini)
+         :map mode-specific-map
+         ("g"         . helm-rg)))
 (use-package helm-mode
   :diminish
   :hook ((helm-after-initialize . helm-hide-mode-line))
@@ -732,15 +739,15 @@
          ("M-["       . helm-enlarge-window)
            
          :map help-map
-         ("SPC"       . helm-all-mark-rings)
-         ("/"         . helm-dabbrev)
-         ("C-z"       . helm-toggle-suspend-update)
-         ("a"         . helm-apropos)
-         ("b"         . helm-descbinds)
-         ("g"         . helm-google-suggest)
-         ("o"         . helm-top)
-         ("q"         . helm-regexp)
-         ("r"         . helm-register)
+         ;; ("SPC"       . helm-all-mark-rings)
+         ;; ("/"         . helm-dabbrev)
+         ;; ("C-z"       . helm-toggle-suspend-update)
+         ;; ("a"         . helm-apropos)
+         ;; ("b"         . helm-descbinds)
+         ;; ("g"         . helm-google-suggest)
+         ;; ("o"         . helm-top)
+         ;; ("q"         . helm-regexp)
+         ;; ("r"         . helm-register)
          ("z"         . helm-resume)
 
          :map isearch-mode-map
@@ -770,30 +777,18 @@
   (helm-selection ((t :inherit hl-line)))
   (helm-selection-line ((t :inherit hl-line)))
   :config
-  (when (eq completion-framework 'helm)
-    (helm-mode t)
-    (bind-keys
-     ("M-T"       . helm-semantic-or-imenu)
-     ("M-y"       . helm-show-kill-ring)
-     ("M-x"       . helm-M-x)
-     ([remap find-file] . helm-find-files)
-     ([remap switch-to-buffer] . helm-mini)
-     :map mode-specific-map
-     ("g"         . helm-rg)))
   (fset 'helm-display-mode-line #'ignore)
   (defun helm-hide-mode-line ()
     (with-current-buffer helm-buffer
-      (setq-local mode-line-format nil)))
-  (when (eq completion-framework 'helm)
-    (add-hook 'after-init-hook #'helm-mode)))
+      (setq-local mode-line-format nil))))
 (use-package helm-dash
-  :if (eq completion-framework 'helm)
+  :disabled
   :ensure
   :bind (:map help-map (("d" . helm-dash)))
   :custom
   (dash-docs-browser-func 'eww))
 (use-package helm-files
-  :if (eq completion-framework 'helm)
+  :disabled
   :bind (([remap find-file] . helm-find-files)
          :map ctl-x-map
          ("C-r"   . helm-recentf)
@@ -834,26 +829,25 @@
             :ff-transformer-show-only-basename nil
             :case-fold-search helm-file-name-case-fold-search))))
 (use-package helm-rtags
-  :if (eq completion-framework 'helm)
+  :disabled
   :custom
   (rtags-display-result-backend 'helm))
 (use-package helm-swoop
-  :if (eq completion-framework 'helm)
+  :disabled
   :ensure
-  :bind (:map help-map
-         ("C-SPC"   . helm-swoop)
-         ("M-,"     . helm-swoop-back-to-last-point)
-         :map isearch-mode-map
-         ("M-i"     . helm-swoop-from-isearch))
-  :config
-  (bind-keys :map helm-swoop-map
-             ("C-r"     . helm-previous-line)
-             ("C-s"     . helm-next-line)
-             :map helm-multi-swoop-map
-             ("C-r"     . helm-previous-line)
-             ("C-s"     . helm-next-line)))
+  :bind ( :map help-map
+          ("C-SPC"   . helm-swoop)
+          ("M-,"     . helm-swoop-back-to-last-point)
+          :map isearch-mode-map
+          ("M-i"     . helm-swoop-from-isearch)
+          :map helm-swoop-map
+          ("C-r"     . helm-previous-line)
+          ("C-s"     . helm-next-line)
+          :map helm-multi-swoop-map
+          ("C-r"     . helm-previous-line)
+          ("C-s"     . helm-next-line)))
 (use-package helm-xref
-  :if (eq completion-framework 'helm)
+  :disabled
   :ensure)
 (use-package hl-line
   :hook ((prog-mode conf-mode compilation-mode) . hl-line-mode)
@@ -896,7 +890,6 @@
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
 (use-package ivy
-  :if (eq completion-framework 'ivy)
   :ensure
   :diminish
   :hook (after-init . ivy-mode)
@@ -948,11 +941,9 @@
               :key #'car)
   (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-arrow))
 (use-package ivy-hydra
-  :if (eq completion-framework 'ivy)
   :ensure
   :after ivy)
 (use-package counsel
-  :if (eq completion-framework 'ivy)
   :ensure
   :diminish
   :hook (after-init . counsel-mode)
@@ -1052,7 +1043,6 @@
              (find-file-read-args "Find file: "
                                   (confirm-nonexistent-file-or-buffer))))))
 (use-package swiper
-  :if (eq completion-framework 'ivy)
   :ensure
   :bind (:map isearch-mode-map
          ("M-s s" . swiper-isearch-toggle)
@@ -1086,16 +1076,14 @@
       (swiper-all query))))
 (use-package ivy-rich
   :disabled
-  :if (eq completion-framework 'ivy)
   :ensure
   :hook (after-init . ivy-rich-mode))
 (use-package ivy-rtags
-  :if (eq completion-framework 'ivy)
+  :ensure
   :after rtags
   :custom
   (rtags-display-result-backend 'ivy))
 (use-package ivy-xref
-  :if (eq completion-framework 'ivy)
   :ensure
   :after xref
   :custom
@@ -1241,6 +1229,8 @@
 (use-package smex
   :ensure
   :hook (after-init . smex-initialize))
+(use-package so-long
+  :hook (after-init . global-so-long-mode))
 (eval-and-compile
   (defmacro use-package-when (pkg cond &rest body)
     `(use-package ,pkg
@@ -1335,58 +1325,3 @@
             (remove 'ansi-color-process-output comint-output-filter-functions))
       (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t))))
 
-(custom-set-variables
- `(frame-background-mode ',(if use-dark-mode 'dark 'light)))
-(apply #'custom-set-faces
-       (if use-dark-mode
-           '('(header-line        ((t (:inherit mode-line))))
-             '(mode-line          ((t (:foreground "#3f3f3f" :background "#dcdccc" :box nil))))
-             '(mode-line-inactive ((t (:foreground "grey20" :background "grey30" :box nil))))
-             '(region             ((t (:background "#6f6f6f"))))
-             '(vertical-border    ((t (:foreground "grey30" :background "grey30" :box nil))))
-             '(hl-line                  ((t (:background "#4f4f4f"))))
-             '(line-number-current-line ((t (:inherit hl-line))))
-             '(diff-added                  ((t :foreground "green"  :background "gray10")))
-             '(diff-removed                ((t :foreground "yellow" :background "gray10")))
-             '(ediff-current-diff-A        ((t :background "gray20" :inherit diff-added)))
-             '(ediff-current-diff-B        ((t :background "gray20" :inherit diff-added)))
-             '(ediff-current-diff-C        ((t :background "gray20" :inherit diff-added)))
-             '(ediff-current-diff-Ancestor ((t :background "gray20" :inherit diff-added)))
-             '(ediff-fine-diff-A           ((t :background "gray30" :inherit diff-added)))
-             '(ediff-fine-diff-B           ((t :background "gray30" :inherit diff-added)))
-             '(ediff-fine-diff-C           ((t :background "gray30" :inherit diff-added)))
-             '(ediff-fine-diff-Ancestor    ((t :background "gray30" :inherit diff-added)))
-             '(ediff-even-diff-A           ((t :background "gray10")))
-             '(ediff-even-diff-B           ((t :background "gray10")))
-             '(ediff-even-diff-C           ((t :background "gray10")))
-             '(ediff-even-diff-Ancestor    ((t :background "gray10")))
-             '(ediff-odd-diff-A            ((t :background "gray15")))
-             '(ediff-odd-diff-B            ((t :background "gray15")))
-             '(ediff-odd-diff-C            ((t :background "gray15")))
-             '(ediff-odd-diff-Ancestor     ((t :background "gray15")))
-             '(diff-refine-added           ((t :background "gray30" :bold t :inherit diff-added)))
-             '(diff-refine-change          ((t :background "gray30" :bold t :inherit diff-changed)))
-             '(diff-refine-removed         ((t :background "gray30" :bold t :inherit diff-removed)))
-             '(ivy-current-match ((t (:inherit secondary-selection))))
-             '(helm-ff-prefix                   ((t :inherit dired-header)))
-             '(helm-ff-executable               ((t :inherit dired-perm-write)))
-             '(helm-ff-suid                     ((t :inherit dired-set-id)))
-             '(helm-ff-directory                ((t :inherit dired-directory)))
-             '(helm-ff-dotted-directory         ((t :inherit helm-ff-directory)))
-             '(helm-ff-dotted-symlink-directory ((t :inherit helm-ff-symlink)))
-             '(helm-ff-symlink                  ((t :inherit dired-symlink)))
-             '(helm-ff-invalid-symlink          ((t :inherit error)))
-             '(helm-ff-denied                   ((t :inherit error)))
-             '(helm-ff-file                     ((t :inherit default)))
-             '(helm-ff-truename                 ((t :inherit dired-flagged)))
-             '(helm-ff-dirs                     ((t :inherit dired-directory)))
-             '(helm-ff-socket                   ((t :inherit dired-special)))
-             '(helm-ff-pipe                     ((t :inherit dired-special)))
-             '(helm-ff-file-extension           ((t :inherit font-lock-type-face)))
-             '(helm-ff-backup-file              ((t :inherit dired-ignored))))
-         '(custom-set-faces
-           '(header-line        ((t (:inherit mode-line))))
-           '(mode-line          ((t (:background "grey75" :foreground "black" :box nil))))
-           '(mode-line-inactive ((t (:foreground "grey20" :background "grey90" :box nil))))
-           '(vertical-border    ((t (:foreground "grey30" :background "grey90" :box nil))))
-           '(line-number-current-line ((t (:inherit hl-line)))))))
