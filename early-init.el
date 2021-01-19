@@ -43,9 +43,9 @@
   (custom-set-variables
    `(frame-background-mode 'dark))
   (custom-set-faces
-   '(mode-line          ((t :background "grey75" :foreground "black" :box nil)))
-   '(mode-line-inactive ((t :foreground "grey20" :background "grey90" :box nil)))
-   '(vertical-border    ((t :foreground "grey30" :background "grey90" :box nil)))
+   '(mode-line          ((t :foreground "#3f3f3f" :background "#dcdccc" :box nil)))
+   '(mode-line-inactive ((t :foreground "grey20" :background "grey30" :box nil)))
+   '(vertical-border    ((t :foreground "grey30" :background "grey30" :box nil)))
    '(header-line                 ((t :inherit mode-line)))
    '(line-number-current-line    ((t :inherit hl-line)))
    '(region                      ((t :background "#6f6f6f")))
