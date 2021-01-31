@@ -6,9 +6,7 @@
                               (background-mode  . dark)
                               (background-color . "#3f3f3f")
                               (foreground-color . "#dcdccc")
-                              ,@(if (eq system-type 'darwin)
-                                    nil
-                                  '((menu-bar-lines . 0)))
+                              (menu-bar-lines . 0)
                               (tool-bar-lines . 0)
                               (vertical-scroll-bars . nil)
                               (alpha            . (100 95))

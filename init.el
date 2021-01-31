@@ -42,12 +42,15 @@
   (auto-window-vscroll nil)
   (backup-by-copying t)
   (backup-directory-alist '(("." . "~/.cache/emacs/backups")))
-  (bidi-display-reordering nil)
+  (bidi-display-reordering 'left-to-right)
   (bidi-inhibit-bpa t)
   (bidi-paragraph-direction 'left-to-right)
   (blink-matching-paren t)
   (calc-display-trail nil)
+  (completion-styles '(initials partial-completion flex))
+  (completion-cycle-threshold 10)
   (create-lockfiles nil)
+  (cursor-in-non-selected-windows nil)
   (delete-old-versions t)
   (disabled-command-function nil)
   (display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)
@@ -57,15 +60,19 @@
   (eval-expression-print-level nil)    
   (even-window-heights nil)
   (fast-but-imprecise-scrolling t)
+  (ffap-machine-p-known 'reject)
   (fit-window-to-buffer-horizontally t)
   (font-lock-maximum-decoration '((c-mode . 2) (c++-mode . 2) (t . t)))
+  (frame-inhibit-implied-resize t) 
   (frame-resize-pixelwise t)
+  (hscroll-margin 2)
+  (hscroll-step 1)
   (help-char ?^)
   (history-length 1000)
-  (completion-styles '(initials partial-completion flex))
-  (completion-cycle-threshold 10)
+  (highlight-nonselected-windows nil)
   (idle-update-delay 1)
   (indent-tabs-mode nil)
+  (inhibit-compacting-font-caches t)
   (inhibit-startup-screen t)
   (initial-scratch-message nil)
   (kill-buffer-query-functions nil)
@@ -77,6 +84,8 @@
   (mac-right-option-modifier nil)
   (mark-even-if-inactive t)
   (max-mini-window-height 0.15)
+  (minibuffer-prompt-properties
+   '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
   (mode-line-client '(""))
   (mode-line-modified '("%* "))
   (mode-line-remote '(""))
@@ -103,9 +112,10 @@
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 1024 1024))
+  (redisplay-skip-fontification-on-input t)
   (resize-mini-windows 'grow-only)
   (ring-bell-function 'ignore)
-  (scroll-conservatively 1)
+  (scroll-conservatively 101)
   (scroll-preserve-screen-position t)
   (scroll-margin 0)
   (scroll-step 1)
@@ -113,7 +123,7 @@
   (sentence-end-double-space nil)
   (shell-command-switch "-lc")  
   (split-height-threshold nil)
-  (split-width-threshold nil)
+  (split-width-threshold 160)
   (suggest-key-bindings nil)
   (tab-always-indent 'complete)
   (truncate-lines t)
@@ -121,8 +131,13 @@
   (use-package-compute-statistics nil)
   (vc-follow-symlinks t)
   (version-control t)
+  (visible-bell nil)
+  (x-underline-at-descent-line t)
   (x-selection-timeout 100)
-  (window-resize-pixelwise t)
+  (window-divider-default-places t)
+  (window-divider-default-bottom-width 1)
+  (window-divider-default-right-width 1)
+  (window-resize-pixelwise nil)
   :hook (after-init . find-function-setup-keys)
   :bind (([C-tab]              . other-window)
          ([C-up]               . windmove-up)
@@ -414,6 +429,7 @@
   :custom
   (comint-buffer-maximum-size 10240)
   (comint-move-point-for-output nil)
+  (comint-prompt-read-only t)
   (comint-scroll-to-bottom-on-input nil)
   :config
   ;; (add-hook 'comint-output-filter-functions 'comint-watch-for-password-prompt)
@@ -471,8 +487,7 @@
   (compilation-always-kill t)
   (compilation-ask-about-save nil)
   (compilation-save-buffers-predicate (lambda ()))
-  ;; non-nil significantly slows down emacs
-  (compilation-scroll-output nil)
+  (compilation-scroll-output 'first-error)
   (completion-auto-help 'lazy)
   (completion-styles '(partial-completion initials))
   (completion-pcm-complete-word-inserts-delimiters t)
@@ -657,7 +672,7 @@
     (ediff-window-setup-function #'ediff-setup-windows-plain)))
 (use-package eldoc
   :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
-(use-package electric-pair
+(use-package elec-pair
   :hook (after-init . electric-pair-mode))
 (use-package elfeed
   :bind (("C-x !" . elfeed)))
@@ -687,7 +702,10 @@
 (use-package gcmh
   :ensure
   :diminish
-  :hook (after-init . gcmh-mode))
+  :hook (after-init . gcmh-mode)
+  :custom
+  (gcmh-idle-delay 5)
+  (gcmh-high-cons-threshold (* 16 1024 1024)))
 (use-package go-mode
   :ensure
   :custom
