@@ -550,6 +550,10 @@
   (defun compilation-toggle-shell-mode ()
     (interactive) (setq buffer-read-only nil)
     (shell-mode)))
+(use-package compiler-explorer
+  :ensure
+  :bind (:map help-map
+              ("C-c" . compiler-explorer)))
 (use-package cua-base
   :hook (after-init . cua-mode)
   :custom
