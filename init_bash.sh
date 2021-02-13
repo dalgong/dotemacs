@@ -1,6 +1,1 @@
-bak=$PS1; PS1=; # -*- mode: shell-script -*-                                                                                                     
-export EDITOR='emacsclient'
-export PAGER=cat
-export TERM=xterm-256color
-
-PS1=$bak
+export EDITOR='emacsclient' PAGER=cat TERM=xterm-256color
