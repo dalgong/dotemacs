@@ -1458,6 +1458,28 @@
   :ensure
   :diminish
   :hook (after-init . volatile-highlights-mode))
+(use-package vterm
+  :custom
+  (shell-pop-shell-type '("vterm" "*vterm*" #'vterm))
+  :commands vterm
+  :config
+  (advice-add 'counsel-yank-pop-action :around #'vterm-counsel-yank-pop-action)
+  (defun vterm-counsel-yank-pop-action (o &rest args)
+    (if (equal major-mode 'vterm-mode)
+        (let ((inhibit-read-only t)
+              (yank-undo-function (lambda (&rest _) (vterm-undo))))
+          (cl-letf (((symbol-function 'insert-for-yank)
+                     (lambda (str) (vterm-send-string str t))))
+            (apply o args)))
+      (apply o args)))
+  (advice-add 'counsel-find-file :before #'vterm-directory-sync)
+  (defun vterm-directory-sync (&rest _)
+    "Synchronize current working directory."
+    (interactive)
+    (when vterm--process
+      (let* ((pid (process-id vterm--process))
+             (dir (file-truename (format "/proc/%d/cwd/" pid))))
+        (setq default-directory dir)))))
 (use-package which-key
   :ensure
   :hook (after-init . which-key-mode)
