@@ -188,7 +188,7 @@
          ("q"                  . delete-other-window)
          ("r"                  . replace-regexp)
          ("s"                  . replace-string)
-         ("u"                  . rename-uniquely)           
+         ("u"                  . rename-uniquely)
          ("D"                  . toggle-debug-on-error)
          ("E"                  . erase-buffer)
          ("x"                  . shell-command)
@@ -921,11 +921,11 @@
     :ensure))
 (when (eq j:completion-ui 'icomplete)
   (use-package icomplete 
-    :if (eq completion-framework 'icomplete)
+    :if (eq j:completion-ui 'icomplete)
     :hook (after-init . fido-mode))
   (use-package icomplete-vertical
     :disabled
-    :if (eq completion-framework 'icomplete)
+    :if (eq j:completion-ui 'icomplete)
     :ensure
     :hook (after-init . icomplete-vertical-mode)
     :bind (:map icomplete-minibuffer-map
@@ -1184,7 +1184,6 @@
     :ensure
     :after xref
     :custom
-    (xref-search-program 'ripgrep)
     (xref-show-xrefs-function 'ivy-xref-show-xrefs)
     (xref-show-definitions-function #'ivy-xref-show-defs)))
 (when (eq j:completion-ui 'selectrum)
@@ -1282,15 +1281,16 @@
                 ("!" . consult-flycheck)))
   (use-package marginalia
     :ensure
+    :custom
+    (marginalia-annotators
+     '(marginalia-annotators-heavy marginalia-annotators-light nil))
     :hook (after-init . marginalia-mode))
   (use-package embark
     :ensure
-    :bind (:map minibuffer-local-map
-                ("C-o" . embark-act)
-                ("C-M-o" . embark-act-noquit)
-           :map selectrum-minibuffer-map
-                ("C-o" . embark-act)
-                ("C-M-o" . embark-act-noquit))
+    :bind ( :map minibuffer-local-map
+            ("M-SPC" . embark-act)
+            :map selectrum-minibuffer-map
+            ("M-SPC" . embark-act))
     :custom
     (embark-action-indicator
      (lambda (map _target)
@@ -1302,7 +1302,12 @@
       "Run action but don't quit the minibuffer afterwards."
       (interactive)
       (let ((embark-quit-after-action nil))
-        (embark-act))))
+        (embark-act)))
+    (advice-add #'just-one-space :around
+                (defun embark-act-if-feasible (o &rest args)
+                  (if (car (embark--target))
+                      (call-interactively 'embark-act)
+                    (apply o args)))))
   (use-package embark-consult
     :ensure
     :after (embark consult)
@@ -1335,6 +1340,7 @@
               ("l" . org-store-link)
               ("a" . org-agenda)
               ("c" . org-capture)
+              ("C" . org-goto-calendar)
               :map org-mode-map
               ("C-TAB" . nil)
               ("C-c ;" . nil))
@@ -1544,7 +1550,10 @@
   (xref-prompt-for-identifier '(not xref-find-definitions
                                     xref-find-definitions-other-window
                                     xref-find-definitions-other-frame
-                                    xref-find-references)))
+                                    xref-find-references))
+  (xref-search-program 'ripgrep)
+  (xref-show-xrefs-function 'xref-show-definitions-completing-read)
+  (xref-show-definitions-function 'xref-show-definitions-completing-read))
 (use-package xterm-color
   :ensure
   :after shell
