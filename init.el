@@ -1247,6 +1247,7 @@
            ("l" . consult-line)
            ("m" . consult-multi-occur)
            ("o" . consult-line-symbol-at-point)
+           ("O" . consult-focus-lines-symbol-at-point)
            ("k" . consult-keep-lines)
            ("u" . consult-focus-lines)
            ("e" . consult-isearch)
@@ -1268,7 +1269,13 @@
         (apply o args)))
     (defun consult-line-symbol-at-point ()
       (interactive)
-      (consult-line (thing-at-point 'symbol))))
+      (consult-line (thing-at-point 'symbol)))
+    (defun consult-focus-lines-symbol-at-point ()
+      (interactive)
+      (consult-focus-lines
+       nil
+       (consult--completion-filter 'consult-location nil)
+       (thing-at-point 'symbol))))
   (use-package consult-flycheck
     :ensure
     :bind (:map flycheck-command-map
