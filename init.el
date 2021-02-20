@@ -1207,22 +1207,27 @@
            ("M-T" . consult-imenu)
 
            :map help-map
-           ("a" . consult-apropos)
-           ("SPC" . consult-mark)
+           ("a"     . consult-apropos)
+           ("C-m"   . consult-man)
+           ("SPC"   . consult-mark)
            ("C-SPC" . consult-global-mark)
+           ("x"     . consult-minor-mode-menu)
+           ("X"     . consult-mode-command)
 
            :map mode-specific-map
            ("h" . consult-history)
            ("b" . consult-bookmark)
            ("g" . consult-ripgrep)
-           ("C-g" . consult-git-grep)
+           ("G" . consult-git-grep)
+           ("C-g" . consult-grep)
            ("k" . consult-kmacro)
            ("m" . consult-mode-command)
 
            :map ctl-x-map
            ("M-:" . consult-complex-command)
-           ("b" . consult-buffer)
-           ("C-r"   . consult-recent-file)
+           ("b"   . consult-buffer)
+           ("C-r" . consult-recent-file)
+           ("`"   . consult-compile-error)
 
            :map ctl-x-4-map
            ("b" . consult-buffer-other-window)
@@ -1238,8 +1243,10 @@
            ("e" . consult-error)
            :map search-map
            ("f" . consult-find)
+           ("g" . consult-grep)
            ("l" . consult-line)
            ("m" . consult-multi-occur)
+           ("o" . consult-line-symbol-at-point)
            ("k" . consult-keep-lines)
            ("u" . consult-focus-lines)
            ("e" . consult-isearch)
@@ -1258,7 +1265,10 @@
     (defun maybe-start-consult-mark (o &rest args)
       (if (eq last-command 'pop-to-mark-command)
           (consult-mark)
-        (apply o args))))
+        (apply o args)))
+    (defun consult-line-symbol-at-point ()
+      (interactive)
+      (consult-line (thing-at-point 'symbol))))
   (use-package consult-flycheck
     :ensure
     :bind (:map flycheck-command-map
@@ -1469,6 +1479,7 @@
   :diminish
   :hook (after-init . volatile-highlights-mode))
 (use-package vterm
+  :disabled
   :custom
   (shell-pop-shell-type '("vterm" "*vterm*" #'vterm))
   :commands vterm
@@ -1536,4 +1547,3 @@
       (setq comint-output-filter-functions
             (remove 'ansi-color-process-output comint-output-filter-functions))
       (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t))))
-
