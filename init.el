@@ -1278,7 +1278,10 @@
     :hook (after-init . marginalia-mode))
   (use-package embark
     :ensure
-    :bind (:map selectrum-minibuffer-map
+    :bind (:map minibuffer-local-map
+                ("C-o" . embark-act)
+                ("C-M-o" . embark-act-noquit)
+           :map selectrum-minibuffer-map
                 ("C-o" . embark-act)
                 ("C-M-o" . embark-act-noquit))
     :custom
