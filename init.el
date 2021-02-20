@@ -19,7 +19,7 @@
       (package-install p))))
 
 ;; icomplete ido ivy helm selectrum
-(defvar j:completion-ui 'ivy) 
+(defvar j:completion-ui 'selectrum)
 (eval-when-compile
   (require 'use-package nil t)
   (require 'bind-key nil t)
@@ -469,10 +469,11 @@
   (company-tooltip-align-annotations t)
   :config
   (advice-add 'cua-set-mark :around #'company-complete-dwim)
+  (advice-add 'set-mark-command :around #'company-complete-dwim)
   (defun company-complete-dwim (o &rest args)
     (if (or (not (called-interactively-p 'interactive))
             current-prefix-arg
-            (memq last-command '(cua-set-mark pop-to-mark-command pop-global-mark))
+            (memq last-command '(set-mark-command cua-set-mark pop-to-mark-command pop-global-mark))
             (not (sit-for 0.5)))
         (apply o args)
       (call-interactively 'company-complete))))
@@ -563,6 +564,7 @@
   :bind (:map help-map
               ("C-c" . compiler-explorer)))
 (use-package cua-base
+  :if (not (eq j:completion-ui 'selectrum))
   :hook (after-init . cua-mode)
   :custom
   (cua-delete-selection t)
@@ -645,6 +647,8 @@
   :ensure
   :bind (([remap kill-ring-save]              . easy-kill)
          :map easy-kill-base-map
+         ([remap exchange-point-and-mark] . easy-kill-exchange-point-and-mark)
+         ([remap set-mark]                . easy-kill-mark-region)
          ([remap cua-exchange-point-and-mark] . easy-kill-exchange-point-and-mark)
          ([remap cua-set-mark]                . easy-kill-mark-region)
          ("o" . easy-kill-expand)
@@ -1218,6 +1222,7 @@
            :map ctl-x-map
            ("M-:" . consult-complex-command)
            ("b" . consult-buffer)
+           ("C-r"   . consult-recent-file)
 
            :map ctl-x-4-map
            ("b" . consult-buffer-other-window)
@@ -1248,7 +1253,12 @@
     (consult-preview-key 'any)
     (consult-narrow-key (kbd "C-SPC"))
     :config
-    (advice-add #'register-preview :override #'consult-register-window))
+    (advice-add #'register-preview :override #'consult-register-window)
+    (advice-add #'set-mark-command :around #'maybe-start-consult-mark)
+    (defun maybe-start-consult-mark (o &rest args)
+      (if (eq last-command 'pop-to-mark-command)
+          (consult-mark)
+        (apply o args))))
   (use-package consult-flycheck
     :ensure
     :bind (:map flycheck-command-map
