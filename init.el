@@ -1287,10 +1287,12 @@
     :hook (after-init . marginalia-mode))
   (use-package embark
     :ensure
-    :bind ( :map minibuffer-local-map
-            ("M-SPC" . embark-act)
-            :map selectrum-minibuffer-map
-            ("M-SPC" . embark-act))
+    :after selectrum
+    :bind (([remap just-one-space] . embark-act*)
+           :map minibuffer-local-map
+           ("M-SPC" . embark-act)
+           :map selectrum-minibuffer-map
+           ("M-SPC" . embark-act))
     :custom
     (embark-action-indicator
      (lambda (map _target)
@@ -1303,11 +1305,9 @@
       (interactive)
       (let ((embark-quit-after-action nil))
         (embark-act)))
-    (advice-add #'just-one-space :around
-                (defun embark-act-if-feasible (o &rest args)
-                  (if (car (embark--target))
-                      (call-interactively 'embark-act)
-                    (apply o args)))))
+    (defun embark-act* ()
+      (interactive)
+      (call-interactively (if (car (embark--target)) 'embark-act 'just-one-space))))
   (use-package embark-consult
     :ensure
     :after (embark consult)
