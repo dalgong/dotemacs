@@ -62,13 +62,13 @@
                           ("\\*compilation\\*" display-buffer-in-bottom-window)))
   (enable-recursive-minibuffers t)
   (eval-expression-print-length nil)
-  (eval-expression-print-level nil)    
+  (eval-expression-print-level nil)
   (even-window-heights nil)
   (fast-but-imprecise-scrolling t)
   (ffap-machine-p-known 'reject)
   (fit-window-to-buffer-horizontally t)
   (font-lock-maximum-decoration '((c-mode . 2) (c++-mode . 2) (t . t)))
-  (frame-inhibit-implied-resize t) 
+  (frame-inhibit-implied-resize t)
   (frame-resize-pixelwise t)
   (hscroll-margin 2)
   (hscroll-step 1)
@@ -126,7 +126,7 @@
   (scroll-step 1)
   (select-active-regions nil)
   (sentence-end-double-space nil)
-  (shell-command-switch "-lc")  
+  (shell-command-switch "-lc")
   (split-height-threshold nil)
   (split-width-threshold 160)
   (suggest-key-bindings nil)
@@ -751,10 +751,10 @@
         (if isearch-forward
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
-(use-package selectrum 
+(use-package selectrum
   :ensure
   :bind (:map mode-specific-map
-              ("C-r" . selectrum-repeat)) 
+              ("C-r" . selectrum-repeat))
   :hook (after-init . selectrum-mode)
   :custom
   (selectrum-count-style nil))
@@ -834,7 +834,17 @@
     (consult-focus-lines
      nil
      (consult--completion-filter 'consult-location nil)
-     (thing-at-point 'symbol))))
+     (thing-at-point 'symbol)))
+  (defvar-local consult-toggle-preview-orig nil)
+  (defun consult-toggle-preview ()
+    "Command to enable/disable preview."
+    (interactive)
+    (if consult-toggle-preview-orig
+        (setq consult--preview-function consult-toggle-preview-orig
+              consult-toggle-preview-orig nil)
+      (setq consult-toggle-preview-orig consult--preview-function
+            consult--preview-function #'ignore)))
+  (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
 (use-package consult-flycheck
   :ensure
   :bind (:map flycheck-command-map
@@ -921,7 +931,7 @@
   (org-babel-do-load-languages
    'org-babel-load-languages
    '((dot . t)
-     (emacs-lisp . t) 
+     (emacs-lisp . t)
      (shell . t))))
 (use-package osc52
   :if (getenv "TMUX")
