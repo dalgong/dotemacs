@@ -20,8 +20,7 @@
 
 (eval-when-compile
   (require 'use-package nil t)
-  (require 'bind-key nil t)
-  (require 'key-chord nil t))
+  (require 'bind-key nil t))
 (eval-and-compile
   (defmacro csetq (sym val)
     `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val))
@@ -30,11 +29,7 @@
     `(use-package ,pkg
        ,@(if (eval cond)
              body
-           (cons ':disabled body))))
-  (use-package use-package-chords
-    :ensure
-    :config
-    (key-chord-mode 1)))
+           (cons ':disabled body)))))
 (use-package diminish
   :ensure
   :config
@@ -154,9 +149,10 @@
          ("C-TAB"              . other-window)
          ("C-."                . next-error)
          ("C-,"                . previous-error)
+         ("C-:"                . backward-other-window)
+         ("C-;"                . other-window)
          ("C-RET"              . open-dwim)
          ("M-K"                . kill-this-buffer)
-         ("M-`"                . other-window)
          ("M-o"                . find-file)
          ("M-q"                . fill-paragraph)
          ("RET"                . newline-and-indent)
@@ -191,6 +187,9 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
+  (defun backward-other-window (count &optional all-frames interactive)
+    (interactive "p\ni\np")
+    (other-window (- count) all-frames interactive))
   (advice-add 'display-startup-echo-area-message :override #'ignore)
   (advice-add #'recursive-edit :around #'preseve-window-configuration-if-interactive)
   (advice-add 'split-window-right :after #'call-other-window-if-interactive)
@@ -353,7 +352,6 @@
               ("C-x '" . ahs-change-range)))
 (use-package avy
   :ensure
-  :chords ("''" . avy-goto-char-timer)
   :bind ("C-'" . avy-goto-char-timer)
   :config
   (advice-add 'avy-goto-char-timer :around
@@ -461,8 +459,6 @@
   :diminish compilation-in-progress
   :hook ((compilation-mode . run-before-compile)
          (compilation-filter . apply-xterm-color-filter))
-  :chords (("%%" . compile)
-           ("^^" . recompile))
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
          :map compilation-mode-map
@@ -1011,7 +1007,7 @@
   (advice-add 'read-shell-command :around #'use-region-if-active))
 (use-package shell-pop
   :ensure
-  :chords (("``" . shell-pop))
+  :bind ("C-`" . shell-pop)
   :custom
   (shell-pop-full-span nil))
 (use-package smerge-mode
@@ -1064,6 +1060,7 @@
   :diminish
   :hook (after-init . volatile-highlights-mode))
 (use-package vterm
+  :disabled
   :custom
   (shell-pop-shell-type '("vterm" "*vterm*" #'vterm))
   :commands vterm
