@@ -187,6 +187,13 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
+  (advice-add #'ffap-c++-mode :around
+              (defun search-within-project (o name)
+                (let ((r (funcall o name)))
+                  (unless r
+                    (when-let (d (locate-dominating-file "." name))
+                      (setq r (concat d name))))
+                  r)))
   (defun backward-other-window (count &optional all-frames interactive)
     (interactive "p\ni\np")
     (other-window (- count) all-frames interactive))
@@ -383,7 +390,6 @@
 (use-package cc-mode
   :custom
   (c-electric-flag nil)
-  :bind (:map c-mode-base-map ("TAB" . company-indent-or-complete-common))
   :hook (c-mode-common . set-outline-regexp)
   :config
   (defun set-outline-regexp ()
@@ -434,8 +440,8 @@
   :bind (:map prog-mode-map
          ("C-i"   . company-indent-or-complete-common)
          :map mode-specific-map
-         ("SPC"   . company-complete)
-         ("C-SPC" . company-complete)
+         ("SPC"   . company-manual-begin)
+         ("C-SPC" . company-manual-begin)
          :map company-active-map
          ("C-n" . company-select-next)
          ("C-p" . company-select-previous)
@@ -840,7 +846,8 @@
               consult-toggle-preview-orig nil)
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore)))
-  (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
+  (when (require 'selectrum nil t)
+    (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview)))
 (use-package consult-flycheck
   :ensure
   :bind (:map flycheck-command-map
@@ -1031,7 +1038,6 @@
   :custom
   (tramp-auto-save-directory "~/.cache/emacs/backups")
   (tramp-persistency-file-name "~/.emacs.d/data/tramp")
-  (tramp-default-method "ssh")
   (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
   :config
   (put 'temporary-file-directory 'standard-value '("/tmp")))
