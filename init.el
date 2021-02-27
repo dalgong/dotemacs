@@ -121,6 +121,7 @@
   (scroll-step 1)
   (select-active-regions nil)
   (sentence-end-double-space nil)
+  (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
   (split-height-threshold nil)
   (split-width-threshold 160)
@@ -351,6 +352,9 @@
   (add-hook 'after-make-frame-functions
             (defun adjust-default-color (frame)
               (modify-frame-parameters frame default-frame-alist))))
+(use-package ace-window
+  :ensure
+  :bind ("M-`" . ace-window))
 (use-package auto-highlight-symbol
   :ensure
   :diminish
@@ -486,15 +490,15 @@
     (let* ((proc (get-buffer-process (current-buffer)))
            (end-marker (and proc (process-mark proc))))
       (goto-char compilation-filter-start)
-      (while (search-forward "\033[1A\033[K" end-marker t)
-        (let ((pos (point-at-bol 0)))
+      (while (search-forward "\033[2K" end-marker t)
+        (let ((p (point-at-bol))
+              (cnt 1))
           (save-excursion
-            (goto-char pos)
-            (while (looking-at "^ ")
-              (beginning-of-line 0))
-            (setq pos (point)))
-          (setq compilation-filter-start (min compilation-filter-start pos))
-          (delete-region pos (point))))
+            (while (search-backward "\033[1A" p t)
+              (cl-decf cnt))
+            (setq p (point-at-bol cnt)))
+          (setq compilation-filter-start (min compilation-filter-start p))
+          (delete-region p (point))))
       (goto-char end-marker)
       (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
              (ns (xterm-color-filter s)))
@@ -564,9 +568,9 @@
   :bind (:map diff-mode-map
               ("|" . diffview-current)))
 (use-package dired
-  :bind (("C-x C-j" . dired-jump)
-         :map dired-mode-map
-         ("^" . dired-up-directory-inplace))
+  :bind ( :map dired-mode-map
+          ("^" . dired-up-directory-inplace)
+          ([remap dired-do-find-regexp] . dired-do-multi-occur))
   :custom
   (dired-no-confirm t)
   (dired-use-ls-dired nil)
@@ -576,19 +580,22 @@
   (defun dired-up-directory-inplace ()
     (interactive)
     (find-alternate-file ".."))
+  (defun dired-do-multi-occur (regexp)
+    "Run `dired-do-multi-occur` with REGEXP on all marked files."
+    (interactive (list (read-regexp "Regexp: ")))
+    (multi-occur (mapcar 'find-file-noselect (dired-get-marked-files)) regexp))
   (advice-add #'dired-find-file-other-window :around
               (defun force-horizontal-split (o &rest args)
                 (let ((split-width-threshold (frame-width)))
                   (apply o args)))))
-(use-package dired-aux
-  :after dired
-  :bind (:map dired-mode-map
-              ([remap dired-do-find-regexp] . dired-do-multi-occur))
-  :config
-  (defun dired-do-multi-occur (regexp)
-    "Run `dired-do-multi-occur` with REGEXP on all marked files."
-    (interactive (list (read-regexp "Regexp: ")))
-    (multi-occur (mapcar 'find-file-noselect (dired-get-marked-files)) regexp)))
+(use-package dired-sidebar
+  :ensure
+  :bind ("C-x C-j" . dired-sidebar-toggle-sidebar)
+  :custom
+  (dired-sidebar-no-delete-other-windows t)
+  (dired-sidebar-one-instance-p t)
+  (dired-sidebar-should-follow-file t)
+  (dired-sidebar-theme 'ascii))
 (use-package dired-subtree
   :ensure
   :after dired
@@ -822,11 +829,6 @@
   (consult-narrow-key (kbd "C-SPC"))
   :config
   (advice-add #'register-preview :override #'consult-register-window)
-  (advice-add #'set-mark-command :around #'maybe-start-consult-mark)
-  (defun maybe-start-consult-mark (o &rest args)
-    (if (eq last-command 'pop-to-mark-command)
-        (consult-mark)
-      (apply o args)))
   (defun consult-line-symbol-at-point ()
     (interactive)
     (consult-line (thing-at-point 'symbol)))
@@ -1065,20 +1067,6 @@
   :ensure
   :diminish
   :hook (after-init . volatile-highlights-mode))
-(use-package vterm
-  :disabled
-  :custom
-  (shell-pop-shell-type '("vterm" "*vterm*" #'vterm))
-  :commands vterm
-  :config
-  (advice-add 'find-file :before #'vterm-directory-sync)
-  (defun vterm-directory-sync (&rest _)
-    "Synchronize current working directory."
-    (interactive)
-    (when vterm--process
-      (let* ((pid (process-id vterm--process))
-             (dir (file-truename (format "/proc/%d/cwd/" pid))))
-        (setq default-directory dir)))))
 (use-package which-key
   :ensure
   :hook (after-init . which-key-mode)
