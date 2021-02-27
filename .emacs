@@ -1,3 +1,4 @@
+(setq comp-async-report-warnings-errors nil)
 (when (< emacs-major-version 27)
   (load "~/.emacs.d/early-init" nil t))
 
@@ -14,3 +15,4 @@
   (server-start))
 (or window-system
     (xterm-mouse-mode t))
+(load-theme 'zerodark t)
