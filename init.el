@@ -542,8 +542,7 @@
     (shell-mode)))
 (use-package compiler-explorer
   :ensure
-  :bind (:map help-map
-              ("C-c" . compiler-explorer)))
+  :bind (:map help-map ("C" . compiler-explorer)))
 (use-package dabbrev
   :bind (("C-M-_" . dabbrev-completion)
          ("C-M-/" . dabbrev-completion)
@@ -1016,6 +1015,7 @@
   :ensure
   :bind ("C-`" . shell-pop)
   :custom
+  (shell-pop-window-position "full")
   (shell-pop-full-span nil))
 (use-package smerge-mode
   :custom
