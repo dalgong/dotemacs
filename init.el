@@ -837,6 +837,9 @@
   (consult-preview-key 'any)
   (consult-narrow-key (kbd "C-SPC"))
   :config
+  (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
+  (nconc consult--source-file (list :state #'consult--file-preview))
+  (nconc consult--source-project-file (list :state #'consult--file-preview))
   (advice-add #'register-preview :override #'consult-register-window)
   (defun consult-line-symbol-at-point ()
     (interactive)
