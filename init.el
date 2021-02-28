@@ -759,13 +759,22 @@
         (if isearch-forward
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
+(use-package prescient
+  :ensure
+  :hook (after-init . prescient-persist-mode))
 (use-package selectrum
   :ensure
   :bind (:map mode-specific-map
               ("C-r" . selectrum-repeat))
   :hook (after-init . selectrum-mode)
   :custom
-  (selectrum-count-style nil))
+  (selectrum-count-style nil)
+  (file-name-shadow-properties '(invisible t))
+  :config
+  (use-package selectrum-prescient
+    :ensure
+    :config
+    (selectrum-prescient-mode 1)))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -855,10 +864,14 @@
               ("!" . consult-flycheck)))
 (use-package marginalia
   :ensure
+  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :custom
   (marginalia-annotators
    '(marginalia-annotators-heavy marginalia-annotators-light nil))
-  :hook (after-init . marginalia-mode))
+  :hook (after-init . marginalia-mode)
+  :config
+  (advice-add #'marginalia-cycle :after
+              (lambda () (when (bound-and-true-p selectrum-mode) (selectrum-exhibit)))))
 (use-package embark
   :ensure
   :after selectrum
@@ -908,9 +921,6 @@
   :bind (:map mode-specific-map ("8" . ob-compile))
   :config
   (org-babel-do-load-languages 'org-babel-load-languages '((compile . t))))
-(use-package orderless
-  :ensure
-  :custom (completion-styles '(basic partial-completion initials orderless)))
 (use-package org
   :bind (:map mode-specific-map
               ("l" . org-store-link)
@@ -1017,7 +1027,7 @@
   :ensure
   :bind ("C-`" . shell-pop)
   :custom
-  (shell-pop-window-position "full")
+  (shell-pop-window-size 50)
   (shell-pop-full-span nil))
 (use-package smerge-mode
   :custom
