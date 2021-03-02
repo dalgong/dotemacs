@@ -560,8 +560,6 @@
               (defun suppress-message (o &rest args)
                 (let ((inhibit-message t))
                   (apply o args)))))
-(use-package deferred
-  :ensure)
 (use-package diffview
   :ensure
   :after diff-mode
@@ -610,18 +608,12 @@
 (use-package dired-x
   :after dired
   :hook (dired-mode . dired-extra-startup))
-(use-package display-line-numbers
-  :disabled
-  :hook ((prog-mode conf-mode) . display-line-numbers-mode)
-  :custom
-  (display-line-numbers-width 3)
-  (display-line-numbers-widen t))
 (use-package easy-kill
   :ensure
   :bind (([remap kill-ring-save]              . easy-kill)
          :map easy-kill-base-map
-         ([remap exchange-point-and-mark] . easy-kill-exchange-point-and-mark)
-         ([remap set-mark]                . easy-kill-mark-region)
+         ([remap exchange-point-and-mark]     . easy-kill-exchange-point-and-mark)
+         ([remap set-mark]                    . easy-kill-mark-region)
          ([remap cua-exchange-point-and-mark] . easy-kill-exchange-point-and-mark)
          ([remap cua-set-mark]                . easy-kill-mark-region)
          ("o" . easy-kill-expand)
@@ -665,13 +657,6 @@
   :hook (after-init . electric-pair-mode))
 (use-package elfeed
   :bind (("C-x !" . elfeed)))
-(use-package evil
-  :disabled
-  :ensure
-  :hook (after-init . evil-mode)
-  :custom
-  (evil-default-state 'emacs)
-  (evil-ex-search-highlight-all nil))
 (use-package exec-path-from-shell
   :if (eq system-type 'darwin)
   :ensure
@@ -718,7 +703,9 @@
   :bind ("M-g M-/" . goto-last-change))
 (use-package hermes
   :load-path "~/work/hermes"
-  :bind (:map mode-specific-map ("v" . hermes)))
+  :bind (:map mode-specific-map ("v" . hermes))
+  :config
+  (add-to-list 'display-buffer-alist '("\\*hermes.*" display-buffer-same-window)))
 (use-package hl-line
   :hook ((prog-mode conf-mode compilation-mode) . hl-line-mode)
   :custom
@@ -837,10 +824,20 @@
   (consult-preview-key 'any)
   (consult-narrow-key (kbd "C-SPC"))
   :config
-  (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
-  (nconc consult--source-file (list :state #'consult--file-preview))
-  (nconc consult--source-project-file (list :state #'consult--file-preview))
+  ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
+  ;; (nconc consult--source-file (list :state #'consult--file-preview))
+  ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
   (advice-add #'register-preview :override #'consult-register-window)
+  (advice-add #'consult-imenu :around
+              (defun consult-imenu-across-all-buffers (o &rest args)
+                (if current-prefix-arg
+                    (apply o args)
+                  (let* ((buffers (cl-remove-if-not
+                                   (lambda (b)
+                                     (eq major-mode
+                                         (buffer-local-value 'major-mode b)))
+                                   (buffer-list))))
+                    (consult--imenu (consult--imenu-all-items buffers))))))
   (defun consult-line-symbol-at-point ()
     (interactive)
     (consult-line (thing-at-point 'symbol)))
@@ -910,8 +907,11 @@
   :bind (:map ctl-x-map ("g" . magit-status))
   :custom
   (magit-diff-refine-hunk t)
+  (magit-display-buffer-function 'magit-display-buffer-same-window)
   :config
-  (setq magit-status-buffer-switch-function 'switch-to-buffer))
+  (setq magit-status-buffer-switch-function 'switch-to-buffer)
+  (defun magit-display-buffer-same-window (buffer)
+    (display-buffer buffer '(display-buffer-same-window))))
 (use-package mb-depth
   :hook (after-init . minibuffer-depth-indicate-mode))
 (use-package multiple-cursors
