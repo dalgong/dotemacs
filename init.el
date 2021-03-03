@@ -141,6 +141,7 @@
   (window-resize-pixelwise nil)
   :hook (after-init . find-function-setup-keys)
   :bind (([C-tab]              . other-window)
+         ([C-S-tab]            . backward-other-window)
          ([C-up]               . windmove-up)
          ([C-down]             . windmove-down)
          ([C-left]             . windmove-left)
@@ -148,6 +149,7 @@
          ([remap suspend-frame]. ignore)
          ([remap kill-buffer]  . kill-this-buffer)
          ("C-TAB"              . other-window)
+         ("C-S-TAB"            . backward-other-window)
          ("C-."                . next-error)
          ("C-,"                . previous-error)
          ("C-:"                . backward-other-window)
@@ -968,6 +970,7 @@
   :bind (:map rust-mode-map ("C-h d" . racer-describe))
   :hook (rust-mode . racer-mode))
 (use-package rtags
+  :disabled
   :after company
   :custom
   (rtags-completions-enabled t)
