@@ -589,6 +589,7 @@
                 (let ((split-width-threshold (frame-width)))
                   (apply o args)))))
 (use-package dired-sidebar
+  :disabled
   :ensure
   :bind ("C-x C-j" . dired-sidebar-toggle-sidebar)
   :custom
@@ -768,7 +769,7 @@
   :ensure
   :bind (("M-\"" . consult-register-load)
          ("M-'"  . consult-register-store)
-         ("M-y" . consult-yank-pop)
+         ([remap yank-pop] . consult-yank-pop)
          ("M-T" . consult-imenu)
 
          :map help-map
