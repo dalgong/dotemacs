@@ -107,7 +107,6 @@
   (ns-tool-bar-display-mode 'both)
   (ns-tool-bar-size-mode 'regular)
   (ns-use-thin-smoothing t)
-  (prefix-help-command 'dispatch-command-with-prefix)
   (process-adaptive-read-buffering nil)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
@@ -152,8 +151,6 @@
          ("C-S-TAB"            . backward-other-window)
          ("C-."                . next-error)
          ("C-,"                . previous-error)
-         ("C-:"                . backward-other-window)
-         ("C-;"                . other-window)
          ("C-RET"              . open-dwim)
          ("M-K"                . kill-this-buffer)
          ("M-o"                . find-file)
@@ -291,34 +288,6 @@
         (setq w (selected-window)))
       (window--display-buffer buffer w 'reuse)))
   (fset 'yes-or-no-p 'y-or-n-p)
-  (defvar dispatch-command-from-keymap-map nil)
-  (defun dispatch-command-from-keymap (keymap &optional excludes)
-    (setq dispatch-command-from-keymap-map keymap)
-    (let* ((lines (cdr (split-string (substitute-command-keys "\\{dispatch-command-from-keymap-map}") "\n" t)))
-           (key-pos (+ 2 (length (car (split-string (car lines) "  -"))))))
-      (setq lines (cdr lines))
-      (let (r p)
-        (dolist (l lines)
-          (when (and (> (length l) key-pos)
-                     (not (string= (setq p (substring l key-pos)) "Prefix Command"))
-                     (not (memq (setq p (intern p)) excludes)))
-            (push (cons l p) r)))
-        (setq r (nreverse r))
-        (when (and (setq p (completing-read "Command: " r))
-                   (setq p (assoc p r)))
-          (call-interactively (cdr p))))))
-  (defun dispatch-command-with-prefix (&optional _)
-    (interactive)
-    (let ((key (this-command-keys)))
-      (if (stringp key)
-          (setq key (substring key 0 (1- (length key))))
-        (let ((prefix (make-vector (1- (length key)) nil))
-              (i 0))
-          (while (< i (length prefix))
-            (aset prefix i (aref key i))
-            (setq i (1+ i)))
-          (setq key prefix)))
-      (dispatch-command-from-keymap (key-binding key))))
   (defun get-current-active-selection ()
     (let ((p (if (use-region-p)
                  (cons (region-beginning) (region-end))
@@ -365,7 +334,10 @@
               ("C-x '" . ahs-change-range)))
 (use-package avy
   :ensure
-  :bind ("C-'" . avy-goto-char-timer)
+  :bind (("C-'"   . avy-goto-char-timer)
+         ("C-c '" . avy-goto-char-timer)
+         ("M-g SPC" . avy-goto-char-timer)
+         ("M-g M-SPC" . avy-goto-char-timer))
   :config
   (advice-add 'avy-goto-char-timer :around
               (defun avy-pop-mark-if-prefix (o &rest args)
@@ -1084,6 +1056,17 @@
   :ensure
   :diminish
   :hook (after-init . volatile-highlights-mode))
+(use-package vterm
+  :config
+  (csetq shell-pop-shell-type '("vterm" "*vterm*" (lambda () (vterm))))
+  (advice-add #'vterm-yank-pop :override
+              (defun use-consult-yank-pop (&optional arg)
+                (interactive "p")
+                (vterm-goto-char (point))
+                (let ((inhibit-read-only t)
+                      (yank-undo-function #'(lambda (_start _end) (vterm-undo))))
+                  (cl-letf (((symbol-function 'insert-for-yank) #'vterm-insert))
+                    (consult-yank-pop arg))))))
 (use-package which-key
   :ensure
   :hook (after-init . which-key-mode)
