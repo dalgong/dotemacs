@@ -806,13 +806,13 @@
   (advice-add #'consult-imenu :around
               (defun consult-imenu-across-all-buffers (o &rest args)
                 (if current-prefix-arg
-                    (apply o args)
-                  (let* ((buffers (cl-remove-if-not
-                                   (lambda (b)
-                                     (eq major-mode
-                                         (buffer-local-value 'major-mode b)))
-                                   (buffer-list))))
-                    (consult--imenu (consult--imenu-all-items buffers))))))
+                    (let* ((buffers (cl-remove-if-not
+                                     (lambda (b)
+                                       (eq major-mode
+                                           (buffer-local-value 'major-mode b)))
+                                     (buffer-list))))
+                      (consult--imenu (consult--imenu-all-items buffers)))
+                  (apply o args))))
   (defun consult-line-symbol-at-point ()
     (interactive)
     (consult-line (thing-at-point 'symbol)))
