@@ -361,7 +361,7 @@
 (use-package cc-mode
   :custom
   (c-electric-flag nil)
-  :map ("M-I" . ffap-include-file)
+  :bind ("M-I" . ffap-include-file)
   :hook (c-mode-common . set-outline-regexp)
   :config
   (defun ffap-include-file ()
