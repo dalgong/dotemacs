@@ -187,13 +187,6 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
-  (advice-add #'ffap-c++-mode :around
-              (defun search-within-project (o name)
-                (let ((r (funcall o name)))
-                  (unless r
-                    (when-let (d (locate-dominating-file "." name))
-                      (setq r (concat d name))))
-                  r)))
   (defun backward-other-window (count &optional all-frames interactive)
     (interactive "p\ni\np")
     (other-window (- count) all-frames interactive))
@@ -368,8 +361,30 @@
 (use-package cc-mode
   :custom
   (c-electric-flag nil)
+  :map ("M-I" . ffap-include-file)
   :hook (c-mode-common . set-outline-regexp)
   :config
+  (defun ffap-include-file ()
+    (interactive)
+    (let (files)
+      (save-excursion
+        (goto-char (point-min))
+        (while (re-search-forward "^#include\\s-*[\"<]\\([^\">]+\\)[\">]\\s-*$" nil t)
+          (push (match-string 1) files))
+        (setq files (nreverse files)))
+      (find-file (save-excursion
+                   (let ((match (completing-read "Open include: " files)))
+                     (goto-char (point-min))
+                     (re-search-forward (concat "^#include\\s-*[\"<]" (regexp-quote match) "[\">]\\s-*$"))
+                     (re-search-backward "[\">]")
+                     (ffap-guesser))))))
+  (advice-add #'ffap-c++-mode :around
+              (defun search-within-project (o name)
+                (let ((r (funcall o name)))
+                  (unless r
+                    (when-let (d (locate-dominating-file "." name))
+                      (setq r (concat d name))))
+                  r)))
   (defun set-outline-regexp ()
     (require 'outline)
     (setq outline-regexp "\\s-*\\S-"))
