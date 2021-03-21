@@ -749,8 +749,16 @@
   (selectrum-count-style nil)
   (file-name-shadow-properties '(invisible t))
   :config
+  (use-package orderless
+    :ensure
+    :custom
+    (completion-styles '(orderless))
+    (orderless-skip-highlighting (lambda () selectrum-is-active))
+    (selectrum-highlight-candidates-function #'orderless-highlight-matches))
   (use-package selectrum-prescient
     :ensure
+    :custom
+    (selectrum-prescient-enable-filtering nil)
     :config
     (selectrum-prescient-mode 1)))
 (use-package consult
@@ -1073,6 +1081,7 @@
   :diminish
   :hook (after-init . volatile-highlights-mode))
 (use-package vterm
+  :disabled
   :config
   (csetq shell-pop-shell-type '("vterm" "*vterm*" (lambda () (vterm))))
   (advice-add #'vterm-yank-pop :override
