@@ -742,8 +742,8 @@
   :hook (after-init . prescient-persist-mode))
 (use-package selectrum
   :ensure
-  :bind (:map mode-specific-map
-              ("C-r" . selectrum-repeat))
+  :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
+          :map mode-specific-map ("C-r" . selectrum-repeat))
   :hook (after-init . selectrum-mode)
   :custom
   (selectrum-count-style nil)
