@@ -108,6 +108,7 @@
   (ns-tool-bar-size-mode 'regular)
   (ns-use-thin-smoothing t)
   (process-adaptive-read-buffering nil)
+  (process-connection-type nil)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 1024 1024))

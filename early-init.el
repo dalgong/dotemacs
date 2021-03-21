@@ -1,9 +1,9 @@
 ;; -*- lexical-binding: t -*-
 (unless noninteractive
   (setq default-frame-alist `(;; (undecorated . t)
-                              (background-mode  . dark)
-                              (background-color . "#3f3f3f")
-                              (foreground-color . "#dcdccc")
+                              ;; (background-mode  . dark)
+                              ;; (background-color . "#3f3f3f")
+                              ;; (foreground-color . "#dcdccc")
                               (menu-bar-lines . 0)
                               (tool-bar-lines . 0)
                               (vertical-scroll-bars . nil)
