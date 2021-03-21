@@ -23,4 +23,14 @@
             ((,class (:foreground "#98be65"))))))
        (enable-theme 'zerodark))
       (t
-       (load-theme 'leuven t nil)))
+       (load-theme 'leuven t t)
+       (let ((class '((class color) (min-colors 89))))
+         (custom-theme-set-faces
+          'leuven
+          `(selectrum-current-candidate
+            ((,class (:background "#c678dd" :weight bold :foreground "#48384c"))))
+          `(selectrum-prescient-primary-highlight
+            ((,class (:foreground "#da8548"))))
+          `(selectrum-prescient-secondary-highlight
+            ((,class (:foreground "#98be65"))))))
+       (enable-theme 'leuven)))
