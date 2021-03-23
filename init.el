@@ -287,7 +287,11 @@
                  (cons (region-beginning) (region-end))
                (and (fboundp 'easy-kill--bounds)
                     (ignore-errors (funcall 'easy-kill--bounds))))))
-      (and p (car p) (buffer-substring-no-properties (car p) (cdr p))))))
+      (and p (car p) (buffer-substring-no-properties (car p) (cdr p)))))
+  (defun override-process-connection-type (o &rest args)
+    (let ((process-connection-type t))
+      (apply o args)))
+  (advice-add #'shell :around #'override-process-connection-type))
 (use-package files
   :custom
   (backup-by-copying-when-linked t)
