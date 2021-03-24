@@ -107,8 +107,6 @@
   (ns-tool-bar-display-mode 'both)
   (ns-tool-bar-size-mode 'regular)
   (ns-use-thin-smoothing t)
-  (process-adaptive-read-buffering nil)
-  (process-connection-type nil)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 1024 1024))
@@ -287,11 +285,7 @@
                  (cons (region-beginning) (region-end))
                (and (fboundp 'easy-kill--bounds)
                     (ignore-errors (funcall 'easy-kill--bounds))))))
-      (and p (car p) (buffer-substring-no-properties (car p) (cdr p)))))
-  (defun override-process-connection-type (o &rest args)
-    (let ((process-connection-type t))
-      (apply o args)))
-  (advice-add #'shell :around #'override-process-connection-type))
+      (and p (car p) (buffer-substring-no-properties (car p) (cdr p))))))
 (use-package files
   :custom
   (backup-by-copying-when-linked t)
