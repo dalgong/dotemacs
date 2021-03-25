@@ -920,7 +920,8 @@
   :after org
   :bind (:map mode-specific-map ("8" . ob-compile))
   :config
-  (org-babel-do-load-languages 'org-babel-load-languages '((compile . t))))
+  (org-babel-do-load-languages 'org-babel-load-languages '((compile . t)))
+  (use-package ob-async :ensure))
 (use-package org
   :bind (:map mode-specific-map
               ("l" . org-store-link)
