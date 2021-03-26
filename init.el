@@ -916,12 +916,6 @@
   :bind (:map mode-specific-map
               ("e" . mc/edit-lines)
               ("A" . mc/mark-all-in-region)))
-(use-package ob-compile
-  :after org
-  :bind (:map mode-specific-map ("8" . ob-compile))
-  :config
-  (org-babel-do-load-languages 'org-babel-load-languages '((compile . t)))
-  (use-package ob-async :ensure))
 (use-package org
   :bind (:map mode-specific-map
               ("l" . org-store-link)
@@ -942,12 +936,15 @@
   (org-src-fontify-natively t)
   (org-src-tab-acts-natively t)
   :config
+  (use-package ob-async :ensure)
   (require 'org-tempo nil t)
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((dot . t)
-     (emacs-lisp . t)
-     (shell . t))))
+  (let ((languages '((dot . t)
+                     (emacs-lisp . t)
+                     (shell . t))))
+    (when (require 'ob-compile nil t)
+      (define-key mode-specific-map "8" #'ob-compile)
+      (push '(compile . t) languages))
+    (org-babel-do-load-languages 'org-babel-load-languages languages)))
 (use-package osc52
   :if (getenv "TMUX")
   :hook (after-init . osc52-set-cut-function)
