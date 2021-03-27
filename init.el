@@ -925,6 +925,7 @@
               :map org-mode-map
               ("C-TAB" . nil)
               ("C-c ;" . nil))
+  :hook (org-babel-after-execute . org-redisplay-inline-images)
   :custom
   (org-agenda-span 'fortnight)
   (org-hide-leading-stars t)
