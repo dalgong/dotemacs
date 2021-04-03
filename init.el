@@ -186,6 +186,24 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
+  (defvar set-mark-dwim-timeout 0.5)
+  (defvar set-mark-dwim-repeat-action 'embark-act)
+  (defvar set-mark-dwim-timeout-action 'company-complete)
+  (defun set-mark-dwim (o &rest args)
+    (cond ((or (not (called-interactively-p 'interactive))
+               current-prefix-arg
+               (memq last-command '(pop-to-mark-command pop-global-mark)))
+           (apply o args))
+          ((not (sit-for set-mark-dwim-timeout))
+           (let ((cmd (lookup-key (current-active-maps) (read-key-sequence ""))))
+             (if (memq cmd '(set-mark-command cua-set-mark))
+                 (progn
+                   (call-interactively set-mark-dwim-repeat-action))
+               (apply o args)
+               (call-interactively cmd))))
+          (t
+           (call-interactively set-mark-dwim-timeout-action)))) 
+  (advice-add 'set-mark-command :around #'set-mark-dwim)
   (defun backward-other-window (count &optional all-frames interactive)
     (interactive "p\ni\np")
     (other-window (- count) all-frames interactive))
@@ -443,17 +461,7 @@
   ;; (company-auto-complete t)
   (company-idle-delay nil)
   (company-tooltip-idle-delay nil)
-  (company-tooltip-align-annotations t)
-  :config
-  (advice-add 'cua-set-mark :around #'company-complete-dwim)
-  (advice-add 'set-mark-command :around #'company-complete-dwim)
-  (defun company-complete-dwim (o &rest args)
-    (if (or (not (called-interactively-p 'interactive))
-            current-prefix-arg
-            (memq last-command '(set-mark-command cua-set-mark pop-to-mark-command pop-global-mark))
-            (not (sit-for 0.5)))
-        (apply o args)
-      (call-interactively 'company-complete))))
+  (company-tooltip-align-annotations t))
 (use-package compile
   :diminish compilation-in-progress
   :hook ((compilation-mode . run-before-compile)
@@ -874,11 +882,12 @@
 (use-package embark
   :ensure
   :after selectrum
-  :bind (([remap just-one-space] . embark-act*)
-         :map minibuffer-local-map
-         ("M-SPC" . embark-act)
+  :commands embark-act
+  :bind (:map minibuffer-local-map
+         ("M-SPC" . embark-act-noquit)
          :map selectrum-minibuffer-map
-         ("M-SPC" . embark-act))
+         ("M-SPC" . embark-act-noquit))
+
   :custom
   (embark-action-indicator
    (lambda (map _target)
@@ -890,11 +899,7 @@
     "Run action but don't quit the minibuffer afterwards."
     (interactive)
     (let ((embark-quit-after-action nil))
-      (embark-act)))
-  (defun embark-act* ()
-    (interactive)
-    (call-interactively
-     (if (car (embark--target)) 'embark-act 'just-one-space))))
+      (embark-act))))
 (use-package embark-consult
   :ensure
   :after (embark consult)
