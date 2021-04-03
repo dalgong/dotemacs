@@ -865,11 +865,12 @@
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :custom
   (marginalia-annotators
-   '(marginalia-annotators-heavy marginalia-annotators-light nil))
+   '(marginalia-annotators-light marginalia-annotators-heavy))
   :hook (after-init . marginalia-mode)
   :config
   (advice-add #'marginalia-cycle :after
-              (lambda () (when (bound-and-true-p selectrum-mode) (selectrum-exhibit)))))
+              (lambda () (when (bound-and-true-p selectrum-mode)
+                           (selectrum-exhibit 'keep-selected)))))
 (use-package embark
   :ensure
   :after selectrum
