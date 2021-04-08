@@ -432,9 +432,9 @@
   :custom
   (comint-buffer-maximum-size 10240)
   (comint-move-point-for-output nil)
-  (comint-prompt-read-only t)
+  ;; (comint-prompt-read-only t)
   (comint-scroll-to-bottom-on-input nil)
-  (comint-use-prompt-regexp t)
+  ;; (comint-use-prompt-regexp t)
   :config
   ;; (add-hook 'comint-output-filter-functions 'comint-watch-for-password-prompt)
   ;; (add-hook 'comint-output-filter-functions 'comint-truncate-buffer)
