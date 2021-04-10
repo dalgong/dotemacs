@@ -6,7 +6,7 @@ env:
   TERM: xterm-256color
 
 window:
-  # decorations: buttonless
+  decorations: buttonless
   padding:
     x: 6
     y: 6
@@ -100,6 +100,33 @@ key_bindings:
   - { key: X,         mods: Command|Shift, chars: "\x1bX"                       }
   - { key: Y,         mods: Command|Shift, chars: "\x1bY"                       }
   - { key: Z,         mods: Command|Shift, chars: "\x1bZ"                       }
+
+  - { key: A,         mods: Command|Control, chars: "\x1b\x01"                       }
+  - { key: B,         mods: Command|Control, chars: "\x1b\x02"                       }
+  - { key: C,         mods: Command|Control, chars: "\x1b\x03"                       }
+  - { key: D,         mods: Command|Control, chars: "\x1b\x04"                       }
+  - { key: E,         mods: Command|Control, chars: "\x1b\x05"                       }
+  - { key: F,         mods: Command|Control, chars: "\x1b\x06"                       }
+  - { key: G,         mods: Command|Control, chars: "\x1b\x07"                       }
+  - { key: H,         mods: Command|Control, chars: "\x1b\x08"                       }
+  - { key: I,         mods: Command|Control, chars: "\x1b\x09"                       }
+  - { key: J,         mods: Command|Control, chars: "\x1b\x0a"                       }
+  - { key: K,         mods: Command|Control, chars: "\x1b\x0b"                       }
+  - { key: L,         mods: Command|Control, chars: "\x1b\x0c"                       }
+  - { key: M,         mods: Command|Control, chars: "\x1b\x0d"                       }
+  - { key: N,         mods: Command|Control, chars: "\x1b\x0e"                       }
+  - { key: O,         mods: Command|Control, chars: "\x1b\x0f"                       }
+  - { key: P,         mods: Command|Control, chars: "\x1b\x10"                       }
+  - { key: Q,         mods: Command|Control, chars: "\x1b\x11"                       }
+  - { key: R,         mods: Command|Control, chars: "\x1b\x12"                       }
+  - { key: S,         mods: Command|Control, chars: "\x1b\x13"                       }
+  - { key: T,         mods: Command|Control, chars: "\x1b\x14"                       }
+  - { key: U,         mods: Command|Control, chars: "\x1b\x15"                       }
+  - { key: V,         mods: Command|Control, chars: "\x1b\x16"                       }
+  - { key: W,         mods: Command|Control, chars: "\x1b\x17"                       }
+  - { key: X,         mods: Command|Control, chars: "\x1b\x18"                       }
+  - { key: Y,         mods: Command|Control, chars: "\x1b\x19"                       }
+  - { key: Z,         mods: Command|Control, chars: "\x1b\x1a"                       }
   - { key: Slash,     mods: Control,       chars: "\x1f"                        }
   - { key: Key1,      mods: Command,       chars: "\x1b1"                       }
   - { key: Key2,      mods: Command,       chars: "\x1b2"                       }
@@ -234,4 +261,5 @@ key_bindings:
   - { key: Grave,    mods: Control|Shift, chars: "\x18@c~" }
   - { key: Semicolon,    mods: Control, chars: "\x18@c;"                  }
   - { key: Semicolon,    mods: Control|Shift, chars: "\x18@c:"                  }
+  - { key: Semicolon,    mods: Command, chars: "\x1b;"                  }
   - { key: Tab,   mods: Control, chars: "\x18@c\x09"                  }
