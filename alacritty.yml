@@ -252,7 +252,9 @@ key_bindings:
   - { key: F12,      mods: Command, chars: "\x1b[24;3~"                  }
 
   - { key: 39,       mods: Control, chars: "\x18@c'"                  } # single quote
-  - { key: 34,       mods: Control, chars: "\x18@c\""                 } # double quote
+  - { key: 39,       mods: Control|Shift, chars: "\x18@c\""                 } # double quote
+  - { key: 39,       mods: Command, chars: "\x1b'"                  } # single quote
+  - { key: 39,       mods: Command|Shift, chars: "\x1b\""                 } # double quote
   - { key: Comma,    mods: Control, chars: "\x18@c,"                  }
   - { key: Period,   mods: Control, chars: "\x18@c."                  }
   - { key: Comma,    mods: Control|Shift, chars: "\x18@c<"                  }
