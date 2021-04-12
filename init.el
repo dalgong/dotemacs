@@ -36,12 +36,21 @@
   (diminish 'auto-revert-mode)
   (diminish 'eldoc-mode)
   (diminish 'flymake-mode))
-(use-package simple
+(use-package emacs
+  :init
+  (unless (display-graphic-p)
+    (advice-add #'tty-run-terminal-initialization :override #'ignore)
+    (add-hook 'window-setup-hook
+              (defun restore-tty-run-terminal-initialization ()
+                (advice-remove #'tty-run-terminal-initialization #'ignore)
+                (tty-run-terminal-initialization (selected-frame) nil t))))
   :custom
   (ad-redefinition-action 'accept)
   (async-shell-command-buffer 'rename-buffer)
   (auto-window-vscroll nil)
   (backup-by-copying t)
+  (backup-by-copying-when-linked t)
+  (backup-by-copying-when-mismatch t)
   (backup-directory-alist '(("." . "~/.cache/emacs/backups")))
   (bidi-display-reordering 'left-to-right)
   (bidi-inhibit-bpa t)
@@ -49,6 +58,9 @@
   (blink-matching-paren t)
   (calc-display-trail nil)
   (completion-cycle-threshold 10)
+  (completion-styles '(basic substring flex))
+  (confirm-kill-emacs nil)
+  (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
   (cursor-in-non-selected-windows nil)
   (delete-old-versions t)
@@ -111,6 +123,7 @@
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 1024 1024))
   (redisplay-skip-fontification-on-input t)
+  (require-final-newline t)
   (resize-mini-windows 'grow-only)
   (ring-bell-function 'ignore)
   (scroll-conservatively 101)
@@ -118,6 +131,7 @@
   (scroll-margin 0)
   (scroll-step 1)
   (select-active-regions nil)
+  (server-client-instructions nil)
   (sentence-end-double-space nil)
   (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
@@ -137,7 +151,8 @@
   (window-divider-default-bottom-width 1)
   (window-divider-default-right-width 1)
   (window-resize-pixelwise nil)
-  :hook (after-init . find-function-setup-keys)
+  :hook ((after-init . find-function-setup-keys)
+         (after-save . executable-make-buffer-file-executable-if-script-p))
   :bind (([C-tab]              . other-window)
          ([C-S-tab]            . backward-other-window)
          ([C-up]               . windmove-up)
@@ -186,6 +201,19 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
+  (defun crm-indicator (args)
+    (cons (concat "[CRM] " (car args)) (cdr args)))
+  (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
+  (put 'backup-inhibited 'safe-local-variable 'booleanp)
+  (add-hook 'after-make-frame-functions
+            (defun adjust-default-color (frame)
+              (modify-frame-parameters frame default-frame-alist)))
+  (defvar server-buffer-clients nil)
+  (advice-add 'save-buffers-kill-terminal :around
+              (defun do-server-edit-if-server-buffer (o &rest args)
+                (if server-buffer-clients
+                    (call-interactively 'server-edit)
+                  (apply o args))))
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
   (defvar set-mark-dwim-timeout-action 'company-complete)
@@ -202,7 +230,7 @@
                (apply o args)
                (call-interactively cmd))))
           (t
-           (call-interactively set-mark-dwim-timeout-action)))) 
+           (call-interactively set-mark-dwim-timeout-action))))
   (advice-add 'set-mark-command :around #'set-mark-dwim)
   (defun backward-other-window (count &optional all-frames interactive)
     (interactive "p\ni\np")
@@ -304,35 +332,6 @@
                (and (fboundp 'easy-kill--bounds)
                     (ignore-errors (funcall 'easy-kill--bounds))))))
       (and p (car p) (buffer-substring-no-properties (car p) (cdr p))))))
-(use-package files
-  :custom
-  (backup-by-copying-when-linked t)
-  (backup-by-copying-when-mismatch t)
-  (confirm-kill-emacs nil)
-  (confirm-nonexistent-file-or-buffer nil)
-  (require-final-newline t)
-  (server-client-instructions nil)
-  :config
-  (put 'backup-inhibited 'safe-local-variable 'booleanp)
-  (defvar server-buffer-clients nil)
-  (advice-add 'save-buffers-kill-terminal :around
-              (defun do-server-edit-if-server-buffer (o &rest args)
-                (if server-buffer-clients
-                    (call-interactively 'server-edit)
-                  (apply o args))))
-  (add-hook 'after-save-hook 'executable-make-buffer-file-executable-if-script-p))
-(use-package faces
-  :init
-  (unless (display-graphic-p)
-    (advice-add #'tty-run-terminal-initialization :override #'ignore)
-    (add-hook 'window-setup-hook
-              (defun restore-tty-run-terminal-initialization ()
-                (advice-remove #'tty-run-terminal-initialization #'ignore)
-                (tty-run-terminal-initialization (selected-frame) nil t))))
-  :config
-  (add-hook 'after-make-frame-functions
-            (defun adjust-default-color (frame)
-              (modify-frame-parameters frame default-frame-alist))))
 (use-package ace-window
   :ensure
   :bind ("M-`" . ace-window))
@@ -748,6 +747,7 @@
   :ensure
   :hook (after-init . prescient-persist-mode))
 (use-package selectrum
+  :disabled t
   :ensure
   :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
           :map mode-specific-map ("C-r" . selectrum-repeat))
@@ -757,6 +757,7 @@
   (file-name-shadow-properties '(invisible t))
   :config
   (use-package orderless
+    :disabled t
     :ensure
     :custom
     (completion-styles '(orderless))
@@ -1075,6 +1076,17 @@
   (uniquify-buffer-name-style 'reverse)
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
+(use-package vertico
+  :ensure
+  :hook (after-init . vertico-mode)
+  :bind ( :map vertico-map
+          ("?" .   minibuffer-completion-help))
+  :custom
+  (vertico-count-format nil)
+  (advice-add #'vertico--setup :after
+              (lambda (&rest _)
+                (setq-local completion-auto-help nil
+                            completion-show-inline-help nil))))
 (use-package vlf
   :ensure
   :defer t
