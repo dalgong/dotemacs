@@ -747,7 +747,6 @@
   :ensure
   :hook (after-init . prescient-persist-mode))
 (use-package selectrum
-  :disabled t
   :ensure
   :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
           :map mode-specific-map ("C-r" . selectrum-repeat))
@@ -1077,6 +1076,7 @@
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
 (use-package vertico
+  :disabled
   :ensure
   :hook (after-init . vertico-mode)
   :bind ( :map vertico-map
