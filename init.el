@@ -1083,6 +1083,7 @@
           ("?" .   minibuffer-completion-help))
   :custom
   (vertico-count-format nil)
+  :config
   (advice-add #'vertico--setup :after
               (lambda (&rest _)
                 (setq-local completion-auto-help nil
