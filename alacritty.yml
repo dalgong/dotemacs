@@ -146,6 +146,7 @@ key_bindings:
   - { key: Grave,     mods: Command,       chars: "\x1b`"                       } # Command + `
   - { key: Grave,     mods: Command|Shift, chars: "\x1b~"                       } # Command + ~
   - { key: Period,    mods: Command,       chars: "\x1b."                       } # Command + .
+  - { key: Comma,     mods: Command,       chars: "\x1b,"                       } # Command + .
   - { key: Key8,      mods: Command|Shift, chars: "\x1b*"                       } # Command + *
   - { key: Key3,      mods: Command|Shift, chars: "\x1b#"                       } # Command + #
   - { key: Period,    mods: Command|Shift, chars: "\x1b>"                       } # Command + >
