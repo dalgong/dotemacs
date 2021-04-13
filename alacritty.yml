@@ -127,7 +127,6 @@ key_bindings:
   - { key: X,         mods: Command|Control, chars: "\x1b\x18"                       }
   - { key: Y,         mods: Command|Control, chars: "\x1b\x19"                       }
   - { key: Z,         mods: Command|Control, chars: "\x1b\x1a"                       }
-  - { key: Slash,     mods: Control,       chars: "\x1f"                        }
   - { key: Key1,      mods: Command,       chars: "\x1b1"                       }
   - { key: Key2,      mods: Command,       chars: "\x1b2"                       }
   - { key: Key3,      mods: Command,       chars: "\x1b3"                       }
@@ -138,6 +137,20 @@ key_bindings:
   - { key: Key8,      mods: Command,       chars: "\x1b8"                       }
   - { key: Key9,      mods: Command,       chars: "\x1b9"                       }
   - { key: Key0,      mods: Command,       chars: "\x1b0"                       }
+  - { key: Minus,     mods: Command,       chars: "\x1b-"                       }
+  - { key: Equals,    mods: Command,       chars: "\x1b="                       }
+  - { key: Key1,      mods: Command|Shift, chars: "\x1b!"                       }
+  - { key: Key2,      mods: Command|Shift, chars: "\x1b@"                       }
+  - { key: Key3,      mods: Command|Shift, chars: "\x1b#"                       }
+  - { key: Key4,      mods: Command|Shift, chars: "\x1b$"                       }
+  - { key: Key5,      mods: Command|Shift, chars: "\x1b%"                       }
+  - { key: Key6,      mods: Command|Shift, chars: "\x1b^"                       }
+  - { key: Key7,      mods: Command|Shift, chars: "\x1b&"                       }
+  - { key: Key8,      mods: Command|Shift, chars: "\x1b*"                       }
+  - { key: Key9,      mods: Command|Shift, chars: "\x1b("                       }
+  - { key: Key0,      mods: Command|Shift, chars: "\x1b)"                       }
+  - { key: Minus,     mods: Command|Shift, chars: "\x1b_"                       }
+  - { key: Equals,    mods: Command|Shift, chars: "\x1b+"                       }
   - { key: Space,     mods: Control,       chars: "\x00"                        }
   - { key: Space,     mods: Command,       chars: "\x1b "                       }
   - { key: Space,     mods: Alt,           chars: "\x1b "                       }
@@ -149,9 +162,10 @@ key_bindings:
   - { key: Comma,     mods: Command,       chars: "\x1b,"                       } # Command + .
   - { key: Key8,      mods: Command|Shift, chars: "\x1b*"                       } # Command + *
   - { key: Key3,      mods: Command|Shift, chars: "\x1b#"                       } # Command + #
-  - { key: Period,    mods: Command|Shift, chars: "\x1b>"                       } # Command + >
   - { key: Comma,     mods: Command|Shift, chars: "\x1b<"                       } # Command + <
-  - { key: Minus,     mods: Command|Shift, chars: "\x1b_"                       } # Command + _
+  - { key: Period,    mods: Command|Shift, chars: "\x1b>"                       } # Command + >
+  - { key: Slash,     mods: Control,       chars: "\x1f"                        }
+  - { key: Slash,     mods: Command|Shift, chars: "\x1b?"                       } # Command + >
   - { key: Key5,      mods: Command|Shift, chars: "\x1b%"                       } # Command + %
   - { key: Key6,      mods: Command|Shift, chars: "\x1b^"                       } # Command + ^
   - { key: Backslash, mods: Command,       chars: "\x1b\\"                      } # Command + \
