@@ -256,6 +256,8 @@ key_bindings:
   - { key: 39,       mods: Control|Shift, chars: "\x18@c\""                 } # double quote
   - { key: 39,       mods: Command, chars: "\x1b'"                  } # single quote
   - { key: 39,       mods: Command|Shift, chars: "\x1b\""                 } # double quote
+  - { key: Slash,    mods: Command, chars: "\x1b/"                  } # slash
+  - { key: Slash,    mods: Command|Shift, chars: "\x1b?"                 }
   - { key: Comma,    mods: Control, chars: "\x18@c,"                  }
   - { key: Period,   mods: Control, chars: "\x18@c."                  }
   - { key: Comma,    mods: Control|Shift, chars: "\x18@c<"                  }
@@ -265,4 +267,5 @@ key_bindings:
   - { key: Semicolon,    mods: Control, chars: "\x18@c;"                  }
   - { key: Semicolon,    mods: Control|Shift, chars: "\x18@c:"                  }
   - { key: Semicolon,    mods: Command, chars: "\x1b;"                  }
+  - { key: Semicolon,    mods: Command|Shift, chars: "\x1b:"                  }
   - { key: Tab,   mods: Control, chars: "\x18@c\x09"                  }
