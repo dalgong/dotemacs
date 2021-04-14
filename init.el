@@ -758,9 +758,14 @@
     :ensure
     :custom
     (completion-styles '(orderless))
-    (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
+    (orderless-matching-styles (orderless-literal orderless-regexp orderless-initialism))
+    (orderless-style-dispatchers '(negate-if-bang))
     (orderless-skip-highlighting (lambda () selectrum-is-active))
-    (selectrum-highlight-candidates-function #'orderless-highlight-matches))
+    (selectrum-highlight-candidates-function #'orderless-highlight-matches)
+    :config
+    (defun negate-if-bang (pattern _index _total)
+      (when (string-prefix-p "!" pattern)
+        `(orderless-without-literal . ,(substring pattern 1)))))
   (use-package selectrum-prescient
     :ensure
     :custom
