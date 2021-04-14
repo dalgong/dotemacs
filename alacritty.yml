@@ -127,6 +127,30 @@ key_bindings:
   - { key: X,         mods: Command|Control, chars: "\x1b\x18"                       }
   - { key: Y,         mods: Command|Control, chars: "\x1b\x19"                       }
   - { key: Z,         mods: Command|Control, chars: "\x1b\x1a"                       }
+  - { key: Key1,      mods: Control,       chars: "\x18@c1"                       }
+  - { key: Key2,      mods: Control,       chars: "\x18@c2"                       }
+  - { key: Key3,      mods: Control,       chars: "\x18@c3"                       }
+  - { key: Key4,      mods: Control,       chars: "\x18@c4"                       }
+  - { key: Key5,      mods: Control,       chars: "\x18@c5"                       }
+  - { key: Key6,      mods: Control,       chars: "\x18@c6"                       }
+  - { key: Key7,      mods: Control,       chars: "\x18@c7"                       }
+  - { key: Key8,      mods: Control,       chars: "\x18@c8"                       }
+  - { key: Key9,      mods: Control,       chars: "\x18@c9"                       }
+  - { key: Key0,      mods: Control,       chars: "\x18@c0"                       }
+  - { key: Minus,     mods: Control,       chars: "\x18@c-"                    }
+  - { key: Equals,    mods: Control,       chars: "\x18@c="                    }
+  - { key: Key1,      mods: Control|Shift, chars: "\x18@c!"                       }
+  - { key: Key2,      mods: Control|Shift, chars: "\x18@c@"                       }
+  - { key: Key3,      mods: Control|Shift, chars: "\x18@c#"                       }
+  - { key: Key4,      mods: Control|Shift, chars: "\x18@c$"                       }
+  - { key: Key5,      mods: Control|Shift, chars: "\x18@c%"                       }
+  - { key: Key6,      mods: Control|Shift, chars: "\x18@c^"                       }
+  - { key: Key7,      mods: Control|Shift, chars: "\x18@c&"                       }
+  - { key: Key8,      mods: Control|Shift, chars: "\x18@c*"                       }
+  - { key: Key9,      mods: Control|Shift, chars: "\x18@c("                       }
+  - { key: Key0,      mods: Control|Shift, chars: "\x18@c)"                       }
+  - { key: Minus,     mods: Control|Shift, chars: "\x18@c_"                       }
+  - { key: Equals,    mods: Control|Shift, chars: "\x18@c+"                       }
   - { key: Key1,      mods: Command,       chars: "\x1b1"                       }
   - { key: Key2,      mods: Command,       chars: "\x1b2"                       }
   - { key: Key3,      mods: Command,       chars: "\x1b3"                       }
