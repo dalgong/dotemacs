@@ -58,7 +58,6 @@
   (blink-matching-paren t)
   (calc-display-trail nil)
   (completion-cycle-threshold 10)
-  (completion-styles '(basic substring flex))
   (confirm-kill-emacs nil)
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
@@ -756,10 +755,10 @@
   (file-name-shadow-properties '(invisible t))
   :config
   (use-package orderless
-    :disabled t
     :ensure
     :custom
     (completion-styles '(orderless))
+    (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
     (orderless-skip-highlighting (lambda () selectrum-is-active))
     (selectrum-highlight-candidates-function #'orderless-highlight-matches))
   (use-package selectrum-prescient
