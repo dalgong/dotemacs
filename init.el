@@ -743,6 +743,7 @@
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
 (use-package prescient
+  :disabled t
   :ensure
   :hook (after-init . prescient-persist-mode))
 (use-package selectrum
@@ -758,7 +759,7 @@
     :ensure
     :custom
     (completion-styles '(orderless))
-    (orderless-matching-styles (orderless-literal orderless-regexp orderless-initialism))
+    (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
     (orderless-style-dispatchers '(negate-if-bang))
     (orderless-skip-highlighting (lambda () selectrum-is-active))
     (selectrum-highlight-candidates-function #'orderless-highlight-matches)
@@ -767,6 +768,7 @@
       (when (string-prefix-p "!" pattern)
         `(orderless-without-literal . ,(substring pattern 1)))))
   (use-package selectrum-prescient
+    :disabled t
     :ensure
     :custom
     (selectrum-prescient-enable-filtering nil)
