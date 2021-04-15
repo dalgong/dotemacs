@@ -57,6 +57,8 @@
   (bidi-paragraph-direction 'left-to-right)
   (blink-matching-paren t)
   (calc-display-trail nil)
+  (completion-category-defaults nil)
+  (completion-category-overrides '((file (styles . (partial-completion)))))
   (completion-cycle-threshold 10)
   (confirm-kill-emacs nil)
   (confirm-nonexistent-file-or-buffer nil)
@@ -1003,14 +1005,14 @@
   (savehist-additional-variables
    '(kill-ring command-history regexp-search-ring))
   :config
-  (put 'savehist-minibuffer-history-variables 'history-length 50)
-  (put 'org-read-date-history                 'history-length 50)
-  (put 'read-expression-history               'history-length 50)
-  (put 'org-table-formula-history             'history-length 50)
-  (put 'extended-command-history              'history-length 50)
-  (put 'minibuffer-history                    'history-length 50)
-  (put 'buffer-name-history                   'history-length 50)
-  (put 'file-name-history                     'history-length 50))
+  (put 'savehist-minibuffer-history-variables 'history-length 300)
+  (put 'org-read-date-history                 'history-length 300)
+  (put 'read-expression-history               'history-length 300)
+  (put 'org-table-formula-history             'history-length 300)
+  (put 'extended-command-history              'history-length 300)
+  (put 'minibuffer-history                    'history-length 300)
+  (put 'buffer-name-history                   'history-length 300)
+  (put 'file-name-history                     'history-length 300))
 (use-package saveplace
   :hook (after-init . save-place-mode)
   :custom
