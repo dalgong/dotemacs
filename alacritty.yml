@@ -1,6 +1,6 @@
-background_opacity: 0.8
+background_opacity: 0.9
 live_config_reload: true
-alt_send_esc: true
+alt_send_esc: false
 
 env:
   TERM: xterm-256color
@@ -20,8 +20,8 @@ font:
     # family: "IBM Plex Mono"
     family: "Roboto Mono"
     style: Bold
-  size: 14.0
-  use_thin_strokes: false
+  size: 13.0
+  use_thin_strokes: true
   offset:
     x: 0
     y: 1
@@ -307,3 +307,5 @@ key_bindings:
   - { key: Semicolon,    mods: Command, chars: "\x1b;"                  }
   - { key: Semicolon,    mods: Command|Shift, chars: "\x1b:"                  }
   - { key: Tab,   mods: Control, chars: "\x18@c\x09"                  }
+  - { key: Return,   mods: Control, chars: "\x18@c\x0d"                  }
+  - { key: Return,   mods: Command, chars: "\x18@m\x0d"                  }
