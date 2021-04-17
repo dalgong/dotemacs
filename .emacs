@@ -9,9 +9,10 @@
         "https://blog.codinghorror.com/rss/"
         "https://daringfireball.net/feeds/main"))
 
-(load "~/.emacs.d/init" nil t)
+(let ((file-name-handler-alist nil))
+  (load "~/.emacs.d/init" nil t))
 
-(cond ((and nil (require 'zerodark-theme nil t))
+(cond ((and t (require 'zerodark-theme nil t))
        (let ((class '((class color) (min-colors 89))))
          (custom-theme-set-faces
           'zerodark

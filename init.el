@@ -144,6 +144,7 @@
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
   (vc-follow-symlinks t)
+  (vc-handled-backends nil)
   (version-control t)
   (visible-bell nil)
   (x-underline-at-descent-line t)
@@ -217,7 +218,7 @@
                   (apply o args))))
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
-  (defvar set-mark-dwim-timeout-action 'company-complete)
+  (defvar set-mark-dwim-timeout-action 'completion-at-point)
   (defun set-mark-dwim (o &rest args)
     (cond ((or (not (called-interactively-p 'interactive))
                current-prefix-arg
@@ -445,6 +446,7 @@
         (fset 'message message))))
   (advice-add 'comint-previous-matching-input :around #'do-silently))
 (use-package company
+  :disabled t
   :ensure
   :diminish
   :hook (after-init . global-company-mode)
@@ -544,6 +546,10 @@
 (use-package compiler-explorer
   :ensure
   :bind (:map help-map ("C" . compiler-explorer)))
+(use-package corfu
+  :ensure
+  :hook ((prog-mode . corfu-mode)
+         (shell-mode . corfu-mode)))
 (use-package dabbrev
   :bind (("C-M-_" . dabbrev-completion)
          ("C-M-/" . dabbrev-completion)
@@ -1047,9 +1053,6 @@
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
-(use-package smex
-  :ensure
-  :hook (after-init . smex-initialize))
 (use-package so-long
   :hook (after-init . global-so-long-mode))
 (use-package-when tab-bar (>= (string-to-number emacs-version) 27)
