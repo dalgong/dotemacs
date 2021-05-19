@@ -136,6 +136,7 @@
   (sentence-end-double-space nil)
   (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
+  (shell-command-default-error-buffer "*Shell Command Errors*")
   (split-height-threshold nil)
   (split-width-threshold 160)
   (suggest-key-bindings nil)
@@ -750,11 +751,20 @@
         (if isearch-forward
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
-(use-package prescient
-  :disabled t
+(use-package orderless
   :ensure
-  :hook (after-init . prescient-persist-mode))
+  :custom
+  (completion-styles '(orderless))
+  (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
+  (orderless-style-dispatchers '(negate-if-bang))
+  (orderless-skip-highlighting (lambda () (bound-and-true-p selectrum-is-active)))
+  (selectrum-highlight-candidates-function #'orderless-highlight-matches)
+  :config
+  (defun negate-if-bang (pattern _index _total)
+    (when (string-prefix-p "!" pattern)
+      `(orderless-without-literal . ,(substring pattern 1)))))
 (use-package selectrum
+  :disabled t
   :ensure
   :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
           :map mode-specific-map ("C-r" . selectrum-repeat))
@@ -763,18 +773,10 @@
   (selectrum-count-style nil)
   (file-name-shadow-properties '(invisible t))
   :config
-  (use-package orderless
+  (use-package prescient
+    :disabled t
     :ensure
-    :custom
-    (completion-styles '(orderless))
-    (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
-    (orderless-style-dispatchers '(negate-if-bang))
-    (orderless-skip-highlighting (lambda () selectrum-is-active))
-    (selectrum-highlight-candidates-function #'orderless-highlight-matches)
-    :config
-    (defun negate-if-bang (pattern _index _total)
-      (when (string-prefix-p "!" pattern)
-        `(orderless-without-literal . ,(substring pattern 1)))))
+    :hook (after-init . prescient-persist-mode))
   (use-package selectrum-prescient
     :disabled t
     :ensure
@@ -782,6 +784,18 @@
     (selectrum-prescient-enable-filtering nil)
     :config
     (selectrum-prescient-mode 1)))
+(use-package vertico
+  :ensure
+  :hook (after-init . vertico-mode)
+  :bind ( :map vertico-map
+          ("?" . minibuffer-completion-help))
+  :custom
+  (vertico-count-format nil)
+  :config
+  (advice-add #'vertico--setup :after
+              (lambda (&rest _)
+                (setq-local completion-auto-help nil
+                            completion-show-inline-help nil))))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -1086,19 +1100,6 @@
   (uniquify-buffer-name-style 'reverse)
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
-(use-package vertico
-  :disabled
-  :ensure
-  :hook (after-init . vertico-mode)
-  :bind ( :map vertico-map
-          ("?" .   minibuffer-completion-help))
-  :custom
-  (vertico-count-format nil)
-  :config
-  (advice-add #'vertico--setup :after
-              (lambda (&rest _)
-                (setq-local completion-auto-help nil
-                            completion-show-inline-help nil))))
 (use-package vlf
   :ensure
   :defer t
