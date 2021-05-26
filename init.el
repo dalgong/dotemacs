@@ -816,7 +816,6 @@
          ("b" . consult-bookmark)
          ("g" . consult-ripgrep)
          ("G" . consult-git-grep)
-         ("C-g" . consult-grep)
          ("k" . consult-kmacro)
          ("m" . consult-mode-command)
 
@@ -839,8 +838,6 @@
          ("I" . consult-project-imenu)
          ("e" . consult-error)
          :map search-map
-         ("f" . consult-find)
-         ("g" . consult-grep)
          ("l" . consult-line)
          ("m" . consult-multi-occur)
          ("o" . consult-line-symbol-at-point)
@@ -932,6 +929,21 @@
   :ensure
   :after (embark consult)
   :hook (embark-collect-mode . embark-consult-preview-minor-mode))
+(use-package affe
+  :ensure
+  :after orderless
+  :bind ( :map mode-specific-map
+          ("C-g" . affe-grep)
+          :map search-map
+          ("f" . affe-find)
+          ("g" . affe-grep))
+  :config
+  ;; Configure Orderless
+  (setq affe-regexp-function #'orderless-pattern-compiler
+        affe-highlight-function #'orderless-highlight-matches)
+
+  ;; Manual preview key for `affe-grep'
+  (consult-customize affe-grep :preview-key (kbd "M-.")))
 (use-package jka-cmpr-hook
   :hook (after-init . auto-compression-mode))
 (use-package magit
