@@ -60,6 +60,7 @@
   (completion-category-defaults nil)
   (completion-category-overrides '((file (styles . (partial-completion)))))
   (completion-cycle-threshold 10)
+  (completion-ignore-case t)
   (confirm-kill-emacs nil)
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
@@ -81,6 +82,7 @@
   (hscroll-margin 2)
   (hscroll-step 1)
   (help-char ?^)
+  (history-delete-duplicates t)
   (history-length 1000)
   (highlight-nonselected-windows nil)
   (idle-update-delay 1)
@@ -89,14 +91,17 @@
   (inhibit-startup-screen t)
   (initial-scratch-message nil)
   (kill-buffer-query-functions nil)
+  (kill-do-not-save-duplicates t)
   (kill-read-only-ok t)
   (kill-ring-max 3000)
   (kill-whole-line t)
   (line-move-visual nil)
   (mac-option-key-is-meta t)
   (mac-right-option-modifier nil)
+  (make-backup-files nil)
   (mark-even-if-inactive t)
   (max-mini-window-height 0.15)
+  (minibuffer-eldef-shorten-default t)
   (minibuffer-prompt-properties
    '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
   (mode-line-client '(""))
@@ -127,6 +132,7 @@
   (require-final-newline t)
   (resize-mini-windows 'grow-only)
   (ring-bell-function 'ignore)
+  (save-interprogram-paste-before-kill t)
   (scroll-conservatively 101)
   (scroll-preserve-screen-position t)
   (scroll-margin 0)
@@ -137,6 +143,7 @@
   (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
   (shell-command-default-error-buffer "*Shell Command Errors*")
+  (show-trailing-whitespace t)
   (split-height-threshold nil)
   (split-width-threshold 160)
   (suggest-key-bindings nil)
@@ -147,6 +154,7 @@
   (vc-follow-symlinks t)
   (vc-handled-backends nil)
   (version-control t)
+  (view-read-only t)
   (visible-bell nil)
   (x-underline-at-descent-line t)
   (x-selection-timeout 100)
@@ -154,6 +162,7 @@
   (window-divider-default-bottom-width 1)
   (window-divider-default-right-width 1)
   (window-resize-pixelwise nil)
+  (words-include-escapes t)
   :hook ((after-init . find-function-setup-keys)
          (after-save . executable-make-buffer-file-executable-if-script-p))
   :bind (([C-tab]              . other-window)
@@ -204,6 +213,7 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
+  (minibuffer-electric-default-mode t)
   (defun crm-indicator (args)
     (cons (concat "[CRM] " (car args)) (cdr args)))
   (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
@@ -784,6 +794,15 @@
     (selectrum-prescient-enable-filtering nil)
     :config
     (selectrum-prescient-mode 1)))
+(use-package icomplete
+  :demand t
+  :bind ( :map icomplete-minibuffer-map
+          ("RET" . icomplete-force-complete-and-exit)
+          ("C-j" . exit-minibuffer))
+  :custom
+  (icomplete-show-matches-on-no-input t)
+  (icomplete-prospects-height 1)
+  (icomplete-hide-common-prefix nil))
 (use-package vertico
   :ensure
   :hook (after-init . vertico-mode)
