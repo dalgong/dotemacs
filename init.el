@@ -949,6 +949,7 @@
   :after (embark consult)
   :hook (embark-collect-mode . embark-consult-preview-minor-mode))
 (use-package affe
+  :disabled
   :ensure
   :after orderless
   :bind ( :map mode-specific-map
