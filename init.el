@@ -143,7 +143,7 @@
   (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
   (shell-command-default-error-buffer "*Shell Command Errors*")
-  (show-trailing-whitespace t)
+  (show-trailing-whitespace nil)
   (split-height-threshold nil)
   (split-width-threshold 160)
   (suggest-key-bindings nil)
@@ -457,7 +457,6 @@
         (fset 'message message))))
   (advice-add 'comint-previous-matching-input :around #'do-silently))
 (use-package company
-  :disabled t
   :ensure
   :diminish
   :hook (after-init . global-company-mode)
@@ -557,10 +556,6 @@
 (use-package compiler-explorer
   :ensure
   :bind (:map help-map ("C" . compiler-explorer)))
-(use-package corfu
-  :ensure
-  :hook ((prog-mode . corfu-mode)
-         (shell-mode . corfu-mode)))
 (use-package dabbrev
   :bind (("C-M-_" . dabbrev-completion)
          ("C-M-/" . dabbrev-completion)
@@ -829,12 +824,13 @@
          ("X"     . consult-mode-command)
 
          :map mode-specific-map
-         ("h" . consult-history)
-         ("b" . consult-bookmark)
-         ("g" . consult-ripgrep)
-         ("G" . consult-git-grep)
-         ("k" . consult-kmacro)
-         ("m" . consult-mode-command)
+         ("h"   . consult-history)
+         ("b"   . consult-bookmark)
+         ("g"   . consult-ripgrep)
+         ("C-g" . consult-grep)
+         ("G"   . consult-git-grep)
+         ("k"   . consult-kmacro)
+         ("m"   . consult-mode-command)
 
          :map ctl-x-map
          ("M-:" . consult-complex-command)
@@ -927,8 +923,10 @@
   :commands embark-act
   :bind (:map minibuffer-local-map
          ("M-SPC" . embark-act-noquit)
+         ("M-E"   . embark-export)
          :map selectrum-minibuffer-map
-         ("M-SPC" . embark-act-noquit))
+         ("M-SPC" . embark-act-noquit)
+         ("M-E"   . embark-export))
 
   :custom
   (embark-action-indicator
