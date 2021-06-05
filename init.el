@@ -774,7 +774,6 @@
     (when (string-prefix-p "!" pattern)
       `(orderless-without-literal . ,(substring pattern 1)))))
 (use-package selectrum
-  :disabled t
   :ensure
   :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
           :map mode-specific-map ("C-r" . selectrum-repeat))
@@ -784,11 +783,9 @@
   (file-name-shadow-properties '(invisible t))
   :config
   (use-package prescient
-    :disabled t
     :ensure
     :hook (after-init . prescient-persist-mode))
   (use-package selectrum-prescient
-    :disabled t
     :ensure
     :custom
     (selectrum-prescient-enable-filtering nil)
@@ -804,6 +801,7 @@
   (icomplete-prospects-height 1)
   (icomplete-hide-common-prefix nil))
 (use-package vertico
+  :disabled
   :ensure
   :hook (after-init . vertico-mode)
   :bind ( :map vertico-map
