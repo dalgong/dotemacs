@@ -179,7 +179,7 @@
          ("C-,"                . previous-error)
          ("C-RET"              . open-dwim)
          ("M-K"                . kill-this-buffer)
-         ("M-o"                . find-file)
+         ("M-o"                . other-window)
          ("M-q"                . fill-paragraph)
          ("RET"                . newline-and-indent)
          ("M-9"                . open-dwim)
