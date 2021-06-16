@@ -371,6 +371,9 @@
   :hook (after-init . bash-completion-setup)
   :custom
   (bash-completion-use-separate-processes t))
+(use-package better-shell
+  :ensure
+  :bind ("C-`" . better-shell-shell))
 (use-package browse-url
   :functions browse-url-url-at-point
   :config
@@ -1086,12 +1089,6 @@
                   r))
           (mapconcat #'identity (nreverse r) "\n")))))
   (advice-add 'read-shell-command :around #'use-region-if-active))
-(use-package shell-pop
-  :ensure
-  :bind ("C-`" . shell-pop)
-  :custom
-  (shell-pop-window-size 50)
-  (shell-pop-full-span nil))
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
