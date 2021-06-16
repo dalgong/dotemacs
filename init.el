@@ -1157,7 +1157,11 @@
   :ensure
   :hook (grep-setup . wgrep-setup)
   :custom
-  (wgrep-enable-key "\C-x\C-q"))
+  (wgrep-enable-key "\C-x\C-q")
+  :bind ( :map wgrep-mode-map
+          ("C-c C-c" . save-buffer)
+          :map grep-mode-map
+          ("e" . wgrep-change-to-wgrep-mode)))
 (use-package wrap-region
   :ensure
   :diminish
