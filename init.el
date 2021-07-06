@@ -942,7 +942,20 @@
     "Run action but don't quit the minibuffer afterwards."
     (interactive)
     (let ((embark-quit-after-action nil))
-      (embark-act))))
+      (embark-act)))
+  (add-to-list 'embark-target-finders (defun my-consult-multi-target ()
+                                        (let ((c (embark-target-top-minibuffer-completion)))
+                                          (when (and c (eq 'consult-multi (car c)))
+                                            (get-text-property 0 'consult-multi (cdr c))))))
+  (advice-add 'kill-line :around #'consult-kill-line-dwim)
+  (defun consult-kill-line-dwim (o &rest args)
+    (let ((target (and (minibufferp) (embark--target))))
+      (cond ((eq 'buffer (car target))
+             (kill-buffer (cl-second target)))
+            ((eq 'file (car target))
+             (delete-file (cl-second target)))
+            (t
+             (apply o args))))))
 (use-package embark-consult
   :ensure
   :after (embark consult)
