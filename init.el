@@ -925,10 +925,12 @@
   :after selectrum
   :commands embark-act
   :bind (:map minibuffer-local-map
-         ("M-SPC" . embark-act-noquit)
+         ("M-."   . embark-act)
+         ("M-,"   . embark-act-noquit)
          ("M-E"   . embark-export)
          :map selectrum-minibuffer-map
-         ("M-SPC" . embark-act-noquit)
+         ("M-."   . embark-act)
+         ("M-,"   . embark-act-noquit)
          ("M-E"   . embark-export))
 
   :custom
@@ -943,10 +945,6 @@
     (interactive)
     (let ((embark-quit-after-action nil))
       (embark-act)))
-  (add-to-list 'embark-target-finders (defun my-consult-multi-target ()
-                                        (let ((c (embark-target-top-minibuffer-completion)))
-                                          (when (and c (eq 'consult-multi (car c)))
-                                            (get-text-property 0 'consult-multi (cdr c))))))
   (advice-add 'kill-line :around #'consult-kill-line-dwim)
   (defun consult-kill-line-dwim (o &rest args)
     (let ((target (and (minibufferp) (embark--target))))
@@ -959,7 +957,8 @@
 (use-package embark-consult
   :ensure
   :after (embark consult)
-  :hook (embark-collect-mode . embark-consult-preview-minor-mode))
+  :config
+  (add-hook 'embark-collect-mode-hook #'embark-consult-preview-minor-mode))
 (use-package affe
   :disabled
   :ensure
