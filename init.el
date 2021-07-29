@@ -582,10 +582,11 @@
           ("^" . dired-up-directory-inplace)
           ([remap dired-do-find-regexp] . dired-do-multi-occur))
   :custom
+  (dired-kill-when-opening-new-dired-buffer t)
   (dired-no-confirm t)
-  (dired-use-ls-dired nil)
   (dired-recursive-copies 'always)
   (dired-recursive-deletes 'always)
+  (dired-use-ls-dired nil)
   :config
   (defun dired-up-directory-inplace ()
     (interactive)
@@ -883,7 +884,7 @@
                                        (eq major-mode
                                            (buffer-local-value 'major-mode b)))
                                      (buffer-list))))
-                      (consult--imenu (consult--imenu-all-items buffers)))
+                      (consult-imenu--select (consult-imenu--all-items buffers)))
                   (apply o args))))
   (defun consult-line-symbol-at-point ()
     (interactive)
@@ -892,7 +893,9 @@
     (interactive)
     (consult-focus-lines
      nil
-     (consult--completion-filter 'consult-location nil)
+     (lambda (pattern cands)
+       (consult--completion-filter
+        pattern cands 'consult-location 'highlight))
      (thing-at-point 'symbol)))
   (defvar-local consult-toggle-preview-orig nil)
   (defun consult-toggle-preview ()
@@ -923,7 +926,7 @@
 (use-package embark
   :ensure
   :after selectrum
-  :commands embark-act
+  :commands (embark-act embark-prefix-help-command)
   :bind (:map minibuffer-local-map
          ("M-."   . embark-act)
          ("M-,"   . embark-act-noquit)
@@ -934,11 +937,8 @@
          ("M-E"   . embark-export))
 
   :custom
-  (embark-action-indicator
-   (lambda (map _target)
-     (which-key--show-keymap "Embark" map nil nil 'no-paging)
-     #'which-key--hide-popup-ignore-command)
-   embark-become-indicator embark-action-indicator)
+  (prefix-help-command #'embark-prefix-help-command)
+  (embark-prompter #'embark-completing-read-prompter)
   :config
   (defun embark-act-noquit ()
     "Run action but don't quit the minibuffer afterwards."
@@ -1158,13 +1158,6 @@
                       (yank-undo-function #'(lambda (_start _end) (vterm-undo))))
                   (cl-letf (((symbol-function 'insert-for-yank) #'vterm-insert))
                     (consult-yank-pop arg))))))
-(use-package which-key
-  :ensure
-  :hook (after-init . which-key-mode)
-  :diminish which-key-mode
-  :custom
-  (which-key-idle-delay 1)
-  (which-key-popup-type 'minibuffer))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
