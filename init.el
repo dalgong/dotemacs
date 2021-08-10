@@ -938,7 +938,6 @@
 
   :custom
   (prefix-help-command #'embark-prefix-help-command)
-  (embark-prompter #'embark-completing-read-prompter)
   :config
   (defun embark-act-noquit ()
     "Run action but don't quit the minibuffer afterwards."
