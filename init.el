@@ -946,7 +946,7 @@
       (embark-act)))
   (advice-add 'kill-line :around #'consult-kill-line-dwim)
   (defun consult-kill-line-dwim (o &rest args)
-    (let ((target (and (minibufferp) (embark--target))))
+    (let ((target (and (minibufferp) (car (embark--targets)))))
       (cond ((eq 'buffer (car target))
              (kill-buffer (cl-second target)))
             ((eq 'file (car target))
