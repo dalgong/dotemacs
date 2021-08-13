@@ -852,7 +852,7 @@
          ("g" . consult-goto-line)
          ("M-g" . consult-goto-line)
          ("o" . consult-outline)
-         ("I" . consult-project-imenu)
+         ("I" . consult-imenu-multi)
          ("e" . consult-error)
          :map search-map
          ("l" . consult-line)
@@ -884,7 +884,9 @@
                                        (eq major-mode
                                            (buffer-local-value 'major-mode b)))
                                      (buffer-list))))
-                      (consult-imenu--select (consult-imenu--all-items buffers)))
+                      (consult-imenu--select
+                       "Go to item: "
+                       (consult-imenu--multi-items buffers)))
                   (apply o args))))
   (defun consult-line-symbol-at-point ()
     (interactive)
@@ -957,7 +959,7 @@
   :ensure
   :after (embark consult)
   :config
-  (add-hook 'embark-collect-mode-hook #'embark-consult-preview-minor-mode))
+  (add-hook 'embark-collect-mode-hook #'consult-preview-at-point-mode))
 (use-package affe
   :disabled
   :ensure
@@ -1173,7 +1175,7 @@
          (wrap-region-after-wrap . move-to-wrapped-region))
   :config
   (defun move-to-wrapped-region ()
-    (when (and (boundp 'left) (equal (string (char-after)) left))
+    (when (< (point) (region-end))
       (forward-char 1))))
 (use-package windresize
   :ensure
