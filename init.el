@@ -1131,6 +1131,12 @@
     "-o ControlMaster=auto -o ControlPersist=yes"))
   :config
   (add-to-list 'tramp-remote-path "~/bin"))
+(use-package tree-sitter
+  :ensure
+  :hook ((after-init . global-tree-sitter-mode)
+         (tree-sitter-after-on . tree-sitter-hl-mode))
+  :config
+  (use-package tree-sitter-langs :ensure))
 (use-package uniquify
   :defer t
   :custom
