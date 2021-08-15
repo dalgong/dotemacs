@@ -1197,8 +1197,8 @@
                                     xref-find-definitions-other-frame
                                     xref-find-references))
   (xref-search-program 'ripgrep)
-  (xref-show-xrefs-function 'xref-show-definitions-completing-read)
-  (xref-show-definitions-function 'xref-show-definitions-completing-read))
+  (xref-show-xrefs-function 'consult-xref)
+  (xref-show-definitions-function 'consult-xref))
 (use-package xterm-color
   :ensure
   :after shell
