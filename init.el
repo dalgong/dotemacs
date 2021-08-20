@@ -676,7 +676,7 @@
   :ensure
   :hook (after-init . exec-path-from-shell-initialize)
   :custom
-  (exec-path-from-shell-check-startup-files nil)
+  (exec-path-from-shell-arguments '("-l"))
   :config
   (dolist (env (split-string (shell-command-to-string "bash -lc env") "\n" t))
     (let* ((p (split-string env "=" nil))
@@ -744,7 +744,9 @@
   :hook ((isearch-mode-end . move-to-search-start)
          (isearch-mode . search-for-region))
   :custom
+  (isearch-allow-scroll t)
   (isearch-lazy-count t)
+  (lazy-highlight-buffer t)
   :config
   (defun move-to-search-start ()
     (and isearch-forward
@@ -764,6 +766,7 @@
   :ensure
   :custom
   (completion-styles '(orderless))
+  (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
   (orderless-style-dispatchers '(negate-if-bang))
   (orderless-skip-highlighting (lambda () (bound-and-true-p selectrum-is-active)))
@@ -779,6 +782,7 @@
   :hook (after-init . selectrum-mode)
   :custom
   (selectrum-count-style nil)
+  (selectrum-max-window-height .15)
   (file-name-shadow-properties '(invisible t))
   :config
   (use-package prescient
@@ -1013,8 +1017,15 @@
   (org-startup-folded 'content)
   (org-startup-indented t)
   (org-confirm-babel-evaluate nil)
+  (org-cycle-separator-lines 0)
+  (org-descriptive-links nil)
+  (org-edit-src-content-indentation 0)
+  (org-edit-src-persistent-message nil)
+  (org-fontify-quote-and-verse-blocks t)
+  (org-return-follows-link t)
   (org-src-fontify-natively t)
   (org-src-tab-acts-natively t)
+  (org-src-window-setup 'current-window)
   :config
   (use-package ob-async :ensure)
   (require 'org-tempo nil t)
