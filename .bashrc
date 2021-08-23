@@ -40,9 +40,3 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-
-# deno
-if test -d $HOME/.deno; then
-  export DENO_INSTALL="$HOME/.deno"
-  export PATH="$DENO_INSTALL/bin:$PATH"
-fi
