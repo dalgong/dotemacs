@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t -*-
 ;; jay+nospam@kldp_remove_me_.org
-(setq custom-file "~/.emacs.d/custom.el")
+(setq custom-file "/dev/null")
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
 (when (require 'package nil t)
@@ -47,6 +47,8 @@
   :custom
   (ad-redefinition-action 'accept)
   (async-shell-command-buffer 'rename-buffer)
+  (auto-save-default nil)
+  (auto-save-interval 0)
   (auto-window-vscroll nil)
   (backup-by-copying t)
   (backup-by-copying-when-linked t)
@@ -57,10 +59,12 @@
   (bidi-paragraph-direction 'left-to-right)
   (blink-matching-paren t)
   (calc-display-trail nil)
+  (column-number-indicator-zero-based nil)
   (completion-category-defaults nil)
   (completion-category-overrides '((file (styles . (partial-completion)))))
   (completion-cycle-threshold 10)
   (completion-ignore-case t)
+  (completion-show-help nil)
   (confirm-kill-emacs nil)
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
@@ -151,6 +155,7 @@
   (truncate-lines t)
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
+  (use-package-enable-imenu-support t)
   (vc-follow-symlinks t)
   (vc-handled-backends nil)
   (version-control t)
@@ -158,6 +163,8 @@
   (visible-bell nil)
   (x-underline-at-descent-line t)
   (x-selection-timeout 100)
+  (y-or-n-p-use-read-key t)
+  (warning-minimum-level :emergency)
   (window-divider-default-places t)
   (window-divider-default-bottom-width 1)
   (window-divider-default-right-width 1)
@@ -213,7 +220,6 @@
          ("x"                  . shell-command)
          ("X"                  . async-shell-command))
   :config
-  (minibuffer-electric-default-mode t)
   (defun crm-indicator (args)
     (cons (concat "[CRM] " (car args)) (cdr args)))
   (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
@@ -781,6 +787,7 @@
           :map mode-specific-map ("C-r" . selectrum-repeat))
   :hook (after-init . selectrum-mode)
   :custom
+  (selectrum-complete-in-buffer nil)
   (selectrum-count-style nil)
   (selectrum-max-window-height .15)
   (file-name-shadow-properties '(invisible t))
@@ -944,6 +951,7 @@
 
   :custom
   (prefix-help-command #'embark-prefix-help-command)
+  (embark-cycle-key ";")
   :config
   (defun embark-act-noquit ()
     "Run action but don't quit the minibuffer afterwards."
@@ -993,7 +1001,7 @@
   (defun magit-display-buffer-same-window (buffer)
     (display-buffer buffer '(display-buffer-same-window))))
 (use-package mb-depth
-  :hook (after-init . minibuffer-depth-indicate-mode))
+  :hook (after-init . (minibuffer-depth-indicate-mode minibuffer-electric-default-mode)))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
