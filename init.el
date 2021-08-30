@@ -170,7 +170,7 @@
   (window-divider-default-right-width 1)
   (window-resize-pixelwise nil)
   (words-include-escapes t)
-  :hook ((after-init . find-function-setup-keys)
+  :hook ((after-init . (find-function-setup-keys minibuffer-depth-indicate-mode minibuffer-electric-default-mode))
          (after-save . executable-make-buffer-file-executable-if-script-p))
   :bind (([C-tab]              . other-window)
          ([C-S-tab]            . backward-other-window)
@@ -1000,8 +1000,6 @@
   (setq magit-status-buffer-switch-function 'switch-to-buffer)
   (defun magit-display-buffer-same-window (buffer)
     (display-buffer buffer '(display-buffer-same-window))))
-(use-package mb-depth
-  :hook (after-init . (minibuffer-depth-indicate-mode minibuffer-electric-default-mode)))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
