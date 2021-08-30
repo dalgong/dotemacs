@@ -1,6 +1,7 @@
 ;; -*- lexical-binding: t -*-
 ;; jay+nospam@kldp_remove_me_.org
 (setq custom-file "/dev/null")
+(advice-add #'custom-save-all :override #'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
 (unless (display-graphic-p)
