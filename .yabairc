@@ -12,13 +12,13 @@ yabai -m config mouse_follows_focus          off
 yabai -m config window_placement             second_child
 yabai -m config window_topmost               on
 yabai -m config window_shadow                float
-yabai -m config window_opacity               on
+yabai -m config window_opacity               off
 yabai -m config window_opacity_duration      0.0
 yabai -m config active_window_opacity        1.0
 yabai -m config normal_window_opacity        0.85
 yabai -m config window_border                on
 yabai -m config window_border_width          6
-yabai -m config active_window_border_color   0xff775759
+yabai -m config active_window_border_color   0xfff00000
 yabai -m config normal_window_border_color   0xff555555
 yabai -m config insert_feedback_color        0xaad75f5f
 yabai -m config split_ratio                  0.3
@@ -39,8 +39,11 @@ yabai -m config window_gap                   10
 yabai -m rule --add app="^System Preferences$" manage=off
 yabai -m rule --add app="^Messages$" manage=off
 yabai -m rule --add app="^Firefox$" manage=off
+yabai -m rule --add app="^BlueJeans$" manage=off
+yabai -m rule --add app="^Cisco AnyConnect" manage=off
 
 # signals
+yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
 yabai -m signal --add event=window_destroyed active=yes action="yabai -m query --windows --window &> /dev/null || yabai -m window --focus mouse &> /dev/null || yabai -m window --focus \$(yabai -m query --windows --space | jq .[0].id) &> /dev/null"
 # yabai -m signal --add event=window_destroyed action="echo \"destroyed window with id \$YABAI_WINDOW_ID\""
 # yabai -m signal --add event=space_changed action="echo \"changed space \$YABAI_RECENT_SPACE_ID -> \$YABAI_SPACE_ID\""
