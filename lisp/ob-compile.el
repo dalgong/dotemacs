@@ -1,4 +1,18 @@
 ;; A simple org babel for compile
+;; #+NAME: expand-src-block
+;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
+;;   (save-excursion
+;;     (org-babel-goto-named-src-block block-name)
+;;     (setq datum (org-element-at-point))
+;;     t)
+;;   (setq info (org-babel-get-src-block-info nil datum))
+;;   (cl-callf org-babel-merge-params (nth 2 info) params)
+;;   (cl-callf org-babel-process-params (nth 2 info))
+;;   (setq lang (nth 0 info))
+;;   (setq body (org-babel-expand-src-block nil info))
+;;   (format "%s" body)
+;; #+END_SRC
+
 (require 'ob)
 
 (defvar org-babel-default-header-args:compile
