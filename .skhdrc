@@ -28,6 +28,7 @@ shift + alt - 0x2F : yabai -m window --space next   && yabai -m space --focus ne
 shift + alt - 0x2C : yabai -m window --space recent && yabai -m space --focus recent
 
         alt - return : yabai -m window --swap largest
+shift + alt - return : alacritty
         alt - space  : yabai -m window --toggle zoom-fullscreen
 shift + alt - space  : yabai -m window --toggle native-fullscreen
         alt - tab    : yabai -m window --toggle zoom-parent
