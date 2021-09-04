@@ -41,6 +41,7 @@ yabai -m rule --add app="^Messages$" manage=off
 yabai -m rule --add app="^Firefox$" manage=off
 yabai -m rule --add app="^BlueJeans$" manage=off
 yabai -m rule --add app="^Cisco AnyConnect" manage=off
+yabai -m rule --add app="^zoom.us" manage=off
 
 # signals
 yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
