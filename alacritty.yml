@@ -1,9 +1,13 @@
-background_opacity: 0.9
+background_opacity: 1.0
 live_config_reload: true
 alt_send_esc: false
 
 env:
   TERM: xterm-256color
+
+dpi:
+  x: 96.0
+  y: 96.0
 
 window:
   decorations: buttonless
@@ -13,18 +17,50 @@ window:
 
 font:
   normal:
-    # family: "IBM Plex Mono"
-    family: "Roboto Mono"
+    # family: Roboto Mono
+    # family: Anonymous Pro
+    family: Monaco
     style: Regular
   bold:
-    # family: "IBM Plex Mono"
-    family: "Roboto Mono"
     style: Bold
-  size: 13.0
+  italic:
+    style: Italic
+  bold_italic:
+    style: Bol Italic
+  size: 12.0
   use_thin_strokes: true
   offset:
     x: 0
-    y: 1
+    y: 0
+
+# Colors (iTerm 2 default theme)
+colors:
+  # Default colors
+  primary:
+    background: '#101421'
+    foreground: '#fffbf6'
+
+ # Normal colors
+  normal:
+    black:   '#2e2e2e'
+    red:     '#eb4129'
+    green:   '#abe047'
+    yellow:  '#f6c744'
+    blue:    '#47a0f3'
+    magenta: '#7b5cb0'
+    cyan:    '#64dbed'
+    white:   '#e5e9f0'
+
+ # Bright colors
+  bright:
+    black:   '#565656'
+    red:     '#ec5357'
+    green:   '#c0e17d'
+    yellow:  '#f9da6a'
+    blue:    '#49a4f8'
+    magenta: '#a47de9'
+    cyan:    '#99faf2'
+    white:   '#ffffff'
 
 draw_bold_text_with_bright_colors: true
 
