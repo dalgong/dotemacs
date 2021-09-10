@@ -162,6 +162,12 @@
                                                       (current-window-configuration))))
                                          (unwind-protect (funcall o)
                                            (and wc (set-window-configuration wc))))))
+(advice-add 'split-window-right :after #'call-other-window-if-interactive)
+(advice-add 'split-window-below :after #'call-other-window-if-interactive)
+(defun call-other-window-if-interactive (&rest _)
+  (when (called-interactively-p 'interactive)
+    (other-window 1)))
+
 (defun delete-other-window ()
   (interactive)
   (unless (one-window-p 'nomini)
