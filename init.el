@@ -779,6 +779,9 @@
   (use-package ivy-hydra
     :ensure
     :after ivy)
+  (use-package ivy-prescient
+    :ensure
+    :hook (after-init . ivy-prescient-mode))
   (use-package counsel
     :ensure
     :diminish
@@ -810,6 +813,7 @@
            ("u"   . counsel-unicode-char)
            ("SPC" . counsel-mark-ring)
            ("RET" . counsel-linux-app)
+           ([remap package-install] . counsel-package)
 
            :map mode-specific-map
            ("C-g" . counsel-grep)
