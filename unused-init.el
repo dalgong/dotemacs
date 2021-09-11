@@ -1,3 +1,42 @@
+(use-package affe
+  :disabled
+  :ensure
+  :after orderless
+  :bind ( :map mode-specific-map
+          ("C-g" . affe-grep)
+          :map search-map
+          ("f" . affe-find)
+          ("g" . affe-grep))
+  :config
+  ;; Configure Orderless
+  (setq affe-regexp-function #'orderless-pattern-compiler
+        affe-highlight-function #'orderless-highlight-matches)
+
+  ;; Manual preview key for `affe-grep'
+  (consult-customize affe-grep :preview-key (kbd "M-.")))
+(use-package icomplete
+  :demand t
+  :bind ( :map icomplete-minibuffer-map
+          ("RET" . icomplete-force-complete-and-exit)
+          ("C-j" . exit-minibuffer))
+  :custom
+  (icomplete-show-matches-on-no-input t)
+  (icomplete-prospects-height 1)
+  (icomplete-hide-common-prefix nil))
+(use-package vertico
+  :disabled
+  :ensure
+  :hook (after-init . vertico-mode)
+  :bind ( :map vertico-map
+          ("?" . minibuffer-completion-help))
+  :custom
+  (vertico-count-format nil)
+  :config
+  (advice-add #'vertico--setup :after
+              (lambda (&rest _)
+                (setq-local completion-auto-help nil
+                            completion-show-inline-help nil))))
+
 (use-package cua-base
   :hook (after-init . cua-mode)
   :custom
@@ -19,7 +58,7 @@
     :diminish
     :hook ((helm-after-initialize . helm-hide-mode-line))
     :bind (("M-P"       . helm-mini)
-         
+
            :map helm-map
            ("TAB"       . helm-execute-persistent-action)
            ("C-i"       . helm-execute-persistent-action)
@@ -29,7 +68,7 @@
            ("M-r"       . helm-previous-source)
            ("M-/"       . helm-select-action)
            ("M-["       . helm-enlarge-window)
-           
+
            :map help-map
            ;; ("SPC"       . helm-all-mark-rings)
            ;; ("/"         . helm-dabbrev)
@@ -138,7 +177,7 @@
   (use-package-when helm-xref (eq j:completion-ui 'helm)
     :ensure))
 (when t
-  (use-package icomplete 
+  (use-package icomplete
     :hook (after-init . fido-mode))
   (use-package icomplete-vertical
     :disabled
@@ -151,7 +190,7 @@
                 ("C-p" . icomplete-backward-completions)
                 ("C-v" . icomplete-vertical-toggle))))
 (when t
-  (use-package ido 
+  (use-package ido
     :custom
     (ido-auto-merge-work-directories-length -1)
     (ido-auto-merge-delay-time 999999)
@@ -200,7 +239,7 @@
       :config
       (flx-ido-mode 1))))
 (when t
-  (use-package ivy 
+  (use-package ivy
     :ensure
     :diminish
     :hook (after-init . ivy-mode)
@@ -214,7 +253,7 @@
                 :map mode-specific-map
                 ("]"   . ivy-push-view)
                 ("["   . ivy-pop-view)
-                ("C-r" . ivy-resume))      
+                ("C-r" . ivy-resume))
     :custom
     (ivy-action-wrap nil)
     (ivy-count-format "")

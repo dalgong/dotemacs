@@ -788,6 +788,7 @@
            ([remap menu-bar-open] . counsel-tmm)
            ("M-T"   . counsel-semantic-or-imenu)
            ("M-y"   . counsel-yank-pop)
+           ("M-\""  . counsel-register)
 
            :map counsel-find-file-map
            ("C-h"   . counsel-up-directory)
@@ -811,6 +812,7 @@
            ("RET" . counsel-linux-app)
 
            :map mode-specific-map
+           ("C-g" . counsel-grep)
            ("g"   . counsel-rg)
            ("o"   . counsel-grep-or-swiper)
            ("O"   . counsel-outline)
