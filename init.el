@@ -789,6 +789,7 @@
     :bind (([remap dired] . counsel-dired)
            ([remap tmm-menubar] . counsel-tmm)
            ([remap menu-bar-open] . counsel-tmm)
+           ([remap package-install] . counsel-package)
            ("M-T"   . counsel-semantic-or-imenu)
            ("M-y"   . counsel-yank-pop)
            ("M-\""  . counsel-register)
@@ -813,7 +814,6 @@
            ("u"   . counsel-unicode-char)
            ("SPC" . counsel-mark-ring)
            ("RET" . counsel-linux-app)
-           ([remap package-install] . counsel-package)
 
            :map mode-specific-map
            ("C-g" . counsel-grep)
