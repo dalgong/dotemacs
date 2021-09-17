@@ -55,6 +55,7 @@
  '(history-delete-duplicates t)
  '(history-length 1000)
  '(highlight-nonselected-windows nil)
+ '(find-file-visit-truename nil)
  '(idle-update-delay 1)
  '(indent-tabs-mode nil)
  '(inhibit-compacting-font-caches t)
@@ -122,7 +123,7 @@
  '(use-dialog-box nil)
  '(use-package-compute-statistics nil)
  '(use-package-enable-imenu-support t)
- '(vc-follow-symlinks t)
+ '(vc-follow-symlinks nil)
  '(vc-handled-backends nil)
  '(version-control t)
  '(view-read-only t)
@@ -733,6 +734,7 @@
                 ("TAB"   . ivy-partial)
                 ("C-i"   . ivy-partial)
                 ("M-'"   . ivy-avy)
+                ("M-SPC" . ivy-restrict-to-matches)
 
                 :map mode-specific-map
                 ("]"   . ivy-push-view)
