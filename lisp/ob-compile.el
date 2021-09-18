@@ -1,5 +1,5 @@
 ;; A simple org babel for compile
-;; #+NAME: expand-src-block
+;; #+NAME: embed
 ;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
 ;;   (save-excursion
 ;;     (org-babel-goto-named-src-block block-name)
