@@ -257,6 +257,7 @@
 (add-hook #'after-init-hook #'find-function-setup-keys)
 (add-hook #'after-init-hook #'minibuffer-depth-indicate-mode)
 (add-hook #'after-init-hook #'minibuffer-electric-default-mode)
+(add-hook #'after-init-hook #'repeat-mode)
 (add-hook #'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
 (when (require 'package nil t)
@@ -581,6 +582,7 @@
          ("o" . easy-kill-expand)
          ("i" . easy-kill-shrink)))
 (use-package easy-repeat
+  :disabled
   :ensure
   :hook (after-init . easy-repeat-mode)
   :config
@@ -711,6 +713,7 @@
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
 (use-package orderless
+  :disabled
   :ensure
   :custom
   (completion-styles '(orderless))
@@ -748,7 +751,7 @@
   (ivy-magic-tilde t)
   (ivy-on-del-error-function nil)
   (ivy-read-action-function 'ivy-hydra-read-action)
-  (ivy-re-builders-alist '((t . orderless-ivy-re-builder)))
+  ;; (ivy-re-builders-alist '((t . orderless-ivy-re-builder)))
   (ivy-use-selectable-prompt t)
   (ivy-use-virtual-buffers t)
   (ivy-virtual-abbreviate 'abbreviate)
