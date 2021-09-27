@@ -383,7 +383,33 @@
               (if (bobp) 0 (merge-empty-lines-with-prevous-line nil)))
           (skip-chars-forward "\t ")
           (current-column)))))
-  (advice-add 'c-outline-level :around #'merge-empty-lines-with-prevous-line))
+  (advice-add 'c-outline-level :around #'merge-empty-lines-with-prevous-line)
+  (advice-add #'c-indent-line-or-region :around #'indent-dwim)
+  (defun indent-dwim (o &optional arg region)
+    (if region
+        (funcall o arg region)
+      (let ((old-tick (buffer-chars-modified-tick))
+            (old-point (point))
+	    (old-indent (current-indentation))
+            (syn `(,(syntax-after (point)))))
+        (funcall o arg region)
+        (when (and (eq tab-always-indent 'complete)
+                   (eq old-point (point))
+                   (eq old-tick (buffer-chars-modified-tick))
+                   (or (null tab-first-completion)
+                       (eq last-command this-command)
+                       (and (equal tab-first-completion 'eol)
+                            (eolp))
+                       (and (member tab-first-completion
+                                    '(word word-or-paren word-or-paren-or-punct))
+                            (not (member 2 syn)))
+                       (and (member tab-first-completion
+                                    '(word-or-paren word-or-paren-or-punct))
+                            (not (or (member 4 syn)
+                                     (member 5 syn))))
+                       (and (equal tab-first-completion 'word-or-paren-or-punct)
+                            (not (member 1 syn)))))
+          (completion-at-point))))))
 (use-package color-identifiers-mode
   :ensure
   :diminish
