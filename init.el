@@ -291,13 +291,7 @@
 
 (eval-and-compile
   (defmacro csetq (sym val)
-    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val))
-  (defmacro use-package-when (pkg cond &rest body)
-    (declare (indent 2))
-    `(use-package ,pkg
-       ,@(if (eval cond)
-             body
-           (cons ':disabled body)))))
+    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val)))
 (use-package diminish
   :ensure
   :config
@@ -670,6 +664,17 @@
            (values (cdr p)))
       (unless (member name exec-path-from-shell-variables)
         (setenv name (mapconcat #'identity values "="))))))
+(use-package eyebrowse
+  :ensure
+  :init
+  (csetq eyebrowse-keymap-prefix (kbd "C-z"))
+  :bind (:map eyebrowse-mode-map
+              ("C-z C-z" . eyebrowse-last-window-config)
+              ("C-z c" . eyebrowse-create-window-config)
+              ("C-z k" . eyebrowse-close-window-config)
+              ("C-z n" . eyebrowse-next-window-config)
+              ("C-z p" . eyebrowse-prev-window-config))
+  :hook (after-init . eyebrowse-mode))
 (use-package gcmh
   :ensure
   :diminish
@@ -1106,8 +1111,10 @@
   :custom
   (smerge-command-prefix "\C-z"))
 (use-package so-long
+  :disabled
   :hook (after-init . global-so-long-mode))
-(use-package-when tab-bar (>= (string-to-number emacs-version) 27)
+(use-package tab-bar
+  :disabled
   :bind (("<C-prior>" . tab-previous)
          ("<C-next>"  . tab-next)
          :map tab-prefix-map
@@ -1196,9 +1203,7 @@
                                     xref-find-definitions-other-window
                                     xref-find-definitions-other-frame
                                     xref-find-references))
-  (xref-search-program 'ripgrep)
-  (xref-show-xrefs-function 'consult-xref)
-  (xref-show-definitions-function 'consult-xref))
+  (xref-search-program 'ripgrep))
 (use-package xterm-color
   :ensure
   :after shell
