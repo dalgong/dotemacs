@@ -871,7 +871,6 @@
   :custom
   (counsel-find-file-at-point t)
   (counsel-preselect-current-file t)
-  (counsel-find-file-ignore-regexp (regexp-opt completion-ignored-extensions))
   (counsel-grep-base-command "rg -S -M 120 --no-heading --line-number --color never %s %s")
   (counsel-rg-base-command "rg -S -M 120 --no-heading --line-number --color never %s")
   (counsel-yank-pop-separator "\n----\n")
