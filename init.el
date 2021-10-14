@@ -753,9 +753,10 @@
             (isearch-repeat-forward)
           (isearch-repeat-backward))))))
 (use-package orderless
-  :disabled
   :ensure
+  :after counsel
   :custom
+  (ivy-re-builders-alist '((t . orderless-ivy-re-builder)))
   (completion-styles '(orderless))
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
@@ -791,7 +792,6 @@
   (ivy-magic-tilde t)
   (ivy-on-del-error-function nil)
   (ivy-read-action-function 'ivy-hydra-read-action)
-  ;; (ivy-re-builders-alist '((t . orderless-ivy-re-builder)))
   (ivy-use-selectable-prompt t)
   (ivy-use-virtual-buffers t)
   (ivy-virtual-abbreviate 'abbreviate)
@@ -834,6 +834,7 @@
   :ensure
   :after ivy)
 (use-package ivy-prescient
+  :disabled
   :ensure
   :after counsel
   :custom (ivy-prescient-retain-classic-highlighting t)
