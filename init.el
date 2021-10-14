@@ -835,6 +835,7 @@
   :after ivy)
 (use-package ivy-prescient
   :ensure
+  :after counsel
   :custom (ivy-prescient-retain-classic-highlighting t)
   :hook (after-init . ivy-prescient-mode))
 (use-package counsel
