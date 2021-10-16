@@ -37,8 +37,7 @@
  '(cursor-in-non-selected-windows nil)
  '(delete-old-versions t)
  '(disabled-command-function nil)
- '(display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)
-                          ("\\*compilation\\*" display-buffer-in-bottom-window)))
+ '(display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)))
  '(enable-recursive-minibuffers t)
  '(eval-expression-print-length nil)
  '(eval-expression-print-level nil)
@@ -219,43 +218,6 @@
                  (when (and col (> col 0))
                    (forward-char (1- col)))))))
     (call-interactively 'ffap-other-window)))
-(defun mouse-run-command-dwim ()
-  (interactive)
-  (let ((s (get-current-active-selection)))
-    (cond (s
-           (compile s))
-          ((eq major-mode 'org-mode)
-           (call-interactively 'mouse-set-point)
-           (call-interactively 'org-ctrl-c-ctrl-c))
-          ((eq major-mode 'shell-mode)
-           (call-interactively 'mouse-set-point)
-           (call-interactively 'comint-copy-old-input)
-           (call-interactively 'comint-send-input))
-          (t
-           (call-interactively 'mouse-set-point)
-           (compile (thing-at-point 'filename))))))
-(defun mouse-open-dwim ()
-  (interactive)
-  (let ((s (get-current-active-selection)))
-    (cond (s
-           (open-dwim s))
-          (t
-           (call-interactively 'mouse-set-point)
-           (call-interactively 'open-dwim)))))
-(defun always-use-bottom-window (_ &optional height)
-  ;; Open helm window deterministic location always.
-  ;; (while (window-in-direction 'left)  (select-window (window-in-direction 'left)))
-  (setq height (or height (symbol-value 'helm-display-buffer-default-height)))
-  (while (window-in-direction 'below) (select-window (window-in-direction 'below)))
-  (when (> (window-height (selected-window)) (+ 5 height))
-    (split-window (selected-window) (- -2 height) 'below)
-    (select-window (window-in-direction 'below))))
-(defun display-buffer-in-bottom-window (buffer _)
-  (let ((w (get-buffer-window buffer)))
-    (unless w
-      (always-use-bottom-window nil 30)
-      (setq w (selected-window)))
-    (window--display-buffer buffer w 'reuse)))
 (fset 'yes-or-no-p 'y-or-n-p)
 (defun get-current-active-selection ()
   (let ((p (if (use-region-p)
@@ -300,6 +262,9 @@
 (use-package ace-window
   :ensure
   :bind ("M-`" . ace-window))
+(use-package amx
+  :ensure
+  :hook (after-init . amx-mode))
 (use-package auto-highlight-symbol
   :ensure
   :diminish
@@ -537,6 +502,12 @@
 (use-package compiler-explorer
   :ensure
   :bind (:map help-map ("C" . compiler-explorer)))
+(use-package coterm
+  :ensure
+  :bind (:map comint-mode-map
+              ("C-;" . coterm-char-mode-cycle)
+              ("C-c j" . coterm-char-mode-cycle))
+  :hook (after-init . coterm-mode))
 (use-package dabbrev
   :bind (("C-M-_" . dabbrev-completion)
          ("C-M-/" . dabbrev-completion)
@@ -577,15 +548,6 @@
               (defun force-horizontal-split (o &rest args)
                 (let ((split-width-threshold (frame-width)))
                   (apply o args)))))
-(use-package dired-sidebar
-  :disabled
-  :ensure
-  :bind ("C-x C-j" . dired-sidebar-toggle-sidebar)
-  :custom
-  (dired-sidebar-no-delete-other-windows t)
-  (dired-sidebar-one-instance-p t)
-  (dired-sidebar-should-follow-file t)
-  (dired-sidebar-theme 'ascii))
 (use-package dired-subtree
   :ensure
   :after dired
@@ -610,13 +572,6 @@
          ([remap cua-set-mark]                . easy-kill-mark-region)
          ("o" . easy-kill-expand)
          ("i" . easy-kill-shrink)))
-(use-package easy-repeat
-  :disabled
-  :ensure
-  :hook (after-init . easy-repeat-mode)
-  :config
-  (dolist (c '(goto-last-change tab-next tab-previous tab-move))
-    (cl-pushnew c easy-repeat-command-list)))
 (use-package ediff
   :bind (:map mode-specific-map ("=" . ediff-current-file))
   :custom
@@ -756,7 +711,10 @@
   :ensure
   :after counsel
   :custom
-  (ivy-re-builders-alist '((t . orderless-ivy-re-builder)))
+  (ivy-re-builders-alist '((counsel-file-jump . ivy--regex-fuzzy)
+                           (counsel-rg . ivy--regex-plus)
+                           (read-file-name-internal . ivy--regex-fuzzy)
+                           (t . orderless-ivy-re-builder)))
   (completion-styles '(orderless))
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
@@ -823,22 +781,10 @@
           (select-window w))
       (apply o args)))
   (advice-add 'ivy-switch-buffer :around #'ivy-switch-buffer-maybe-other-window)
-  (cl-pushnew (cons 'read-file-name-internal #'ivy--regex-fuzzy)
-              ivy-re-builders-alist
-              :key #'car)
-  (cl-pushnew (cons 'counsel-file-jump #'ivy--regex-fuzzy)
-              ivy-re-builders-alist
-              :key #'car)
   (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-arrow))
 (use-package ivy-hydra
   :ensure
   :after ivy)
-(use-package ivy-prescient
-  :disabled
-  :ensure
-  :after counsel
-  :custom (ivy-prescient-retain-classic-highlighting t)
-  :hook (after-init . ivy-prescient-mode))
 (use-package counsel
   :ensure
   :diminish
@@ -903,13 +849,18 @@
   (defvar counsel-find-file-extra-actions
     '(("C-e" counsel-edit-file-name "edit file name")
       ("C-f" find-file-no-ivy "find-file")
-      ("M-/" find-file-recursively "search recursively")))
+      ("M-/" find-file-recursively "search recursively")
+      ("M-." open-dwim-from-find-file "open dwim")))
   (ivy-add-actions
    'counsel-find-file
    `(,@counsel-find-file-extra-actions))
   (dolist (c (mapcar #'car counsel-find-file-extra-actions))
     (define-key counsel-find-file-map
       (kbd c) (ivy-make-magic-action 'counsel-find-file c)))
+  (defun open-dwim-from-find-file (&optional _)
+    (interactive)
+    (setq unread-command-events
+          (nconc (listify-key-sequence (kbd "M-9")) unread-command-events)))
   (defun find-file-recursively (&optional initial-input)
     (interactive)
     (let ((default-directory (file-name-directory
@@ -1059,18 +1010,6 @@
   :ensure
   :bind (:map rust-mode-map ("C-h d" . racer-describe))
   :hook (rust-mode . racer-mode))
-(use-package rtags
-  :disabled
-  :after company
-  :custom
-  (rtags-completions-enabled t)
-  :config
-  (add-to-list 'company-backends 'company-rtags)
-  (rtags-enable-standard-keybindings)
-  (use-package cmake-ide
-    :ensure
-    :config
-    (cmake-ide-setup)))
 (use-package python
   :mode ("\\.py\\'" . python-mode)
   :interpreter ("python" . python-mode)
@@ -1122,18 +1061,6 @@
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
-(use-package so-long
-  :disabled
-  :hook (after-init . global-so-long-mode))
-(use-package tab-bar
-  :disabled
-  :bind (("<C-prior>" . tab-previous)
-         ("<C-next>"  . tab-next)
-         :map tab-prefix-map
-         ("O" . tab-previous)
-         ("t" . tab-switcher))
-  :custom
-  (tab-bar-show nil))
 (use-package tramp
   :defer t
   :custom
@@ -1172,18 +1099,6 @@
   :ensure
   :diminish
   :hook (after-init . volatile-highlights-mode))
-(use-package vterm
-  :disabled
-  :config
-  (csetq shell-pop-shell-type '("vterm" "*vterm*" (lambda () (vterm))))
-  (advice-add #'vterm-yank-pop :override
-              (defun use-consult-yank-pop (&optional arg)
-                (interactive "p")
-                (vterm-goto-char (point))
-                (let ((inhibit-read-only t)
-                      (yank-undo-function #'(lambda (_start _end) (vterm-undo))))
-                  (cl-letf (((symbol-function 'insert-for-yank) #'vterm-insert))
-                    (consult-yank-pop arg))))))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
@@ -1246,9 +1161,6 @@
  ("M-q"                . fill-paragraph)
  ("RET"                . newline-and-indent)
  ("M-9"                . open-dwim)
- ("<mouse-2>"          . mouse-run-command-dwim)
- ("<mouse-3>"          . mouse-open-dwim)
-
  ("M-n"                . forward-paragraph)
  ("M-p"                . backward-paragraph)
 

@@ -1,3 +1,40 @@
+(defun mouse-run-command-dwim ()
+  (interactive)
+  (let ((s (get-current-active-selection)))
+    (cond (s
+           (compile s))
+          ((eq major-mode 'org-mode)
+           (call-interactively 'mouse-set-point)
+           (call-interactively 'org-ctrl-c-ctrl-c))
+          ((eq major-mode 'shell-mode)
+           (call-interactively 'mouse-set-point)
+           (call-interactively 'comint-copy-old-input)
+           (call-interactively 'comint-send-input))
+          (t
+           (call-interactively 'mouse-set-point)
+           (compile (thing-at-point 'filename))))))
+(defun mouse-open-dwim ()
+  (interactive)
+  (let ((s (get-current-active-selection)))
+    (cond (s
+           (open-dwim s))
+          (t
+           (call-interactively 'mouse-set-point)
+           (call-interactively 'open-dwim)))))
+(defun always-use-bottom-window (_ &optional height)
+  ;; Open helm window deterministic location always.
+  ;; (while (window-in-direction 'left)  (select-window (window-in-direction 'left)))
+  (setq height (or height (symbol-value 'helm-display-buffer-default-height)))
+  (while (window-in-direction 'below) (select-window (window-in-direction 'below)))
+  (when (> (window-height (selected-window)) (+ 5 height))
+    (split-window (selected-window) (- -2 height) 'below)
+    (select-window (window-in-direction 'below))))
+(defun display-buffer-in-bottom-window (buffer _)
+  (let ((w (get-buffer-window buffer)))
+    (unless w
+      (always-use-bottom-window nil 30)
+      (setq w (selected-window)))
+    (window--display-buffer buffer w 'reuse)))
 (use-package affe
   :disabled
   :ensure
@@ -14,6 +51,58 @@
 
   ;; Manual preview key for `affe-grep'
   (consult-customize affe-grep :preview-key (kbd "M-.")))
+(use-package dired-sidebar
+  :disabled
+  :ensure
+  :bind ("C-x C-j" . dired-sidebar-toggle-sidebar)
+  :custom
+  (dired-sidebar-no-delete-other-windows t)
+  (dired-sidebar-one-instance-p t)
+  (dired-sidebar-should-follow-file t)
+  (dired-sidebar-theme 'ascii))
+(use-package easy-repeat
+  :disabled
+  :ensure
+  :hook (after-init . easy-repeat-mode)
+  :config
+  (dolist (c '(goto-last-change tab-next tab-previous tab-move))
+    (cl-pushnew c easy-repeat-command-list)))
+(use-package rtags
+  :disabled
+  :after company
+  :custom
+  (rtags-completions-enabled t)
+  :config
+  (add-to-list 'company-backends 'company-rtags)
+  (rtags-enable-standard-keybindings)
+  (use-package cmake-ide
+    :ensure
+    :config
+    (cmake-ide-setup)))
+(use-package so-long
+  :disabled
+  :hook (after-init . global-so-long-mode))
+(use-package tab-bar
+  :disabled
+  :bind (("<C-prior>" . tab-previous)
+         ("<C-next>"  . tab-next)
+         :map tab-prefix-map
+         ("O" . tab-previous)
+         ("t" . tab-switcher))
+  :custom
+  (tab-bar-show nil))
+(use-package vterm
+  :disabled
+  :config
+  (csetq shell-pop-shell-type '("vterm" "*vterm*" (lambda () (vterm))))
+  (advice-add #'vterm-yank-pop :override
+              (defun use-consult-yank-pop (&optional arg)
+                (interactive "p")
+                (vterm-goto-char (point))
+                (let ((inhibit-read-only t)
+                      (yank-undo-function #'(lambda (_start _end) (vterm-undo))))
+                  (cl-letf (((symbol-function 'insert-for-yank) #'vterm-insert))
+                    (consult-yank-pop arg))))))
 (use-package icomplete
   :demand t
   :bind ( :map icomplete-minibuffer-map
