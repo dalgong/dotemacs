@@ -780,11 +780,11 @@
             (call-interactively cmd)))
       (ivy-toggle-mark-real)))
   (setq search-default-mode #'char-fold-to-regexp)
-  (defun ivy-switch-buffer-maybe-other-window (o &rest args)
-    (if current-prefix-arg
-        (call-interactively 'ivy-switch-buffer-other-window)
-      (apply o args)))
-  (advice-add 'ivy-switch-buffer :around #'ivy-switch-buffer-maybe-other-window)
+  (advice-add 'ivy-switch-buffer :around
+              (defun ivy-switch-buffer-maybe-other-window (o &rest args)
+                (if current-prefix-arg
+                    (call-interactively 'ivy-switch-buffer-other-window)
+                  (apply o args))))
   (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-arrow))
 (use-package ivy-hydra
   :ensure
@@ -800,6 +800,9 @@
          ("M-T"   . counsel-semantic-or-imenu)
          ("M-y"   . counsel-yank-pop)
          ("M-\""  . counsel-register)
+
+         :map ivy-mode-map
+         ([remap switch-to-buffer] . counsel-switch-buffer)
 
          :map counsel-find-file-map
          ("C-h"   . counsel-up-directory)
@@ -837,6 +840,11 @@
   (counsel-rg-base-command "rg -S -M 120 --no-heading --line-number --color never %s")
   (counsel-yank-pop-separator "\n----\n")
   :config
+  (advice-add 'counsel-switch-buffer :around
+              (defun counsel-switch-buffer-maybe-other-window (o &rest args)
+                (if current-prefix-arg
+                    (call-interactively 'counsel-switch-buffer-other-window)
+                  (apply o args))))
   (ivy-configure 'counsel-yank-pop
     :height ivy-height)
   (advice-add #'counsel-compilation-errors-cands :around
