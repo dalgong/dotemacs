@@ -1175,6 +1175,7 @@
  ("M-9"                . open-dwim)
  ("M-n"                . forward-paragraph)
  ("M-p"                . backward-paragraph)
+ ("M-P"                . ff-find-other-file)
 
  :map help-map
  ("1"                  . byte-compile-file)
