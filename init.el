@@ -717,9 +717,7 @@
   :ensure
   :after counsel
   :custom
-  (ivy-re-builders-alist '((counsel-file-jump . ivy--regex-fuzzy)
-                           (counsel-rg . ivy--regex-plus)
-                           (read-file-name-internal . ivy--regex-fuzzy)
+  (ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
                            (t . orderless-ivy-re-builder)))
   (completion-styles '(orderless))
   (orderless-component-separator 'orderless-escapable-split-on-space)
