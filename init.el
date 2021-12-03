@@ -262,6 +262,7 @@
 (use-package diminish
   :ensure
   :config
+  (diminish 'abbrev-mode)
   (diminish 'auto-revert-mode)
   (diminish 'eldoc-mode)
   (diminish 'flymake-mode))
@@ -280,9 +281,9 @@
 (use-package avy
   :ensure
   :bind (("C-'"   . avy-goto-char-timer)
+         ("C-\""  . avy-pop-mark)
          ("C-c '" . avy-goto-char-timer)
-         ("M-g SPC" . avy-goto-char-timer)
-         ("M-g M-SPC" . avy-goto-char-timer))
+         ("C-c \"". avy-pop-mark))
   :config
   (advice-add 'avy-goto-char-timer :around
               (defun avy-pop-mark-if-prefix (o &rest args)
@@ -1089,6 +1090,7 @@
   (add-to-list 'tramp-remote-path "~/bin"))
 (use-package tree-sitter
   :ensure
+  :diminish
   :hook ((after-init . global-tree-sitter-mode)
          (tree-sitter-after-on . tree-sitter-hl-mode))
   :config
