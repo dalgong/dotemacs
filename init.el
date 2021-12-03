@@ -290,7 +290,20 @@
               (defun avy-pop-mark-if-prefix (o &rest args)
                 (if current-prefix-arg
                     (call-interactively 'avy-pop-mark)
-                  (apply o args)))))
+                  (apply o args))))
+  (setf (alist-get ?. avy-dispatch-alist)
+        (defun avy-action-embark (pt)
+          (unwind-protect
+              (save-excursion
+                (goto-char pt)
+                (embark-act))
+            (select-window
+             (cdr (ring-ref avy-ring 0))))
+          t))
+  (setf (alist-get ?  avy-dispatch-alist)
+        (defun avy-action-mark-to-char (pt)
+          (activate-mark)
+          (goto-char pt))))
 (use-package bash-completion
   :ensure
   :hook (after-init . bash-completion-setup)
@@ -613,6 +626,9 @@
   :hook (after-init . electric-pair-mode))
 (use-package elfeed
   :bind (("C-x !" . elfeed)))
+(use-package embark
+  :custom
+  (embark-cycle-key (kbd "C-SPC")))
 (use-package exec-path-from-shell
   :if (eq system-type 'darwin)
   :ensure
