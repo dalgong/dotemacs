@@ -281,10 +281,11 @@
 (use-package avy
   :ensure
   :bind (("C-'"   . avy-goto-char-timer)
-         ("C-\""  . avy-pop-mark)
+         ("C-\""  . avy-resume)
          ("C-c '" . avy-goto-char-timer)
-         ("C-c \"". avy-pop-mark))
+         ("C-c \"". avy-resume))
   :config
+  (avy-setup-default)
   (advice-add 'avy-goto-char-timer :around
               (defun avy-pop-mark-if-prefix (o &rest args)
                 (if current-prefix-arg
