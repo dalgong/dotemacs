@@ -825,7 +825,9 @@
   (register-preview-function #'consult-register-format)
   ;; (consult-find-command "fd --color=never --full-path ARG OPTS")
   (consult-preview-key 'any)
-  (consult-narrow-key (kbd "C-SPC"))
+  (consult-narrow-key (kbd "M-SPC"))
+  (xref-show-xrefs-function #'consult-xref)
+  (xref-show-definitions-function #'consult-xref)
   :config
   ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
   ;; (nconc consult--source-file (list :state #'consult--file-preview))
@@ -834,14 +836,7 @@
   (advice-add #'consult-imenu :around
               (defun consult-imenu-across-all-buffers (o &rest args)
                 (if current-prefix-arg
-                    (let* ((buffers (cl-remove-if-not
-                                     (lambda (b)
-                                       (eq major-mode
-                                           (buffer-local-value 'major-mode b)))
-                                     (buffer-list))))
-                      (consult-imenu--select
-                       "Go to item: "
-                       (consult-imenu--multi-items buffers)))
+                    (call-interactively 'consult-imenu-multi)
                   (apply o args))))
   (defun consult-line-symbol-at-point ()
     (interactive)
@@ -864,7 +859,21 @@
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore)))
   (when (require 'selectrum nil t)
-    (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview)))
+    (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
+  (defun consult-buffer-state-no-tramp ()
+    "Buffer state function that doesn't preview Tramp buffers."
+    (let ((orig-state (consult--buffer-state))
+          (filter (lambda (cand restore)
+                    (if (or restore
+                            (let ((buffer (get-buffer cand)))
+                              (and buffer
+                                   (not (file-remote-p (buffer-local-value 'default-directory buffer))))))
+                        cand
+                      nil))))
+      (lambda (cand restore)
+        (funcall orig-state (funcall filter cand restore) restore))))
+  (setq consult--source-buffer
+        (plist-put consult--source-buffer :state #'consult-buffer-state-no-tramp)))
 (use-package consult-flycheck
   :ensure
   :bind (:map flycheck-command-map
@@ -1139,6 +1148,11 @@
  ("M-q"                . fill-paragraph)
  ("RET"                . newline-and-indent)
  ("M-9"                . open-dwim)
+ ("M-C"                . compile)
+ ("M-D"                . recompile)
+ ("M-Q"                . query-replace)
+ ("M-R"                . query-replace-regexp)
+ ("M-Z"                . shell)
  ("M-n"                . forward-paragraph)
  ("M-p"                . backward-paragraph)
  ("M-P"                . ff-find-other-file)

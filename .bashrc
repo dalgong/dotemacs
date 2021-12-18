@@ -1,4 +1,4 @@
-expr "$-" : .*i.* >/dev/null 2>&1 || return
+# expr "$-" : .*i.* >/dev/null 2>&1 || return
 
 shopt -s checkwinsize
 shopt -s histappend
@@ -21,8 +21,8 @@ if test -f $HOME/.cargo/env; then
 fi
 
 # go
-export GOPATH=$HOME/gocode
-export PATH=$HOME/go/bin:$GOPATH/bin:$HOME/local/bin:$HOME/.fzf/bin:$PATH
+export GOPATH=$HOME/go
+export PATH=$GOPATH/bin:$HOME/local/bin:$HOME/.fzf/bin:$PATH
 
 alias ls='ls -BCF'
 alias mv='mv -i'
