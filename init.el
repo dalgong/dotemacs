@@ -733,10 +733,7 @@
           (isearch-repeat-backward))))))
 (use-package orderless
   :ensure
-  :after counsel
   :custom
-  (ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
-                           (t . orderless-ivy-re-builder)))
   (completion-styles '(orderless))
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
@@ -744,229 +741,181 @@
   (orderless-skip-highlighting (lambda () (bound-and-true-p selectrum-is-active)))
   (selectrum-highlight-candidates-function #'orderless-highlight-matches)
   :config
+  (eval-after-load "counsel"
+    '(setq ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
+                                   (t . orderless-ivy-re-builder))))
   (defun negate-if-bang (pattern _index _total)
     (when (string-prefix-p "!" pattern)
       `(orderless-without-literal . ,(substring pattern 1)))))
-(use-package ivy
+(use-package selectrum
   :ensure
-  :diminish
-  :hook (after-init . ivy-mode)
-  :bind (:map ivy-minibuffer-map
-              ("C-SPC" . ivy-toggle-mark)
-              ("C-@"   . ivy-toggle-mark)
-              ("TAB"   . ivy-partial)
-              ("C-i"   . ivy-partial)
-              ("M-'"   . ivy-avy)
-              ("M-SPC" . ivy-restrict-to-matches)
-
-              :map mode-specific-map
-              ("]"   . ivy-push-view)
-              ("["   . ivy-pop-view)
-              ("C-r" . ivy-resume))
+  :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
+          :map mode-specific-map ("C-r" . selectrum-repeat))
+  :hook (after-init . selectrum-mode)
   :custom
-  (ivy-action-wrap nil)
-  (ivy-count-format "")
-  (ivy-extra-directories '("./"))
-  (ivy-fixed-height-minibuffer nil)
-  (ivy-height 10)
-  (ivy-magic-tilde t)
-  (ivy-on-del-error-function nil)
-  (ivy-read-action-function 'ivy-hydra-read-action)
-  (ivy-use-selectable-prompt t)
-  (ivy-use-virtual-buffers t)
-  (ivy-virtual-abbreviate 'abbreviate)
-  (ivy-wrap nil)
-  (minibuffer-depth-indicate-mode t)
+  (selectrum-complete-in-buffer nil)
+  (selectrum-count-style nil)
+  (selectrum-max-window-height .15)
+  (file-name-shadow-properties '(invisible t))
   :config
-  (defun ivy-toggle-mark-real ()
-    (if (ivy--marked-p)
-        (ivy--unmark (ivy-state-current ivy-last))
-      (ivy--mark (ivy-state-current ivy-last)))
-    (ivy-next-line))
-  (defun ivy-toggle-mark ()
-    (interactive)
-    (if (and (called-interactively-p 'interactive)
-             (null current-prefix-arg)
-             (not (eq last-command 'ivy-toggle-mark))
-             (not (sit-for set-mark-dwim-timeout)))
-        (let ((cmd (lookup-key (current-active-maps) (read-key-sequence ""))))
-          (if (eq cmd this-command)
-              (call-interactively set-mark-dwim-repeat-action)
-            (ivy-toggle-mark-real)
-            (call-interactively cmd)))
-      (ivy-toggle-mark-real)))
-  (setq search-default-mode #'char-fold-to-regexp)
-  (advice-add 'ivy-switch-buffer :around
-              (defun ivy-switch-buffer-maybe-other-window (o &rest args)
-                (if current-prefix-arg
-                    (call-interactively 'ivy-switch-buffer-other-window)
-                  (apply o args))))
-  (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-arrow))
-(use-package ivy-hydra
+  (use-package prescient
+    :ensure
+    :hook (after-init . prescient-persist-mode))
+  (use-package selectrum-prescient
+    :ensure
+    :custom
+    (selectrum-prescient-enable-filtering nil)
+    :config
+    (selectrum-prescient-mode 1)))
+(use-package consult
   :ensure
-  :after ivy)
-(use-package counsel
-  :ensure
-  :diminish
-  :hook (after-init . counsel-mode)
-  :bind (([remap dired] . counsel-dired)
-         ([remap tmm-menubar] . counsel-tmm)
-         ([remap menu-bar-open] . counsel-tmm)
-         ([remap package-install] . counsel-package)
-         ("M-T"   . counsel-semantic-or-imenu)
-         ("M-y"   . counsel-yank-pop)
-         ("M-\""  . counsel-register)
-
-         :map ivy-mode-map
-         ([remap switch-to-buffer] . counsel-switch-buffer)
-
-         :map counsel-find-file-map
-         ("C-h"   . counsel-up-directory)
-         :map ivy-minibuffer-map
-         ("M-p"   . counsel-minibuffer-history)
-         ("M-y"   . ivy-next-line)
-
-         :map ctl-x-map
-         ("C-r"   . counsel-recentf)
-         ("`"     . counsel-compilation-errors)
-
-         :map compilation-mode-map
-         ("M-T"   . counsel-compilation-errors)
+  :bind (("M-\"" . consult-register-load)
+         ("M-'"  . consult-register-store)
+         ([remap yank-pop] . consult-yank-pop)
+         ("M-T" . consult-imenu)
 
          :map help-map
-         ("x"   . counsel-minor)
-         ("X"   . counsel-major)
-         ("r"   . counsel-register)
-         ("u"   . counsel-unicode-char)
-         ("SPC" . counsel-mark-ring)
-         ("RET" . counsel-linux-app)
+         ("a"     . consult-apropos)
+         ("C-m"   . consult-man)
+         ("SPC"   . consult-mark)
+         ("C-SPC" . consult-global-mark)
+         ("x"     . consult-minor-mode-menu)
+         ("X"     . consult-mode-command)
 
          :map mode-specific-map
-         ("C-g" . counsel-grep)
-         ("g"   . counsel-rg)
-         ("o"   . counsel-grep-or-swiper)
-         ("O"   . counsel-outline)
+         ("h"   . consult-history)
+         ("b"   . consult-bookmark)
+         ("g"   . consult-ripgrep)
+         ("C-g" . consult-grep)
+         ("G"   . consult-git-grep)
+         ("k"   . consult-kmacro)
+         ("m"   . consult-mode-command)
 
-         :map comint-mode-map
-         ("M-r" . counsel-shell-history))
-  :custom
-  (counsel-find-file-at-point t)
-  (counsel-preselect-current-file t)
-  (counsel-grep-base-command "rg -S -M 120 --no-heading --line-number --color never %s %s")
-  (counsel-rg-base-command "rg -S -M 120 --no-heading --line-number --color never %s")
-  (counsel-yank-pop-separator "\n----\n")
-  :config
-  (advice-add 'counsel-switch-buffer :around
-              (defun counsel-switch-buffer-maybe-other-window (o &rest args)
-                (if current-prefix-arg
-                    (call-interactively 'counsel-switch-buffer-other-window)
-                  (apply o args))))
-  (ivy-configure 'counsel-yank-pop
-    :height ivy-height)
-  (advice-add #'counsel-compilation-errors-cands :around
-              (defun use-this-current-compilation-buffer-only (o &rest args)
-                (if (compilation-buffer-p (current-buffer))
-                    (counsel--compilation-errors-buffer (current-buffer))
-                  (apply o args))))
-  (defun set-initial-input-with-region (args)
-    (cons (or (car args)
-              (prog1 (get-current-active-selection) (deactivate-mark)))
-          (cdr args)))
-  (advice-add #'counsel-rg             :filter-args #'set-initial-input-with-region)
-  (advice-add #'counsel-grep-or-swiper :filter-args #'set-initial-input-with-region)
-  (defvar counsel-find-file-extra-actions
-    '(("C-e" counsel-edit-file-name "edit file name")
-      ("C-f" find-file-no-ivy "find-file")
-      ("M-/" find-file-recursively "search recursively")
-      ("M-." open-dwim-from-find-file "open dwim")))
-  (ivy-add-actions
-   'counsel-find-file
-   `(,@counsel-find-file-extra-actions))
-  (dolist (c (mapcar #'car counsel-find-file-extra-actions))
-    (define-key counsel-find-file-map
-      (kbd c) (ivy-make-magic-action 'counsel-find-file c)))
-  (defun open-dwim-from-find-file (&optional _)
-    (interactive)
-    (setq unread-command-events
-          (nconc (listify-key-sequence (kbd "M-9")) unread-command-events)))
-  (defun find-file-recursively (&optional initial-input)
-    (interactive)
-    (let ((default-directory (file-name-directory
-                              (or initial-input default-directory))))
-      (ivy-read "Find file: "
-                (split-string (shell-command-to-string "rg --files") nil t)
-                :matcher #'counsel--find-file-matcher
-                :initial-input nil
-                :action #'find-file
-                :preselect (counsel--preselect-file)
-                :require-match 'confirm-after-completion
-                :history 'file-name-history
-                :keymap counsel-find-file-map
-                :caller 'counsel-file-jump)))
-  (cl-pushnew (cons 'counsel-yank-pop 15)
-              ivy-height-alist
-              :key #'car)
-  (cl-pushnew '("\\`file" . jump-to-register)
-              counsel-register-actions
-              :key #'car
-              :test #'string-equal)
-  (defun counsel-edit-file-name (filename)
-    (interactive "s")
-    (counsel-find-file (read-string "[EDIT] " filename)))
-  (defun find-file-no-ivy (_)
-    (interactive "s")
-    (let ((completing-read-function #'completing-read-default))
-      (apply #'find-file
-             (find-file-read-args "Find file: "
-                                  (confirm-nonexistent-file-or-buffer))))))
-(use-package swiper
-  :ensure
-  :bind (;; ([remap isearch-forward] . swiper-isearch)
-         ;; ([remap isearch-backward] . swiper-isearch-backward)
+         :map ctl-x-map
+         ("M-:" . consult-complex-command)
+         ("b"   . consult-buffer)
+         ("C-r" . consult-recent-file)
+         ("`"   . consult-compile-error)
+
+         :map ctl-x-4-map
+         ("b" . consult-buffer-other-window)
+
+         :map ctl-x-5-map
+         ("b" . consult-buffer-other-frame)
+
+         :map goto-map
+         ("g" . consult-goto-line)
+         ("M-g" . consult-goto-line)
+         ("o" . consult-outline)
+         ("I" . consult-imenu-multi)
+         ("e" . consult-error)
+         :map search-map
+         ("l" . consult-line)
+         ("m" . consult-multi-occur)
+         ("o" . consult-line-symbol-at-point)
+         ("O" . consult-focus-lines-symbol-at-point)
+         ("k" . consult-keep-lines)
+         ("u" . consult-focus-lines)
+         ("e" . consult-isearch)
          :map isearch-mode-map
-         ("M-s s" . swiper-isearch-toggle)
-         ("M-s S" . swiper-all-from-isearch)
-         :map swiper-map
-         ("M-m" . swiper-mc)
-         ("C-w" . ivy-yank-word)
-         ("C-r" . swiper-C-r)
-         ("C-s" . swiper-C-s))
-  :commands swiper-mc
+         ("M-e" . consult-isearch)
+         ("M-l" . consult-line))
+  :custom
+  (register-preview-delay 0)
+  (register-preview-function #'consult-register-format)
+  ;; (consult-find-command "fd --color=never --full-path ARG OPTS")
+  (consult-preview-key 'any)
+  (consult-narrow-key (kbd "C-SPC"))
   :config
-  (defun swiper-C-r (&optional arg)
-    (interactive "p")
-    (if (string= ivy-text "")
-        (ivy-previous-history-element 1)
-      (ivy-previous-line arg)))
-  (advice-add #'swiper-isearch :filter-args #'use-current-active-selection)
-  (defun use-current-active-selection (args)
-    (if (car args)
-        args
-      (let ((s (get-current-active-selection)))
-        (when s
-          (deactivate-mark)
-          (list s)))))
-  (defun swiper-all-from-isearch ()
+  ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
+  ;; (nconc consult--source-file (list :state #'consult--file-preview))
+  ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
+  (advice-add #'register-preview :override #'consult-register-window)
+  (advice-add #'consult-imenu :around
+              (defun consult-imenu-across-all-buffers (o &rest args)
+                (if current-prefix-arg
+                    (let* ((buffers (cl-remove-if-not
+                                     (lambda (b)
+                                       (eq major-mode
+                                           (buffer-local-value 'major-mode b)))
+                                     (buffer-list))))
+                      (consult-imenu--select
+                       "Go to item: "
+                       (consult-imenu--multi-items buffers)))
+                  (apply o args))))
+  (defun consult-line-symbol-at-point ()
     (interactive)
-    (let ((query (if isearch-regexp
-                     isearch-string
-                   (regexp-quote isearch-string))))
-      (isearch-exit)
-      (swiper-all query))))
-(use-package ivy-rich
+    (consult-line (thing-at-point 'symbol)))
+  (defun consult-focus-lines-symbol-at-point ()
+    (interactive)
+    (consult-focus-lines
+     nil
+     (lambda (pattern cands)
+       (consult--completion-filter
+        pattern cands 'consult-location 'highlight))
+     (thing-at-point 'symbol)))
+  (defvar-local consult-toggle-preview-orig nil)
+  (defun consult-toggle-preview ()
+    "Command to enable/disable preview."
+    (interactive)
+    (if consult-toggle-preview-orig
+        (setq consult--preview-function consult-toggle-preview-orig
+              consult-toggle-preview-orig nil)
+      (setq consult-toggle-preview-orig consult--preview-function
+            consult--preview-function #'ignore)))
+  (when (require 'selectrum nil t)
+    (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview)))
+(use-package consult-flycheck
   :ensure
-  :hook (after-init . ivy-rich-mode))
-(use-package ivy-rtags
+  :bind (:map flycheck-command-map
+              ("!" . consult-flycheck)))
+(use-package marginalia
   :ensure
-  :after rtags
+  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :custom
-  (rtags-display-result-backend 'ivy))
-(use-package ivy-xref
+  (marginalia-annotators
+   '(marginalia-annotators-light marginalia-annotators-heavy))
+  :hook (after-init . marginalia-mode)
+  :config
+  (advice-add #'marginalia-cycle :after
+              (lambda () (when (bound-and-true-p selectrum-mode)
+                           (selectrum-exhibit 'keep-selected)))))
+(use-package embark
   :ensure
-  :after xref
+  :after selectrum
+  :commands (embark-act embark-prefix-help-command)
+  :bind (:map minibuffer-local-map
+              ("M-."   . embark-act)
+              ("M-,"   . embark-act-noquit)
+              ("M-E"   . embark-export)
+              :map selectrum-minibuffer-map
+              ("M-."   . embark-act)
+              ("M-,"   . embark-act-noquit)
+              ("M-E"   . embark-export))
+
   :custom
-  (xref-show-xrefs-function 'ivy-xref-show-xrefs)
-  (xref-show-definitions-function #'ivy-xref-show-defs))
+  (prefix-help-command #'embark-prefix-help-command)
+  (embark-cycle-key ";")
+  :config
+  (defun embark-act-noquit ()
+    "Run action but don't quit the minibuffer afterwards."
+    (interactive)
+    (let ((embark-quit-after-action nil))
+      (embark-act)))
+  (advice-add 'kill-line :around #'consult-kill-line-dwim)
+  (defun consult-kill-line-dwim (o &rest args)
+    (let ((target (and (minibufferp) (car (embark--targets)))))
+      (cond ((eq 'buffer (car target))
+             (kill-buffer (cl-second target)))
+            ((eq 'file (car target))
+             (delete-file (cl-second target)))
+            (t
+             (apply o args))))))
+(use-package embark-consult
+  :ensure
+  :after (embark consult)
+  :config
+  (add-hook 'embark-collect-mode-hook #'consult-preview-at-point-mode))
 (use-package jka-cmpr-hook
   :hook (after-init . auto-compression-mode))
 (use-package magit
@@ -1209,6 +1158,8 @@
  ("SPC"                . cycle-spacing)
  ("C-_"                . recursive-edit)
  ("b"                  . bury-buffer)
+ ("C-g"                . counsel-grep)
+ ("g"                  . counsel-rg)
  ("q"                  . delete-other-window)
  ("r"                  . replace-regexp)
  ("s"                  . replace-string)

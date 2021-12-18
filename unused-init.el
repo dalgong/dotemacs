@@ -353,33 +353,35 @@
     (ivy-magic-tilde t)
     (ivy-on-del-error-function nil)
     (ivy-read-action-function 'ivy-hydra-read-action)
-    (ivy-re-builders-alist '((t . orderless-ivy-re-builder)))
     (ivy-use-selectable-prompt t)
     (ivy-use-virtual-buffers t)
     (ivy-virtual-abbreviate 'abbreviate)
     (ivy-wrap nil)
     (minibuffer-depth-indicate-mode t)
     :config
-    (defun ivy-toggle-mark ()
-      (interactive)
+    (defun ivy-toggle-mark-real ()
       (if (ivy--marked-p)
           (ivy--unmark (ivy-state-current ivy-last))
         (ivy--mark (ivy-state-current ivy-last)))
       (ivy-next-line))
+    (defun ivy-toggle-mark ()
+      (interactive)
+      (if (and (called-interactively-p 'interactive)
+               (null current-prefix-arg)
+               (not (eq last-command 'ivy-toggle-mark))
+               (not (sit-for set-mark-dwim-timeout)))
+          (let ((cmd (lookup-key (current-active-maps) (read-key-sequence ""))))
+            (if (eq cmd this-command)
+                (call-interactively set-mark-dwim-repeat-action)
+              (ivy-toggle-mark-real)
+              (call-interactively cmd)))
+        (ivy-toggle-mark-real)))
     (setq search-default-mode #'char-fold-to-regexp)
-    (defun ivy-switch-buffer-maybe-other-window (o &rest args)
-      (if current-prefix-arg
-          (let ((w (selected-window)))
-            (call-interactively 'ivy-switch-buffer-other-window)
-            (select-window w))
-        (apply o args)))
-    (advice-add 'ivy-switch-buffer :around #'ivy-switch-buffer-maybe-other-window)
-    (cl-pushnew (cons 'read-file-name-internal #'ivy--regex-fuzzy)
-                ivy-re-builders-alist
-                :key #'car)
-    (cl-pushnew (cons 'counsel-file-jump #'ivy--regex-fuzzy)
-                ivy-re-builders-alist
-                :key #'car)
+    (advice-add 'ivy-switch-buffer :around
+                (defun ivy-switch-buffer-maybe-other-window (o &rest args)
+                  (if current-prefix-arg
+                      (call-interactively 'ivy-switch-buffer-other-window)
+                    (apply o args))))
     (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-arrow))
   (use-package ivy-hydra
     :ensure
@@ -398,6 +400,9 @@
            ("M-T"   . counsel-semantic-or-imenu)
            ("M-y"   . counsel-yank-pop)
            ("M-\""  . counsel-register)
+
+           :map ivy-mode-map
+           ([remap switch-to-buffer] . counsel-switch-buffer)
 
            :map counsel-find-file-map
            ("C-h"   . counsel-up-directory)
@@ -431,13 +436,17 @@
     :custom
     (counsel-find-file-at-point t)
     (counsel-preselect-current-file t)
-    (counsel-find-file-ignore-regexp (regexp-opt completion-ignored-extensions))
     (counsel-grep-base-command "rg -S -M 120 --no-heading --line-number --color never %s %s")
     (counsel-rg-base-command "rg -S -M 120 --no-heading --line-number --color never %s")
     (counsel-yank-pop-separator "\n----\n")
     :config
+    (advice-add 'counsel-switch-buffer :around
+                (defun counsel-switch-buffer-maybe-other-window (o &rest args)
+                  (if current-prefix-arg
+                      (call-interactively 'counsel-switch-buffer-other-window)
+                    (apply o args))))
     (ivy-configure 'counsel-yank-pop
-                   :height ivy-height)
+      :height ivy-height)
     (advice-add #'counsel-compilation-errors-cands :around
                 (defun use-this-current-compilation-buffer-only (o &rest args)
                   (if (compilation-buffer-p (current-buffer))
@@ -452,13 +461,18 @@
     (defvar counsel-find-file-extra-actions
       '(("C-e" counsel-edit-file-name "edit file name")
         ("C-f" find-file-no-ivy "find-file")
-        ("M-/" find-file-recursively "search recursively")))
+        ("M-/" find-file-recursively "search recursively")
+        ("M-." open-dwim-from-find-file "open dwim")))
     (ivy-add-actions
      'counsel-find-file
      `(,@counsel-find-file-extra-actions))
     (dolist (c (mapcar #'car counsel-find-file-extra-actions))
       (define-key counsel-find-file-map
-        (kbd c) (ivy-make-magic-action 'counsel-find-file c)))
+                  (kbd c) (ivy-make-magic-action 'counsel-find-file c)))
+    (defun open-dwim-from-find-file (&optional _)
+      (interactive)
+      (setq unread-command-events
+            (nconc (listify-key-sequence (kbd "M-9")) unread-command-events)))
     (defun find-file-recursively (&optional initial-input)
       (interactive)
       (let ((default-directory (file-name-directory
