@@ -18,7 +18,7 @@
                                 (tool-bar-lines . 0)
                                 (vertical-scroll-bars . nil)
                                 (alpha            . (100 95))
-                                (font             . "Roboto Mono-12:antialias=true:hinting=true")
+                                (font             . "IBM Plex Mono Medium-10:antialias=true:hinting=true")
                                 (left-fringe      . 0)
                                 (right-fringe     . 0)
                                 (ns-transparent-titlebar . t)

@@ -90,12 +90,14 @@
                        ""))
                    (propertize " " 'display `(space :align-to (- right 6)))
                    "%l:%c")))
+ '(next-error-message-highlight t)
  '(ns-alternate-modifier 'super)
  '(ns-command-modifier 'meta)
  '(ns-tool-bar-display-mode 'both)
  '(ns-tool-bar-size-mode 'regular)
  '(ns-use-thin-smoothing t)
  '(read-buffer-completion-ignore-case t)
+ '(read-extended-command-predicate #'command-completion-default-include-p)
  '(read-file-name-completion-ignore-case t)
  '(read-process-output-max (* 1024 1024))
  '(redisplay-skip-fontification-on-input t)
@@ -122,6 +124,7 @@
  '(use-dialog-box nil)
  '(use-package-compute-statistics nil)
  '(use-package-enable-imenu-support t)
+ '(use-short-answers t)
  '(vc-follow-symlinks nil)
  '(vc-handled-backends nil)
  '(version-control t)
@@ -748,6 +751,7 @@
     (when (string-prefix-p "!" pattern)
       `(orderless-without-literal . ,(substring pattern 1)))))
 (use-package selectrum
+  :disabled
   :ensure
   :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
           :map mode-specific-map ("C-r" . selectrum-repeat))
@@ -767,6 +771,25 @@
     (selectrum-prescient-enable-filtering nil)
     :config
     (selectrum-prescient-mode 1)))
+(use-package vertico
+  :bind ( :map vertico-map
+          ("?" . minibuffer-completion-help)
+          ("RET" . vertico-directory-enter)
+          ("DEL" . vertico-directory-delete-char)
+          ("M-DEL" . vertico-directory-delete-word)
+          ("M-G" . vertico-grid-mode)
+          ("M-F" . vertico-flat-mode)
+          ("M-'" . vertico-quick-insert)
+          ("M-m" . vertico-quick-exit)
+          :map mode-specific-map
+          ("C-r" . vertico-repeat))
+  :hook ((after-init . vertico-mode)
+         (minibuffer-setup . vertico-repeat-save)
+         (rfn-eshadow-update-overlay . vertico-directory-tidy))
+  :custom
+  (read-extended-command-predicate #'command-completion-default-include-p)
+  :config
+  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -829,6 +852,20 @@
   (xref-show-xrefs-function #'consult-xref)
   (xref-show-definitions-function #'consult-xref)
   :config
+  (advice-add #'substitute-in-file-name :around
+              (defun keep-url (o arg)
+                (if (string-match "^https?://" arg)
+                    arg
+                  (funcall o arg))))
+  (advice-add #'find-file-read-args :filter-return
+              (defun may-browse-url (r)
+                (if (string-match "^https?://" (car r))
+                    (progn
+                      (browse-url (car r))
+                      (exit-minibuffer))
+                  r)))
+  (advice-add #'completing-read-multiple :override
+              #'consult-completing-read-multiple)
   ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
   ;; (nconc consult--source-file (list :state #'consult--file-preview))
   ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
@@ -858,8 +895,8 @@
               consult-toggle-preview-orig nil)
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore)))
-  (when (require 'selectrum nil t)
-    (define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
+  (eval-after-load "selectrum"
+    '(define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
   (defun consult-buffer-state-no-tramp ()
     "Buffer state function that doesn't preview Tramp buffers."
     (let ((orig-state (consult--buffer-state))
@@ -891,13 +928,8 @@
                            (selectrum-exhibit 'keep-selected)))))
 (use-package embark
   :ensure
-  :after selectrum
   :commands (embark-act embark-prefix-help-command)
   :bind (:map minibuffer-local-map
-              ("M-."   . embark-act)
-              ("M-,"   . embark-act-noquit)
-              ("M-E"   . embark-export)
-              :map selectrum-minibuffer-map
               ("M-."   . embark-act)
               ("M-,"   . embark-act-noquit)
               ("M-E"   . embark-export))
@@ -906,6 +938,11 @@
   (prefix-help-command #'embark-prefix-help-command)
   (embark-cycle-key ";")
   :config
+  (eval-after-load "selectrum"
+    '(bind-keys :map selectrum-minibuffer-map
+                ("M-."   . embark-act)
+                ("M-,"   . embark-act-noquit)
+                ("M-E"   . embark-export)))
   (defun embark-act-noquit ()
     "Run action but don't quit the minibuffer afterwards."
     (interactive)
@@ -1150,6 +1187,7 @@
  ("M-9"                . open-dwim)
  ("M-C"                . compile)
  ("M-D"                . recompile)
+ ("M-M"                . tmm-menubar)
  ("M-Q"                . query-replace)
  ("M-R"                . query-replace-regexp)
  ("M-Z"                . shell)
@@ -1172,8 +1210,6 @@
  ("SPC"                . cycle-spacing)
  ("C-_"                . recursive-edit)
  ("b"                  . bury-buffer)
- ("C-g"                . counsel-grep)
- ("g"                  . counsel-rg)
  ("q"                  . delete-other-window)
  ("r"                  . replace-regexp)
  ("s"                  . replace-string)
