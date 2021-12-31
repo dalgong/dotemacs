@@ -781,6 +781,8 @@
           ("M-F" . vertico-flat-mode)
           ("M-'" . vertico-quick-insert)
           ("M-m" . vertico-quick-exit)
+          ("M-." . consult-dir)
+          ("M-/" . consult-dir-jump-file)
           :map mode-specific-map
           ("C-r" . vertico-repeat))
   :hook ((after-init . vertico-mode)
@@ -789,7 +791,8 @@
   :custom
   (read-extended-command-predicate #'command-completion-default-include-p)
   :config
-  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions))
+  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
+  (use-package consult-dir :ensure t))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -937,6 +940,7 @@
   :custom
   (prefix-help-command #'embark-prefix-help-command)
   (embark-cycle-key ";")
+  (embark-help-key "?")
   :config
   (eval-after-load "selectrum"
     '(bind-keys :map selectrum-minibuffer-map
