@@ -834,7 +834,7 @@
          ("M-g" . consult-goto-line)
          ("o" . consult-outline)
          ("I" . consult-imenu-multi)
-         ("e" . consult-error)
+         ("e" . consult-compile-error)
          :map search-map
          ("l" . consult-line)
          ("m" . consult-multi-occur)
@@ -978,6 +978,20 @@
   (setq magit-status-buffer-switch-function 'switch-to-buffer)
   (defun magit-display-buffer-same-window (buffer)
     (display-buffer buffer '(display-buffer-same-window))))
+(use-package modus-themes
+  :custom
+  (modus-themes-slanted-constructs t)
+  (modus-themes-bold-constructs t)
+  (modus-themes-scale-headings t)
+  (modus-themes-mode-line '(moody accented borderless))
+  (modus-themes-hl-line '(accented intense))
+  (modus-themes-region '(bg-only))
+  :init
+  (modus-themes-load-themes)
+  :config
+  (if (display-graphic-p)
+      (modus-themes-load-operandi)
+    (modus-themes-load-vivendi)))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
