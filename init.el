@@ -791,6 +791,14 @@
   :custom
   (read-extended-command-predicate #'command-completion-default-include-p)
   :config
+  (advice-add #'vertico--format-candidate :around
+              (defun indicate-current-entry (orig cand prefix suffix index _start)
+                (setq cand (funcall orig cand prefix suffix index _start))
+                (concat
+                 (if (= vertico--index index)
+                     (propertize "» " 'face 'vertico-current)
+                   "  ")
+                 cand)))
   (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
   (use-package consult-dir :ensure t))
 (use-package consult
@@ -837,15 +845,17 @@
          ("e" . consult-compile-error)
          :map search-map
          ("l" . consult-line)
+         ("L" . consult-line-multi)
          ("m" . consult-multi-occur)
          ("o" . consult-line-symbol-at-point)
          ("O" . consult-focus-lines-symbol-at-point)
          ("k" . consult-keep-lines)
          ("u" . consult-focus-lines)
-         ("e" . consult-isearch)
+         ("e" . consult-isearch-history)
          :map isearch-mode-map
-         ("M-e" . consult-isearch)
-         ("M-l" . consult-line))
+         ("M-e" . consult-isearch-history)
+         ("M-l" . consult-line)
+         ("M-L" . consult-line-multi))
   :custom
   (register-preview-delay 0)
   (register-preview-function #'consult-register-format)
@@ -900,6 +910,8 @@
             consult--preview-function #'ignore)))
   (eval-after-load "selectrum"
     '(define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
+  (eval-after-load "vertico"
+    '(define-key vertico-map (kbd "M-P") #'consult-toggle-preview))
   (defun consult-buffer-state-no-tramp ()
     "Buffer state function that doesn't preview Tramp buffers."
     (let ((orig-state (consult--buffer-state))
