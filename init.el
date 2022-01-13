@@ -774,6 +774,7 @@
 (use-package vertico
   :bind ( :map vertico-map
           ("?" . minibuffer-completion-help)
+          ("C-j" . vertico-exit-input)
           ("RET" . vertico-directory-enter)
           ("DEL" . vertico-directory-delete-char)
           ("M-DEL" . vertico-directory-delete-word)
