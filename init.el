@@ -272,6 +272,20 @@
 (use-package ace-window
   :ensure
   :bind ("M-`" . ace-window))
+(use-package affe
+  :ensure
+  :after orderless
+  :bind ( :map mode-specific-map
+          ("C-g" . affe-grep)
+          :map search-map
+          ("f" . affe-find)
+          ("g" . affe-grep))
+  :config
+  (defun affe-orderless-regexp-compiler (input _type)
+    (setq input (orderless-pattern-compiler input))
+    (cons input (lambda (str) (orderless--highlight input str))))
+  ;; Manual preview key for `affe-grep'
+  (consult-customize affe-grep :preview-key (kbd "M-P")))
 (use-package amx
   :ensure
   :hook (after-init . amx-mode))
@@ -526,282 +540,6 @@
 (use-package compiler-explorer
   :ensure
   :bind (:map help-map ("C" . compiler-explorer)))
-(use-package coterm
-  :ensure
-  :bind (:map comint-mode-map
-              ("C-;" . coterm-char-mode-cycle)
-              ("C-c j" . coterm-char-mode-cycle))
-  :hook (after-init . coterm-mode))
-(use-package dabbrev
-  :bind (("C-M-_" . dabbrev-completion)
-         ("C-M-/" . dabbrev-completion)
-         :map mode-specific-map
-         ("/" . dabbrev-expand))
-  :custom
-  (abbrev-suggest t)
-  (dabbrev-case-fold-search nil)
-  :config
-  (advice-add 'dabbrev--find-expansion :around
-              (defun suppress-message (o &rest args)
-                (let ((inhibit-message t))
-                  (apply o args)))))
-(use-package diffview
-  :ensure
-  :after diff-mode
-  :bind (:map diff-mode-map
-              ("|" . diffview-current)))
-(use-package dired
-  :bind ( :map dired-mode-map
-          ("^" . dired-up-directory-inplace)
-          ([remap dired-do-find-regexp] . dired-do-multi-occur))
-  :custom
-  (dired-kill-when-opening-new-dired-buffer t)
-  (dired-no-confirm t)
-  (dired-recursive-copies 'always)
-  (dired-recursive-deletes 'always)
-  (dired-use-ls-dired nil)
-  :config
-  (defun dired-up-directory-inplace ()
-    (interactive)
-    (find-alternate-file ".."))
-  (defun dired-do-multi-occur (regexp)
-    "Run `dired-do-multi-occur` with REGEXP on all marked files."
-    (interactive (list (read-regexp "Regexp: ")))
-    (multi-occur (mapcar 'find-file-noselect (dired-get-marked-files)) regexp))
-  (advice-add #'dired-find-file-other-window :around
-              (defun force-horizontal-split (o &rest args)
-                (let ((split-width-threshold (frame-width)))
-                  (apply o args)))))
-(use-package dired-subtree
-  :ensure
-  :after dired
-  :bind (:map dired-mode-map ("TAB" . dired-subtree-toggle))
-  :custom-face
-  (dired-subtree-depth-1-face ((t :inherit default)))
-  (dired-subtree-depth-2-face ((t :inherit default)))
-  (dired-subtree-depth-3-face ((t :inherit default)))
-  (dired-subtree-depth-4-face ((t :inherit default)))
-  (dired-subtree-depth-5-face ((t :inherit default)))
-  (dired-subtree-depth-6-face ((t :inherit default))))
-(use-package dired-x
-  :after dired
-  :hook (dired-mode . dired-extra-startup))
-(use-package easy-kill
-  :ensure
-  :bind (([remap kill-ring-save]              . easy-kill)
-         :map easy-kill-base-map
-         ([remap exchange-point-and-mark]     . easy-kill-exchange-point-and-mark)
-         ([remap set-mark]                    . easy-kill-mark-region)
-         ([remap cua-exchange-point-and-mark] . easy-kill-exchange-point-and-mark)
-         ([remap cua-set-mark]                . easy-kill-mark-region)
-         ("o" . easy-kill-expand)
-         ("i" . easy-kill-shrink)))
-(use-package ediff
-  :bind (:map mode-specific-map ("=" . ediff-current-file))
-  :custom
-  (diff-switches "-wu")
-  (ediff-diff-options "-w")
-  (ediff-custom-diff-options "-u")
-  (ediff-keep-variants nil)
-  (ediff-highlight-all-diffs 'nil)
-  :hook ((ediff-before-setup . save-window-configuration)
-         ((ediff-quit ediff-suspend) . restore-window-configuration))
-  :config
-  (defun say-yes (o &rest args)
-    (cl-flet ((y-or-n-p (_) t))
-      (apply o args)))
-  (advice-add #'ediff-quit-meta-buffer :around #'say-yes)
-  (advice-add #'ediff-quit             :around #'say-yes)
-  (advice-add #'ediff-janitor          :filter-args (defun dont-ask (args) (setcar args nil) args))
-  (defvar ediff-saved-window-configurations nil)
-  (defun save-window-configuration ()
-    (setq ediff-saved-window-configurations (current-window-configuration)))
-  (defun restore-window-configuration ()
-    (when (window-configuration-p ediff-saved-window-configurations)
-      (set-window-configuration ediff-saved-window-configurations)))
-  (use-package ediff-wind
-    :custom
-    (ediff-split-window-function #'split-window-horizontally)
-    (ediff-window-setup-function #'ediff-setup-windows-plain)))
-(use-package eldoc
-  :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
-(use-package elec-pair
-  :hook (after-init . electric-pair-mode))
-(use-package elfeed
-  :bind (("C-x !" . elfeed)))
-(use-package embark
-  :custom
-  (embark-cycle-key (kbd "C-SPC")))
-(use-package exec-path-from-shell
-  :if (eq system-type 'darwin)
-  :ensure
-  :hook (after-init . exec-path-from-shell-initialize)
-  :custom
-  (exec-path-from-shell-arguments '("-l"))
-  :config
-  (dolist (env (split-string (shell-command-to-string "bash -lc env") "\n" t))
-    (let* ((p (split-string env "=" nil))
-           (name (car p))
-           (values (cdr p)))
-      (unless (member name exec-path-from-shell-variables)
-        (setenv name (mapconcat #'identity values "="))))))
-(use-package eyebrowse
-  :ensure
-  :init
-  (csetq eyebrowse-keymap-prefix (kbd "C-z"))
-  :bind (:map eyebrowse-mode-map
-              ("C-z C-z" . eyebrowse-last-window-config)
-              ("C-z c" . eyebrowse-create-window-config)
-              ("C-z k" . eyebrowse-close-window-config)
-              ("C-z n" . eyebrowse-next-window-config)
-              ("C-z p" . eyebrowse-prev-window-config))
-  :hook (after-init . eyebrowse-mode))
-(use-package gcmh
-  :ensure
-  :diminish
-  :hook (after-init . gcmh-mode)
-  :custom
-  (gcmh-idle-delay 5)
-  (gcmh-high-cons-threshold (* 16 1024 1024)))
-(use-package go-mode
-  :ensure
-  :custom
-  (gofmt-command "goimports")
-  (go-fontify-function-calls nil)
-  (godoc-use-completing-read t)
-  :bind (:map go-mode-map ("C-h d" . godoc))
-  :hook ((go-mode . go-mode-setup)
-         (go-mode . eglot-ensure))
-  :config
-  ;; go get golang.org/x/tools/cmd/...
-  ;; go get github.com/rogpeppe/godef
-  ;; go get github.com/nsf/gocode
-  ;; go get golang.org/x/tools/cmd/goimports
-  ;; go get golang.org/x/tools/gopls
-  (add-to-list 'exec-path (expand-file-name "~/go/bin"))
-  (defun go-mode-setup ()
-    (add-hook 'before-save-hook 'gofmt-before-save)
-    (unless (string-match "go" compile-command)
-      (set (make-local-variable 'compile-command)
-           "go build -v && go test -v && go vet"))))
-(use-package goto-last-change
-  :ensure
-  :bind ("M-g M-/" . goto-last-change))
-(use-package hermes
-  :load-path "~/work/hermes"
-  :bind (:map mode-specific-map ("v" . hermes))
-  :config
-  (add-to-list 'display-buffer-alist '("\\*hermes.*" display-buffer-same-window)))
-(use-package hl-line
-  :hook ((prog-mode conf-mode compilation-mode) . hl-line-mode)
-  :custom
-  (hl-line-sticky-flag nil)
-  (global-hl-line-sticky-flag nil))
-(use-package ibuffer
-  :bind ([remap list-buffers] . ibuffer)
-  :custom
-  (ibuffer-expert t)
-  (ibuffer-show-empty-filter-groups nil))
-(use-package iedit
-  :ensure
-  :bind (:map mode-specific-map
-         ("M-RET" . iedit-mode)
-         :map iedit-lib-keymap
-         ("C-s" . iedit-next-occurrence)
-         ("C-r" . iedit-prev-occurrence))
-  :custom
-  (iedit-toggle-key-default (kbd "M-RET")))
-(use-package isearch
-  :defer t
-  :hook ((isearch-mode-end . move-to-search-start)
-         (isearch-mode . search-for-region))
-  :custom
-  (isearch-allow-scroll t)
-  (isearch-lazy-count t)
-  (lazy-highlight-buffer t)
-  :config
-  (defun move-to-search-start ()
-    (and isearch-forward
-         (number-or-marker-p isearch-other-end)
-         (not mark-active)
-         (not isearch-mode-end-hook-quit)
-         (goto-char isearch-other-end)))
-  (defun search-for-region ()
-    (let ((s (get-current-active-selection)))
-      (when s
-        (isearch-yank-string s)
-        (deactivate-mark)
-        (if isearch-forward
-            (isearch-repeat-forward)
-          (isearch-repeat-backward))))))
-(use-package orderless
-  :ensure
-  :custom
-  (completion-styles '(orderless))
-  (orderless-component-separator 'orderless-escapable-split-on-space)
-  (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
-  (orderless-style-dispatchers '(negate-if-bang))
-  (orderless-skip-highlighting (lambda () (bound-and-true-p selectrum-is-active)))
-  (selectrum-highlight-candidates-function #'orderless-highlight-matches)
-  :config
-  (eval-after-load "counsel"
-    '(setq ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
-                                   (t . orderless-ivy-re-builder))))
-  (defun negate-if-bang (pattern _index _total)
-    (when (string-prefix-p "!" pattern)
-      `(orderless-without-literal . ,(substring pattern 1)))))
-(use-package selectrum
-  :disabled
-  :ensure
-  :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
-          :map mode-specific-map ("C-r" . selectrum-repeat))
-  :hook (after-init . selectrum-mode)
-  :custom
-  (selectrum-complete-in-buffer nil)
-  (selectrum-count-style nil)
-  (selectrum-max-window-height .15)
-  (file-name-shadow-properties '(invisible t))
-  :config
-  (use-package prescient
-    :ensure
-    :hook (after-init . prescient-persist-mode))
-  (use-package selectrum-prescient
-    :ensure
-    :custom
-    (selectrum-prescient-enable-filtering nil)
-    :config
-    (selectrum-prescient-mode 1)))
-(use-package vertico
-  :bind ( :map vertico-map
-          ("?" . minibuffer-completion-help)
-          ("C-j" . vertico-exit-input)
-          ("RET" . vertico-directory-enter)
-          ("DEL" . vertico-directory-delete-char)
-          ("M-DEL" . vertico-directory-delete-word)
-          ("M-G" . vertico-grid-mode)
-          ("M-F" . vertico-flat-mode)
-          ("M-'" . vertico-quick-insert)
-          ("M-m" . vertico-quick-exit)
-          ("M-." . consult-dir)
-          ("M-/" . consult-dir-jump-file)
-          :map mode-specific-map
-          ("C-r" . vertico-repeat))
-  :hook ((after-init . vertico-mode)
-         (minibuffer-setup . vertico-repeat-save)
-         (rfn-eshadow-update-overlay . vertico-directory-tidy))
-  :custom
-  (read-extended-command-predicate #'command-completion-default-include-p)
-  :config
-  (advice-add #'vertico--format-candidate :around
-              (defun indicate-current-entry (orig cand prefix suffix index _start)
-                (setq cand (funcall orig cand prefix suffix index _start))
-                (concat
-                 (if (= vertico--index index)
-                     (propertize "» " 'face 'vertico-current)
-                   "  ")
-                 cand)))
-  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
-  (use-package consult-dir :ensure t))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -931,17 +669,109 @@
   :ensure
   :bind (:map flycheck-command-map
               ("!" . consult-flycheck)))
-(use-package marginalia
+(use-package coterm
   :ensure
-  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
+  :bind (:map comint-mode-map
+              ("C-;" . coterm-char-mode-cycle)
+              ("C-c j" . coterm-char-mode-cycle))
+  :hook (after-init . coterm-mode))
+(use-package dabbrev
+  :bind (("C-M-_" . dabbrev-completion)
+         ("C-M-/" . dabbrev-completion)
+         :map mode-specific-map
+         ("/" . dabbrev-expand))
   :custom
-  (marginalia-annotators
-   '(marginalia-annotators-light marginalia-annotators-heavy))
-  :hook (after-init . marginalia-mode)
+  (abbrev-suggest t)
+  (dabbrev-case-fold-search nil)
   :config
-  (advice-add #'marginalia-cycle :after
-              (lambda () (when (bound-and-true-p selectrum-mode)
-                           (selectrum-exhibit 'keep-selected)))))
+  (advice-add 'dabbrev--find-expansion :around
+              (defun suppress-message (o &rest args)
+                (let ((inhibit-message t))
+                  (apply o args)))))
+(use-package diffview
+  :ensure
+  :after diff-mode
+  :bind (:map diff-mode-map
+              ("|" . diffview-current)))
+(use-package dired
+  :bind ( :map dired-mode-map
+          ("^" . dired-up-directory-inplace)
+          ([remap dired-do-find-regexp] . dired-do-multi-occur))
+  :custom
+  (dired-kill-when-opening-new-dired-buffer t)
+  (dired-no-confirm t)
+  (dired-recursive-copies 'always)
+  (dired-recursive-deletes 'always)
+  (dired-use-ls-dired nil)
+  :config
+  (defun dired-up-directory-inplace ()
+    (interactive)
+    (find-alternate-file ".."))
+  (defun dired-do-multi-occur (regexp)
+    "Run `dired-do-multi-occur` with REGEXP on all marked files."
+    (interactive (list (read-regexp "Regexp: ")))
+    (multi-occur (mapcar 'find-file-noselect (dired-get-marked-files)) regexp))
+  (advice-add #'dired-find-file-other-window :around
+              (defun force-horizontal-split (o &rest args)
+                (let ((split-width-threshold (frame-width)))
+                  (apply o args)))))
+(use-package dired-subtree
+  :ensure
+  :after dired
+  :bind (:map dired-mode-map ("TAB" . dired-subtree-toggle))
+  :custom-face
+  (dired-subtree-depth-1-face ((t :inherit default)))
+  (dired-subtree-depth-2-face ((t :inherit default)))
+  (dired-subtree-depth-3-face ((t :inherit default)))
+  (dired-subtree-depth-4-face ((t :inherit default)))
+  (dired-subtree-depth-5-face ((t :inherit default)))
+  (dired-subtree-depth-6-face ((t :inherit default))))
+(use-package dired-x
+  :after dired
+  :hook (dired-mode . dired-extra-startup))
+(use-package easy-kill
+  :ensure
+  :bind (([remap kill-ring-save]              . easy-kill)
+         :map easy-kill-base-map
+         ([remap exchange-point-and-mark]     . easy-kill-exchange-point-and-mark)
+         ([remap set-mark]                    . easy-kill-mark-region)
+         ([remap cua-exchange-point-and-mark] . easy-kill-exchange-point-and-mark)
+         ([remap cua-set-mark]                . easy-kill-mark-region)
+         ("o" . easy-kill-expand)
+         ("i" . easy-kill-shrink)))
+(use-package ediff
+  :bind (:map mode-specific-map ("=" . ediff-current-file))
+  :custom
+  (diff-switches "-wu")
+  (ediff-diff-options "-w")
+  (ediff-custom-diff-options "-u")
+  (ediff-keep-variants nil)
+  (ediff-highlight-all-diffs 'nil)
+  :hook ((ediff-before-setup . save-window-configuration)
+         ((ediff-quit ediff-suspend) . restore-window-configuration))
+  :config
+  (defun say-yes (o &rest args)
+    (cl-flet ((y-or-n-p (_) t))
+      (apply o args)))
+  (advice-add #'ediff-quit-meta-buffer :around #'say-yes)
+  (advice-add #'ediff-quit             :around #'say-yes)
+  (advice-add #'ediff-janitor          :filter-args (defun dont-ask (args) (setcar args nil) args))
+  (defvar ediff-saved-window-configurations nil)
+  (defun save-window-configuration ()
+    (setq ediff-saved-window-configurations (current-window-configuration)))
+  (defun restore-window-configuration ()
+    (when (window-configuration-p ediff-saved-window-configurations)
+      (set-window-configuration ediff-saved-window-configurations)))
+  (use-package ediff-wind
+    :custom
+    (ediff-split-window-function #'split-window-horizontally)
+    (ediff-window-setup-function #'ediff-setup-windows-plain)))
+(use-package eldoc
+  :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
+(use-package elec-pair
+  :hook (after-init . electric-pair-mode))
+(use-package elfeed
+  :bind (("C-x !" . elfeed)))
 (use-package embark
   :ensure
   :commands (embark-act embark-prefix-help-command)
@@ -951,6 +781,7 @@
               ("M-E"   . embark-export))
 
   :custom
+  (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
   (embark-cycle-key ";")
   (embark-help-key "?")
@@ -979,6 +810,108 @@
   :after (embark consult)
   :config
   (add-hook 'embark-collect-mode-hook #'consult-preview-at-point-mode))
+(use-package exec-path-from-shell
+  :if (eq system-type 'darwin)
+  :ensure
+  :hook (after-init . exec-path-from-shell-initialize)
+  :custom
+  (exec-path-from-shell-arguments '("-l"))
+  :config
+  (dolist (env (split-string (shell-command-to-string "bash -lc env") "\n" t))
+    (let* ((p (split-string env "=" nil))
+           (name (car p))
+           (values (cdr p)))
+      (unless (member name exec-path-from-shell-variables)
+        (setenv name (mapconcat #'identity values "="))))))
+(use-package eyebrowse
+  :ensure
+  :init
+  (csetq eyebrowse-keymap-prefix (kbd "C-z"))
+  :bind (:map eyebrowse-mode-map
+              ("C-z C-z" . eyebrowse-last-window-config)
+              ("C-z c" . eyebrowse-create-window-config)
+              ("C-z k" . eyebrowse-close-window-config)
+              ("C-z n" . eyebrowse-next-window-config)
+              ("C-z p" . eyebrowse-prev-window-config))
+  :hook (after-init . eyebrowse-mode))
+(use-package gcmh
+  :ensure
+  :diminish
+  :hook (after-init . gcmh-mode)
+  :custom
+  (gcmh-idle-delay 5)
+  (gcmh-high-cons-threshold (* 16 1024 1024)))
+(use-package go-mode
+  :ensure
+  :custom
+  (gofmt-command "goimports")
+  (go-fontify-function-calls nil)
+  (godoc-use-completing-read t)
+  :bind (:map go-mode-map ("C-h d" . godoc))
+  :hook ((go-mode . go-mode-setup)
+         (go-mode . eglot-ensure))
+  :config
+  ;; go get golang.org/x/tools/cmd/...
+  ;; go get github.com/rogpeppe/godef
+  ;; go get github.com/nsf/gocode
+  ;; go get golang.org/x/tools/cmd/goimports
+  ;; go get golang.org/x/tools/gopls
+  (add-to-list 'exec-path (expand-file-name "~/go/bin"))
+  (defun go-mode-setup ()
+    (add-hook 'before-save-hook 'gofmt-before-save)
+    (unless (string-match "go" compile-command)
+      (set (make-local-variable 'compile-command)
+           "go build -v && go test -v && go vet"))))
+(use-package goto-last-change
+  :ensure
+  :bind ("M-g M-/" . goto-last-change))
+(use-package hermes
+  :load-path "~/work/hermes"
+  :bind (:map mode-specific-map ("v" . hermes))
+  :config
+  (add-to-list 'display-buffer-alist '("\\*hermes.*" display-buffer-same-window)))
+(use-package hl-line
+  :hook ((prog-mode conf-mode compilation-mode) . hl-line-mode)
+  :custom
+  (hl-line-sticky-flag nil)
+  (global-hl-line-sticky-flag nil))
+(use-package ibuffer
+  :bind ([remap list-buffers] . ibuffer)
+  :custom
+  (ibuffer-expert t)
+  (ibuffer-show-empty-filter-groups nil))
+(use-package iedit
+  :ensure
+  :bind (:map mode-specific-map
+         ("M-RET" . iedit-mode)
+         :map iedit-lib-keymap
+         ("C-s" . iedit-next-occurrence)
+         ("C-r" . iedit-prev-occurrence))
+  :custom
+  (iedit-toggle-key-default (kbd "M-RET")))
+(use-package isearch
+  :defer t
+  :hook ((isearch-mode-end . move-to-search-start)
+         (isearch-mode . search-for-region))
+  :custom
+  (isearch-allow-scroll t)
+  (isearch-lazy-count t)
+  (lazy-highlight-buffer t)
+  :config
+  (defun move-to-search-start ()
+    (and isearch-forward
+         (number-or-marker-p isearch-other-end)
+         (not mark-active)
+         (not isearch-mode-end-hook-quit)
+         (goto-char isearch-other-end)))
+  (defun search-for-region ()
+    (let ((s (get-current-active-selection)))
+      (when s
+        (isearch-yank-string s)
+        (deactivate-mark)
+        (if isearch-forward
+            (isearch-repeat-forward)
+          (isearch-repeat-backward))))))
 (use-package jka-cmpr-hook
   :hook (after-init . auto-compression-mode))
 (use-package magit
@@ -991,6 +924,17 @@
   (setq magit-status-buffer-switch-function 'switch-to-buffer)
   (defun magit-display-buffer-same-window (buffer)
     (display-buffer buffer '(display-buffer-same-window))))
+(use-package marginalia
+  :ensure
+  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
+  :custom
+  (marginalia-annotators
+   '(marginalia-annotators-light marginalia-annotators-heavy))
+  :hook (after-init . marginalia-mode)
+  :config
+  (advice-add #'marginalia-cycle :after
+              (lambda () (when (bound-and-true-p selectrum-mode)
+                           (selectrum-exhibit 'keep-selected)))))
 (use-package modus-themes
   :custom
   (modus-themes-slanted-constructs t)
@@ -1010,6 +954,22 @@
   :bind (:map mode-specific-map
               ("e" . mc/edit-lines)
               ("A" . mc/mark-all-in-region)))
+(use-package orderless
+  :ensure
+  :custom
+  (completion-styles '(orderless))
+  (orderless-component-separator 'orderless-escapable-split-on-space)
+  (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
+  (orderless-style-dispatchers '(negate-if-bang))
+  (orderless-skip-highlighting (lambda () (bound-and-true-p selectrum-is-active)))
+  (selectrum-highlight-candidates-function #'orderless-highlight-matches)
+  :config
+  (eval-after-load "counsel"
+    '(setq ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
+                                   (t . orderless-ivy-re-builder))))
+  (defun negate-if-bang (pattern _index _total)
+    (when (string-prefix-p "!" pattern)
+      `(orderless-without-literal . ,(substring pattern 1)))))
 (use-package org
   :bind (:map mode-specific-map
               ("l" . org-store-link)
@@ -1145,6 +1105,37 @@
   (uniquify-buffer-name-style 'reverse)
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
+(use-package vertico
+  :bind ( :map vertico-map
+          ("?" . minibuffer-completion-help)
+          ("C-j" . vertico-exit-input)
+          ("RET" . vertico-directory-enter)
+          ("DEL" . vertico-directory-delete-char)
+          ("M-DEL" . vertico-directory-delete-word)
+          ("M-G" . vertico-grid-mode)
+          ("M-F" . vertico-flat-mode)
+          ("M-'" . vertico-quick-insert)
+          ("M-m" . vertico-quick-exit)
+          ("M-." . consult-dir)
+          ("M-/" . consult-dir-jump-file)
+          :map mode-specific-map
+          ("C-r" . vertico-repeat))
+  :hook ((after-init . vertico-mode)
+         (minibuffer-setup . vertico-repeat-save)
+         (rfn-eshadow-update-overlay . vertico-directory-tidy))
+  :custom
+  (read-extended-command-predicate #'command-completion-default-include-p)
+  :config
+  (advice-add #'vertico--format-candidate :around
+              (defun indicate-current-entry (orig cand prefix suffix index _start)
+                (setq cand (funcall orig cand prefix suffix index _start))
+                (concat
+                 (if (= vertico--index index)
+                     (propertize "» " 'face 'vertico-current)
+                   "  ")
+                 cand)))
+  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
+  (use-package consult-dir :ensure t))
 (use-package vlf
   :ensure
   :defer t
