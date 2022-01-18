@@ -396,7 +396,6 @@
         (funcall o arg region)
       (let ((old-tick (buffer-chars-modified-tick))
             (old-point (point))
-	    (old-indent (current-indentation))
             (syn `(,(syntax-after (point)))))
         (funcall o arg region)
         (when (and (eq tab-always-indent 'complete)
@@ -946,7 +945,7 @@
   :init
   (modus-themes-load-themes)
   :config
-  (if (display-graphic-p)
+  (if (and nil (display-graphic-p))
       (modus-themes-load-operandi)
     (modus-themes-load-vivendi)))
 (use-package multiple-cursors
@@ -1106,6 +1105,7 @@
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
 (use-package vertico
+  :ensure t
   :bind ( :map vertico-map
           ("?" . minibuffer-completion-help)
           ("C-j" . vertico-exit-input)
@@ -1127,8 +1127,8 @@
   (read-extended-command-predicate #'command-completion-default-include-p)
   :config
   (advice-add #'vertico--format-candidate :around
-              (defun indicate-current-entry (orig cand prefix suffix index _start)
-                (setq cand (funcall orig cand prefix suffix index _start))
+              (defun indicate-current-entry (orig cand prefix suffix index start)
+                (setq cand (funcall orig cand prefix suffix index start))
                 (concat
                  (if (= vertico--index index)
                      (propertize "» " 'face 'vertico-current)

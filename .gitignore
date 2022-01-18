@@ -20,3 +20,5 @@ anything-c-adaptive-history
 /tramp
 /.mc-lists.el
 /eln-cache/
+/amx-items
+/var/
