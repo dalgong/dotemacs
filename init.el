@@ -273,6 +273,7 @@
   :ensure
   :bind ("M-`" . ace-window))
 (use-package affe
+  :disabled
   :ensure
   :after orderless
   :bind ( :map mode-specific-map
