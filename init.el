@@ -945,9 +945,7 @@
   :init
   (modus-themes-load-themes)
   :config
-  (if (and nil (display-graphic-p))
-      (modus-themes-load-operandi)
-    (modus-themes-load-vivendi)))
+  (modus-themes-load-operandi))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
