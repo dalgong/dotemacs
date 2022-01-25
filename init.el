@@ -435,10 +435,8 @@
   ;; (add-hook 'comint-output-filter-functions 'comint-watch-for-password-prompt)
   ;; (add-hook 'comint-output-filter-functions 'comint-truncate-buffer)
   (defun do-silently (o &rest args)
-    (let ((message (symbol-function 'message)))
-      (unwind-protect
-          (progn (fset 'message 'ignore) (apply o args))
-        (fset 'message message))))
+    (let ((inhibit-message t))
+      (apply o args)))
   (advice-add 'comint-previous-matching-input :around #'do-silently))
 (use-package company
   :ensure
@@ -934,7 +932,17 @@
   :config
   (advice-add #'marginalia-cycle :after
               (lambda () (when (bound-and-true-p selectrum-mode)
-                           (selectrum-exhibit 'keep-selected)))))
+                           (selectrum-exhibit 'keep-selected))))
+  (advice-add #'marginalia--buffer-file :around
+              (lambda (o &rest args)
+                ;; marginalia--buffer-file calls abbreviate-file-name which is very slow for remote path.
+                (let ((original (symbol-function #'abbreviate-file-name)))
+                  (cl-letf (((symbol-function #'abbreviate-file-name)
+                             (lambda (filename)
+                               (if (file-remote-p filename)
+                                   filename
+                                 (funcall original filename)))))
+                    (apply o args))))))
 (use-package modus-themes
   :custom
   (modus-themes-slanted-constructs t)
