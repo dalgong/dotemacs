@@ -479,24 +479,41 @@
   :config
   (defun apply-xterm-color-filter ()
     (let* ((proc (get-buffer-process (current-buffer)))
-           (end-marker (and proc (process-mark proc))))
-      (goto-char compilation-filter-start)
-      (while (search-forward "\033[2K" end-marker t)
-        (let ((p (point-at-bol))
-              (cnt 1))
-          (save-excursion
-            (while (search-backward "\033[1A" p t)
-              (cl-decf cnt))
-            (setq p (point-at-bol cnt)))
-          (setq compilation-filter-start (min compilation-filter-start p))
-          (delete-region p (point))))
-      (goto-char end-marker)
-      (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
-             (ns (xterm-color-filter s)))
-        (unless (string-equal s ns)
-          (delete-region compilation-filter-start end-marker)
-          (insert (xterm-color-filter s))))
-      (set-marker end-marker (point))))
+           (end-marker (and proc (process-mark proc)))
+           (buffer-undo-list t))
+      ;; (let ((s (buffer-substring-no-properties compilation-filter-start end-marker)))
+      ;;   (unless (string= s "\033[J")
+      ;;     (with-current-buffer (get-buffer-create "*OUTPUT*")
+      ;;       (insert "\n" s "\n"))))
+      (save-excursion
+        (goto-char compilation-filter-start)
+        (while (re-search-forward (rx "\033[" (group (*? num)) (group (any "GAJK"))) end-marker t)
+          (let ((count (and (> (length (match-string 1)) 0) (string-to-number (match-string 1))))
+                (c (aref (match-string 2) 0)))
+            (cond ((= c ?G)
+                   (delete-region (point-at-bol) (point)))
+                  ((= c ?A)
+                   (delete-region (point-at-bol (- (1- (or count 1)))) (point)))
+                  ((= c ?K)
+                   ;; 0 (or missing) -> point to eol
+                   ;; 1 -> bol to point
+                   ;; 2 -> bol to eol
+                   (unless (= 0 (or count 0))
+                     (delete-region (point-at-bol) (point))))
+                  ((= c ?J)
+                   ;; 0 (or missing) -> point to end of screen
+                   ;; 1 -> beginning of screen to point
+                   ;; 2 -> entire screen
+                   ;; 3 -> entire screen & all lines in scollback buffer
+                   (replace-match "")))
+            (setq compilation-filter-start (min (point) compilation-filter-start))))
+        (goto-char end-marker)
+        (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
+               (ns (ansi-color-apply (xterm-color-filter s))))
+          (unless (string-equal s ns)
+            (delete-region compilation-filter-start end-marker)
+            (insert ns)))
+        (set-marker end-marker (point)))))
   (defun ascend-to-directory-with-file (file &optional dir)
     (setq dir (expand-file-name (or dir default-directory)))
     (while (and (not (file-exists-p (concat dir file)))
