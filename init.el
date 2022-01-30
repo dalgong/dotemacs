@@ -570,6 +570,9 @@
          ("x"     . consult-minor-mode-menu)
          ("X"     . consult-mode-command)
 
+         :map minibuffer-local-map
+         ("C-r"   . consult-history)
+
          :map mode-specific-map
          ("h"   . consult-history)
          ("b"   . consult-bookmark)
@@ -614,6 +617,7 @@
   (register-preview-delay 0)
   (register-preview-function #'consult-register-format)
   ;; (consult-find-command "fd --color=never --full-path ARG OPTS")
+  (completion-in-region-function #'consult-completion-in-region)
   (consult-preview-key 'any)
   (consult-narrow-key (kbd "M-SPC"))
   (xref-show-xrefs-function #'consult-xref)
@@ -866,11 +870,20 @@
   :hook ((go-mode . go-mode-setup)
          (go-mode . eglot-ensure))
   :config
-  ;; go get golang.org/x/tools/cmd/...
-  ;; go get github.com/rogpeppe/godef
-  ;; go get github.com/nsf/gocode
-  ;; go get golang.org/x/tools/cmd/goimports
-  ;; go get golang.org/x/tools/gopls
+  (when nil
+    (async-shell-command
+     (concat (mapconcat
+              (lambda (e) (concat "go install " (cdr e) "@latest"))
+              '((gocode    . "github.com/mdempsky/gocode")
+                (golint    . "golang.org/x/lint/golint")
+                (godef     . "github.com/rogpeppe/godef")
+                (errcheck  . "github.com/kisielk/errcheck")
+                (godoc     . "golang.org/x/tools/cmd/godoc")
+                (gogetdoc  . "github.com/zmb3/gogetdoc")
+                (gopls     . "golang.org/x/tools/gopls")
+                (gotools   . "golang.org/x/tools/cmd/..."))
+              "\n")
+             "\n")))
   (add-to-list 'exec-path (expand-file-name "~/go/bin"))
   (defun go-mode-setup ()
     (add-hook 'before-save-hook 'gofmt-before-save)
@@ -1242,9 +1255,9 @@
  ("M-P"                . ff-find-other-file)
 
  :map help-map
- ("1"                  . byte-compile-file)
- ("2"                  . package-list-packages-no-fetch)
- ("3"                  . package-install)
+ ("+"                  . package-install)
+ ("-"                  . package-delete)
+ ("p"                  . package-list-packages-no-fetch)
  ("C-b"                . describe-personal-keybindings)
  ("="                  . quick-calc)
 
