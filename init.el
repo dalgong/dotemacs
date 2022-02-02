@@ -1034,6 +1034,23 @@
   (org-src-tab-acts-natively t)
   (org-src-window-setup 'current-window)
   :config
+  ;; #+NAME: embed
+  ;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
+  ;;   (save-excursion
+  ;;     (org-babel-goto-named-src-block block-name)
+  ;;     (setq datum (org-element-at-point))
+  ;;     t)
+  ;;   (setq info (org-babel-get-src-block-info nil datum))
+  ;;   (cl-callf org-babel-merge-params (nth 2 info) params)
+  ;;   (cl-callf org-babel-process-params (nth 2 info))
+  ;;   (setq lang (nth 0 info))
+  ;;   (setq body (org-babel-expand-src-block nil info))
+  ;;   (format "%s" body)
+  ;; #+END_SRC
+  ;;
+  ;; #+begin_src compile :noweb yes
+  ;; <<embed("name", arg1="...", arg2="...", ...)>>
+  ;; #+end_src
   (use-package ob-async :ensure)
   (require 'org-tempo nil t)
   (let ((languages '((dot . t)
