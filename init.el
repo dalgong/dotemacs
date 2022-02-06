@@ -666,8 +666,6 @@
               consult-toggle-preview-orig nil)
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore)))
-  (eval-after-load "selectrum"
-    '(define-key selectrum-minibuffer-map (kbd "M-P") #'consult-toggle-preview))
   (eval-after-load "vertico"
     '(define-key vertico-map (kbd "M-P") #'consult-toggle-preview))
   (defun consult-buffer-state-no-tramp ()
@@ -795,21 +793,17 @@
   :ensure
   :commands (embark-act embark-prefix-help-command)
   :bind (:map minibuffer-local-map
+              ("C-."   . embark-act)
               ("M-."   . embark-act)
+              ("C-,"   . embark-act-noquit)
               ("M-,"   . embark-act-noquit)
               ("M-E"   . embark-export))
-
   :custom
   (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
   (embark-cycle-key ";")
   (embark-help-key "?")
   :config
-  (eval-after-load "selectrum"
-    '(bind-keys :map selectrum-minibuffer-map
-                ("M-."   . embark-act)
-                ("M-,"   . embark-act-noquit)
-                ("M-E"   . embark-export)))
   (defun embark-act-noquit ()
     "Run action but don't quit the minibuffer afterwards."
     (interactive)
@@ -960,9 +954,6 @@
    '(marginalia-annotators-light marginalia-annotators-heavy))
   :hook (after-init . marginalia-mode)
   :config
-  (advice-add #'marginalia-cycle :after
-              (lambda () (when (bound-and-true-p selectrum-mode)
-                           (selectrum-exhibit 'keep-selected))))
   (advice-add #'marginalia--buffer-file :around
               (lambda (o &rest args)
                 ;; marginalia--buffer-file calls abbreviate-file-name which is very slow for remote path.
@@ -997,8 +988,6 @@
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
   (orderless-style-dispatchers '(negate-if-bang))
-  (orderless-skip-highlighting (lambda () (bound-and-true-p selectrum-is-active)))
-  (selectrum-highlight-candidates-function #'orderless-highlight-matches)
   :config
   (eval-after-load "counsel"
     '(setq ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
@@ -1170,7 +1159,7 @@
           ("M-F" . vertico-flat-mode)
           ("M-'" . vertico-quick-insert)
           ("M-m" . vertico-quick-exit)
-          ("M-." . consult-dir)
+          ("M-j" . consult-dir)
           ("M-/" . consult-dir-jump-file)
           :map mode-specific-map
           ("C-r" . vertico-repeat))
