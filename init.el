@@ -13,6 +13,7 @@
 (custom-set-variables
  '(ad-redefinition-action 'accept)
  '(async-shell-command-buffer 'rename-buffer)
+ '(async-shell-command-display-buffer nil)
  '(auto-save-default nil)
  '(auto-save-interval 0)
  '(auto-window-vscroll nil)
@@ -26,10 +27,12 @@
  '(blink-matching-paren t)
  '(calc-display-trail nil)
  '(column-number-indicator-zero-based nil)
+ '(completion-auto-help 'lazy)
  '(completion-category-defaults nil)
  '(completion-category-overrides '((file (styles . (partial-completion)))))
- '(completion-cycle-threshold 10)
+ '(completion-cycle-threshold 1)
  '(completion-ignore-case t)
+ '(completion-pcm-complete-word-inserts-delimiters t)
  '(completion-show-help nil)
  '(confirm-kill-emacs nil)
  '(confirm-nonexistent-file-or-buffer nil)
@@ -103,6 +106,7 @@
  '(redisplay-skip-fontification-on-input t)
  '(require-final-newline t)
  '(resize-mini-windows 'grow-only)
+ '(revert-without-query '(""))
  '(ring-bell-function 'ignore)
  '(save-interprogram-paste-before-kill t)
  '(scroll-conservatively 101)
@@ -193,40 +197,6 @@
     (if current-prefix-arg
         (progn (bury-buffer) (other-window -1))
       (delete-window (selected-window)))))
-(defun open-dwim (path)
-  (interactive
-   (save-excursion
-     (let ((candidate (and (require 'ffap) (ffap-guesser)))
-           start)
-       (when candidate
-         (if (not (or (looking-at (regexp-quote candidate))
-                      (progn
-                        (goto-char (point-at-eol))
-                        (search-backward candidate (point-at-bol) t))))
-             (list candidate)
-           (setq start (point))
-           (forward-char (length candidate))
-           (re-search-forward ":\\(\\([0-9]+\\):?\\([0-9]*\\)\\|/[^/]+/\\)" (point-at-eol) t)
-           (list (buffer-substring-no-properties start (point))))))))
-  (if path
-      (if (ffap-url-p path)
-          (funcall ffap-url-fetcher path)
-        (let (line col search)
-          (when (string-match "^\\(.*?\\):\\(\\([0-9]+\\):?\\([0-9]*\\)\\|/\\([^/]+\\)/\\)$" path)
-            (setq line   (and (match-string 3 path) (string-to-number (match-string 3 path)))
-                  col    (and (match-string 4 path) (string-to-number (match-string 4 path)))
-                  search (match-string 5 path))
-            (setq path   (match-string 1 path)))
-          (find-file-other-window path)
-          (goto-char (point-min))
-          (cond (search
-                 (when (re-search-forward search)
-                   (goto-char (match-beginning 0))))
-                (line
-                 (forward-line (1- line))
-                 (when (and col (> col 0))
-                   (forward-char (1- col)))))))
-    (call-interactively 'ffap-other-window)))
 (fset 'yes-or-no-p 'y-or-n-p)
 (defun get-current-active-selection ()
   (let ((p (if (use-region-p)
@@ -234,6 +204,7 @@
              (and (fboundp 'easy-kill--bounds)
                   (ignore-errors (funcall 'easy-kill--bounds))))))
     (and p (car p) (buffer-substring-no-properties (car p) (cdr p)))))
+(add-hook #'after-init-hook #'delete-selection-mode)
 (add-hook #'after-init-hook #'find-function-setup-keys)
 (add-hook #'after-init-hook #'minibuffer-depth-indicate-mode)
 (add-hook #'after-init-hook #'minibuffer-electric-default-mode)
@@ -271,22 +242,7 @@
   (diminish 'flymake-mode))
 (use-package ace-window
   :ensure
-  :bind ("M-`" . ace-window))
-(use-package affe
-  :disabled
-  :ensure
-  :after orderless
-  :bind ( :map mode-specific-map
-          ("C-g" . affe-grep)
-          :map search-map
-          ("f" . affe-find)
-          ("g" . affe-grep))
-  :config
-  (defun affe-orderless-regexp-compiler (input _type)
-    (setq input (orderless-pattern-compiler input))
-    (cons input (lambda (str) (orderless--highlight input str))))
-  ;; Manual preview key for `affe-grep'
-  (consult-customize affe-grep :preview-key (kbd "M-P")))
+  :bind ("C-x o" . ace-window))
 (use-package amx
   :ensure
   :hook (after-init . amx-mode))
@@ -294,20 +250,20 @@
   :ensure
   :diminish
   :hook (after-init . global-auto-highlight-symbol-mode)
-  :bind (:map auto-highlight-symbol-mode-map
-              ("C-x '" . ahs-change-range)))
+  :bind ( :map auto-highlight-symbol-mode-map
+          ("C-x '" . ahs-change-range)))
 (use-package avy
   :ensure
-  :bind (("C-'"   . avy-goto-char-timer)
-         ("C-\""  . avy-resume)
-         ("C-c '" . avy-goto-char-timer)
-         ("C-c \"". avy-resume))
+  :bind (("C-'"       . avy-goto-char-timer)
+         ("C-c C-SPC" . avy-goto-char-timer))
   :config
   (avy-setup-default)
   (advice-add 'avy-goto-char-timer :around
               (defun avy-pop-mark-if-prefix (o &rest args)
                 (if current-prefix-arg
-                    (call-interactively 'avy-pop-mark)
+                    (call-interactively (if (eq 4 (car current-prefix-arg))
+                                            'avy-pop-mark
+                                          'avy-resume))
                   (apply o args))))
   (setf (alist-get ?. avy-dispatch-alist)
         (defun avy-action-embark (pt)
@@ -442,15 +398,14 @@
   :ensure
   :diminish
   :hook (after-init . global-company-mode)
-  :bind (:map prog-mode-map
-         ("C-i"   . company-indent-or-complete-common)
-         :map mode-specific-map
-         ("SPC"   . company-manual-begin)
-         ("C-SPC" . company-manual-begin)
-         :map company-active-map
-         ("C-n" . company-select-next)
-         ("C-p" . company-select-previous)
-         ("M-s" . company-filter-candidates))
+  :bind ( :map prog-mode-map
+          ("C-i"   . company-indent-or-complete-common)
+          :map mode-specific-map
+          ("/" . company-manual-begin)
+          :map company-active-map
+          ("C-n" . company-select-next)
+          ("C-p" . company-select-previous)
+          ("M-s" . company-filter-candidates))
   :custom
   ;; (company-auto-complete t)
   (company-idle-delay nil)
@@ -474,8 +429,6 @@
   (compilation-ask-about-save nil)
   (compilation-save-buffers-predicate (lambda ()))
   (compilation-scroll-output 'first-error)
-  (completion-auto-help 'lazy)
-  (completion-pcm-complete-word-inserts-delimiters t)
   :config
   (defun apply-xterm-color-filter ()
     (let* ((proc (get-buffer-process (current-buffer)))
@@ -617,12 +570,22 @@
   (register-preview-delay 0)
   (register-preview-function #'consult-register-format)
   ;; (consult-find-command "fd --color=never --full-path ARG OPTS")
-  (completion-in-region-function #'consult-completion-in-region)
   (consult-preview-key 'any)
-  (consult-narrow-key (kbd "M-SPC"))
+  (consult-narrow-key "<")
   (xref-show-xrefs-function #'consult-xref)
   (xref-show-definitions-function #'consult-xref)
   :config
+  (advice-add 'kill-line :around #'consult-kill-line-dwim)
+  (defun consult-kill-line-dwim (o &rest args)
+    (require 'embark nil t)
+    (let* ((target (and (minibufferp) (car (embark--targets))))
+           (type (plist-get target :type)))
+      (cond ((eq 'buffer type)
+             (kill-buffer (plist-get target :target)))
+            ((eq 'file type)
+             (delete-file (plist-get target :target)))
+            (t
+             (apply o args)))))
   (advice-add #'substitute-in-file-name :around
               (defun keep-url (o arg)
                 (if (string-match "^https?://" arg)
@@ -686,6 +649,13 @@
   :ensure
   :bind (:map flycheck-command-map
               ("!" . consult-flycheck)))
+(use-package corfu
+  :ensure
+  ;; :custom
+  ;; (corfu-auto t)
+  ;; (corfu-quit-at-boundary t)
+  ;; (corfu-quit-no-match t)
+  :hook (after-init . corfu-global-mode))
 (use-package coterm
   :ensure
   :bind (:map comint-mode-map
@@ -694,9 +664,7 @@
   :hook (after-init . coterm-mode))
 (use-package dabbrev
   :bind (("C-M-_" . dabbrev-completion)
-         ("C-M-/" . dabbrev-completion)
-         :map mode-specific-map
-         ("/" . dabbrev-expand))
+         ("C-M-/" . dabbrev-completion))
   :custom
   (abbrev-suggest t)
   (dabbrev-case-fold-search nil)
@@ -792,15 +760,19 @@
 (use-package embark
   :ensure
   :commands (embark-act embark-prefix-help-command)
-  :bind (:map minibuffer-local-map
-              ("C-."   . embark-act)
-              ("M-."   . embark-act)
-              ("C-,"   . embark-act-noquit)
-              ("M-,"   . embark-act-noquit)
-              ("M-E"   . embark-export))
+  :bind (("M-SPC" . embark-act)
+         ("M-."   . embark-dwim)
+         :map minibuffer-local-map
+         ("M-."   . embark-act)
+         ("M-,"   . embark-act-noquit)
+         ("M-E"   . embark-export))
   :custom
   (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
+  (embark-indicators '(embark-which-key-indicator
+                       embark--vertico-indicator
+                       embark-highlight-indicator
+                       embark-isearch-highlight-indicator))
   (embark-cycle-key ";")
   (embark-help-key "?")
   :config
@@ -809,20 +781,44 @@
     (interactive)
     (let ((embark-quit-after-action nil))
       (embark-act)))
-  (advice-add 'kill-line :around #'consult-kill-line-dwim)
-  (defun consult-kill-line-dwim (o &rest args)
-    (let ((target (and (minibufferp) (car (embark--targets)))))
-      (cond ((eq 'buffer (car target))
-             (kill-buffer (cl-second target)))
-            ((eq 'file (car target))
-             (delete-file (cl-second target)))
-            (t
-             (apply o args))))))
+  (push #'embark--xref-push-marker
+        (alist-get 'find-file embark-pre-action-hooks))
+  (defun embark-which-key-indicator ()
+    "An embark indicator that displays keymaps using which-key.
+The which-key help message will show the type and value of the
+current target followed by an ellipsis if there are further
+targets."
+    (lambda (&optional keymap targets prefix)
+      (if (null keymap)
+          (which-key--hide-popup-ignore-command)
+        (which-key--show-keymap
+         (if (eq (plist-get (car targets) :type) 'embark-become)
+             "Become"
+           (format "Act on %s '%s'%s"
+                   (plist-get (car targets) :type)
+                   (embark--truncate-target (plist-get (car targets) :target))
+                   (if (cdr targets) "…" "")))
+         (if prefix
+             (pcase (lookup-key keymap prefix 'accept-default)
+               ((and (pred keymapp) km) km)
+               (_ (key-binding prefix 'accept-default)))
+           keymap)
+         nil nil t (lambda (binding)
+                     (not (string-suffix-p "-argument" (cdr binding))))))))
+
+  (defun embark-hide-which-key-indicator (fn &rest args)
+    "Hide the which-key indicator immediately when using the completing-read prompter."
+    (which-key--hide-popup-ignore-command)
+    (let ((embark-indicators
+           (remq #'embark-which-key-indicator embark-indicators)))
+      (apply fn args)))
+
+  (advice-add #'embark-completing-read-prompter
+              :around #'embark-hide-which-key-indicator))
 (use-package embark-consult
   :ensure
   :after (embark consult)
-  :config
-  (add-hook 'embark-collect-mode-hook #'consult-preview-at-point-mode))
+  :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package exec-path-from-shell
   :if (eq system-type 'darwin)
   :ensure
@@ -913,19 +909,12 @@
   (iedit-toggle-key-default (kbd "M-RET")))
 (use-package isearch
   :defer t
-  :hook ((isearch-mode-end . move-to-search-start)
-         (isearch-mode . search-for-region))
+  :hook (isearch-mode . search-for-region)
   :custom
   (isearch-allow-scroll t)
   (isearch-lazy-count t)
   (lazy-highlight-buffer t)
   :config
-  (defun move-to-search-start ()
-    (and isearch-forward
-         (number-or-marker-p isearch-other-end)
-         (not mark-active)
-         (not isearch-mode-end-hook-quit)
-         (goto-char isearch-other-end)))
   (defun search-for-region ()
     (let ((s (get-current-active-selection)))
       (when s
@@ -966,16 +955,15 @@
                     (apply o args))))))
 (use-package modus-themes
   :custom
-  (modus-themes-slanted-constructs t)
   (modus-themes-bold-constructs t)
-  (modus-themes-scale-headings t)
-  (modus-themes-mode-line '(moody accented borderless))
   (modus-themes-hl-line '(accented intense))
+  (modus-themes-italic-constructs t)
+  (modus-themes-mode-line '(moody accented borderless))
   (modus-themes-region '(bg-only))
-  :init
-  (modus-themes-load-themes)
+  (modus-themes-scale-headings t)
+  (modus-themes-slanted-constructs t)
   :config
-  (modus-themes-load-operandi))
+  (load-theme 'modus-operandi t))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
@@ -984,7 +972,7 @@
 (use-package orderless
   :ensure
   :custom
-  (completion-styles '(orderless))
+  (completion-styles '(substring orderless basic))
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
   (orderless-style-dispatchers '(negate-if-bang))
@@ -1117,6 +1105,18 @@
 (use-package smerge-mode
   :custom
   (smerge-command-prefix "\C-z"))
+(use-package string-inflection
+  :ensure
+  :after embark
+  :bind ( :map embark-identifier-map
+          ("-" . string-inflection-cycle))
+  :config
+  (add-to-list 'embark-repeat-actions #'string-inflection-cycle))
+(use-package symbol-overlay
+  :ensure
+  :after embark
+  :bind ( :map embark-identifier-map
+          ("y" . symbol-overlay-put)))
 (use-package tramp
   :defer t
   :custom
@@ -1206,6 +1206,11 @@
   (defun move-to-wrapped-region ()
     (when (< (point) (region-end))
       (forward-char 1))))
+(use-package which-key
+  :ensure t
+  :functions
+  which-key--show-keymap
+  which-key--hide-popup-ignore-command)
 (use-package windresize
   :ensure
   :bind (:map mode-specific-map ("w" . windresize)))
@@ -1244,18 +1249,12 @@
  ("C-TAB"              . other-window)
  ("C-."                . next-error)
  ("C-,"                . previous-error)
- ("C-RET"              . open-dwim)
  ("M-K"                . kill-this-buffer)
  ("M-o"                . other-window)
  ("M-q"                . fill-paragraph)
  ("RET"                . newline-and-indent)
- ("M-9"                . open-dwim)
  ("M-C"                . compile)
  ("M-D"                . recompile)
- ("M-M"                . tmm-menubar)
- ("M-Q"                . query-replace)
- ("M-R"                . query-replace-regexp)
- ("M-Z"                . shell)
  ("M-n"                . forward-paragraph)
  ("M-p"                . backward-paragraph)
  ("M-P"                . ff-find-other-file)
@@ -1268,7 +1267,6 @@
  ("="                  . quick-calc)
 
  :map ctl-x-map
- ("k"                  . kill-this-buffer)
  ("O"                  . ff-find-other-file)
 
  :map mode-specific-map
@@ -1281,5 +1279,4 @@
  ("u"                  . rename-uniquely)
  ("D"                  . toggle-debug-on-error)
  ("E"                  . erase-buffer)
- ("x"                  . shell-command)
- ("X"                  . async-shell-command))
+ ("x"                  . shell))
