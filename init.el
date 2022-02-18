@@ -756,65 +756,62 @@
 (use-package elec-pair
   :hook (after-init . electric-pair-mode))
 (use-package elfeed
-  :bind (("C-x !" . elfeed)))
+  :bind ("C-x !" . elfeed))
 (use-package embark
   :ensure
   :commands (embark-act embark-prefix-help-command)
   :bind (("M-SPC" . embark-act)
          ("M-."   . embark-dwim)
          :map minibuffer-local-map
-         ("M-."   . embark-act)
-         ("M-,"   . embark-act-noquit)
          ("M-E"   . embark-export))
   :custom
-  (embark-cycle-key (kbd "C-SPC"))
+  (embark-cycle-key (kbd "M-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
-  (embark-indicators '(embark-which-key-indicator
-                       embark--vertico-indicator
+  (embark-help-key "?")
+  (embark-indicators '(embark--vertico-indicator
                        embark-highlight-indicator
                        embark-isearch-highlight-indicator))
-  (embark-cycle-key ";")
-  (embark-help-key "?")
+  (embark-quit-after-action nil)
   :config
-  (defun embark-act-noquit ()
-    "Run action but don't quit the minibuffer afterwards."
-    (interactive)
-    (let ((embark-quit-after-action nil))
-      (embark-act)))
+  ;; https://github.com/oantolin/embark/issues/464
+  (push 'embark--ignore-target
+        (alist-get 'xref-find-definitions embark-target-injection-hooks))
   (push #'embark--xref-push-marker
         (alist-get 'find-file embark-pre-action-hooks))
-  (defun embark-which-key-indicator ()
-    "An embark indicator that displays keymaps using which-key.
+  (eval-after-load "which-key"
+    (progn
+      (add-to-list 'embark-indicators 'embark-which-key-indicator)
+      (defun embark-which-key-indicator ()
+        "An embark indicator that displays keymaps using which-key.
 The which-key help message will show the type and value of the
 current target followed by an ellipsis if there are further
 targets."
-    (lambda (&optional keymap targets prefix)
-      (if (null keymap)
-          (which-key--hide-popup-ignore-command)
-        (which-key--show-keymap
-         (if (eq (plist-get (car targets) :type) 'embark-become)
-             "Become"
-           (format "Act on %s '%s'%s"
-                   (plist-get (car targets) :type)
-                   (embark--truncate-target (plist-get (car targets) :target))
-                   (if (cdr targets) "…" "")))
-         (if prefix
-             (pcase (lookup-key keymap prefix 'accept-default)
-               ((and (pred keymapp) km) km)
-               (_ (key-binding prefix 'accept-default)))
-           keymap)
-         nil nil t (lambda (binding)
-                     (not (string-suffix-p "-argument" (cdr binding))))))))
+        (lambda (&optional keymap targets prefix)
+          (if (null keymap)
+              (which-key--hide-popup-ignore-command)
+            (which-key--show-keymap
+             (if (eq (plist-get (car targets) :type) 'embark-become)
+                 "Become"
+               (format "Act on %s '%s'%s"
+                       (plist-get (car targets) :type)
+                       (embark--truncate-target (plist-get (car targets) :target))
+                       (if (cdr targets) "…" "")))
+             (if prefix
+                 (pcase (lookup-key keymap prefix 'accept-default)
+                   ((and (pred keymapp) km) km)
+                   (_ (key-binding prefix 'accept-default)))
+               keymap)
+             nil nil t (lambda (binding)
+                         (not (string-suffix-p "-argument" (cdr binding))))))))
 
-  (defun embark-hide-which-key-indicator (fn &rest args)
-    "Hide the which-key indicator immediately when using the completing-read prompter."
-    (which-key--hide-popup-ignore-command)
-    (let ((embark-indicators
-           (remq #'embark-which-key-indicator embark-indicators)))
-      (apply fn args)))
-
-  (advice-add #'embark-completing-read-prompter
-              :around #'embark-hide-which-key-indicator))
+      (defun embark-hide-which-key-indicator (fn &rest args)
+        "Hide the which-key indicator immediately when using the completing-read prompter."
+        (which-key--hide-popup-ignore-command)
+        (let ((embark-indicators
+               (remq #'embark-which-key-indicator embark-indicators)))
+          (apply fn args)))
+      (advice-add #'embark-completing-read-prompter
+                  :around #'embark-hide-which-key-indicator))))
 (use-package embark-consult
   :ensure
   :after (embark consult)
@@ -832,17 +829,6 @@ targets."
            (values (cdr p)))
       (unless (member name exec-path-from-shell-variables)
         (setenv name (mapconcat #'identity values "="))))))
-(use-package eyebrowse
-  :ensure
-  :init
-  (csetq eyebrowse-keymap-prefix (kbd "C-z"))
-  :bind (:map eyebrowse-mode-map
-              ("C-z C-z" . eyebrowse-last-window-config)
-              ("C-z c" . eyebrowse-create-window-config)
-              ("C-z k" . eyebrowse-close-window-config)
-              ("C-z n" . eyebrowse-next-window-config)
-              ("C-z p" . eyebrowse-prev-window-config))
-  :hook (after-init . eyebrowse-mode))
 (use-package gcmh
   :ensure
   :diminish
