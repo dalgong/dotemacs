@@ -130,7 +130,6 @@
  '(use-package-enable-imenu-support t)
  '(use-short-answers t)
  '(vc-follow-symlinks nil)
- '(vc-handled-backends nil)
  '(version-control t)
  '(view-read-only t)
  '(visible-bell nil)
