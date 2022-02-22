@@ -775,6 +775,8 @@
   ;; https://github.com/oantolin/embark/issues/464
   (push 'embark--ignore-target
         (alist-get 'xref-find-definitions embark-target-injection-hooks))
+  (push 'embark--ignore-target
+        (alist-get 'xref-find-references embark-target-injection-hooks))
   (push #'embark--xref-push-marker
         (alist-get 'find-file embark-pre-action-hooks))
   (eval-after-load "which-key"
