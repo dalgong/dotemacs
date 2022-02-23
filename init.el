@@ -1251,6 +1251,7 @@ targets."
  ("-"                  . package-delete)
  ("p"                  . package-list-packages-no-fetch)
  ("C-b"                . describe-personal-keybindings)
+ ("C-o"                . proced)
  ("="                  . quick-calc)
 
  :map ctl-x-map
