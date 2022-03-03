@@ -1,14 +1,13 @@
 # expr "$-" : .*i.* >/dev/null 2>&1 || return
+if [[ -n $INSIDE_EMACS ]];then
+  PS1=''
+fi
 
 shopt -s checkwinsize
 shopt -s histappend
 shopt -s cdable_vars
 
 HISTCONTROL=ignoredups:ignorespace
-if [[ -z $EMACS_BASH_COMPLETE ]];then
-  PS0='\r`printf "%*s" $(($COLUMNS - 20)) ""`\t \d\n'
-  PS1='\h:\w \$ '
-fi
 export PROMPT_COMMAND='history -a'
 export FIGNORE=".svn:.o:~:.class:#"
 HISTSIZE=10000
@@ -39,4 +38,8 @@ if ! shopt -oq posix; then
   elif [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
   fi
+fi
+
+if [[ -z $INSIDE_EMACS ]];then
+  PS0='\r`printf "%*s" $(($COLUMNS - 20)) ""`\t \d\n' PS1='\h:\w \$ '
 fi
