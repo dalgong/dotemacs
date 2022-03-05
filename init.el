@@ -137,7 +137,7 @@
  '(x-selection-timeout 100)
  '(y-or-n-p-use-read-key t)
  '(warning-minimum-level :emergency)
- '(window-divider-default-places t)
+ '(window-divider-default-places 'right-only)
  '(window-divider-default-bottom-width 1)
  '(window-divider-default-right-width 1)
  '(window-resize-pixelwise nil)
@@ -208,6 +208,7 @@
 (add-hook #'after-init-hook #'minibuffer-depth-indicate-mode)
 (add-hook #'after-init-hook #'minibuffer-electric-default-mode)
 (add-hook #'after-init-hook #'repeat-mode)
+(add-hook #'after-init-hook #'window-divider-mode)
 (add-hook #'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
 (when (require 'package nil t)
