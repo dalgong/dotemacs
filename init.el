@@ -1157,14 +1157,14 @@ targets."
   :custom
   (read-extended-command-predicate #'command-completion-default-include-p)
   :config
-  (advice-add #'vertico--format-candidate :around
-              (defun indicate-current-entry (orig cand prefix suffix index start)
-                (setq cand (funcall orig cand prefix suffix index start))
-                (concat
-                 (if (= vertico--index index)
-                     (propertize "» " 'face 'vertico-current)
-                   "  ")
-                 cand)))
+  ;; (advice-add #'vertico--format-candidate :around
+  ;;             (defun indicate-current-entry (orig cand prefix suffix index start)
+  ;;               (setq cand (funcall orig cand prefix suffix index start))
+  ;;               (concat
+  ;;                (if (= vertico--index index)
+  ;;                    (propertize "» " 'face 'vertico-current)
+  ;;                  "  ")
+  ;;                cand)))
   (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
   (use-package consult-dir :ensure t))
 (use-package vlf
