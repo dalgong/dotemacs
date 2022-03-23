@@ -196,7 +196,6 @@
     (if current-prefix-arg
         (progn (bury-buffer) (other-window -1))
       (delete-window (selected-window)))))
-(fset 'yes-or-no-p 'y-or-n-p)
 (defun get-current-active-selection ()
   (let ((p (if (use-region-p)
                (cons (region-beginning) (region-end))
@@ -998,6 +997,7 @@ targets."
   (org-src-fontify-natively t)
   (org-src-tab-acts-natively t)
   (org-src-window-setup 'current-window)
+  (org-use-speed-commands t)
   :config
   ;; #+NAME: embed
   ;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
@@ -1250,22 +1250,20 @@ targets."
  :map help-map
  ("+"                  . package-install)
  ("-"                  . package-delete)
+ ("D"                  . toggle-debug-on-error)
  ("p"                  . package-list-packages-no-fetch)
+ ("q"                  . delete-other-window)
  ("C-b"                . describe-personal-keybindings)
  ("C-o"                . proced)
  ("="                  . quick-calc)
 
  :map ctl-x-map
  ("O"                  . ff-find-other-file)
+ ("x b"                . bury-buffer)
+ ("x e"                . erase-buffer)
 
  :map mode-specific-map
  ("SPC"                . cycle-spacing)
  ("C-_"                . recursive-edit)
- ("b"                  . bury-buffer)
- ("q"                  . delete-other-window)
  ("r"                  . replace-regexp)
- ("s"                  . replace-string)
- ("u"                  . rename-uniquely)
- ("D"                  . toggle-debug-on-error)
- ("E"                  . erase-buffer)
- ("x"                  . shell))
+ ("s"                  . replace-string))
