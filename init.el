@@ -282,9 +282,6 @@
   :hook (after-init . bash-completion-setup)
   :custom
   (bash-completion-use-separate-processes t))
-(use-package better-shell
-  :ensure
-  :bind ("C-`" . better-shell-shell))
 (use-package browse-url
   :functions browse-url-url-at-point
   :config
@@ -817,6 +814,23 @@ targets."
   :ensure
   :after (embark consult)
   :hook (embark-collect-mode . consult-preview-at-point-mode))
+(use-package eshell
+  :hook (eshell-mode . setup-color-for-eshell)
+  :bind ("C-`" . eshell)
+  :config
+  (defun setup-color-for-eshell ()
+    (setenv "TERM" "xterm-256color")
+    (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
+    (setq eshell-output-filter-functions
+          (remove 'eshell-handle-ansi-color eshell-output-filter-functions))))
+(use-package esh-autosuggest
+  :ensure
+  :hook (eshell-mode . esh-autosuggest-mode))
+(use-package eshell-syntax-highlighting
+  :ensure
+  :after eshell-mode
+  :config
+  (eshell-syntax-highlighting-global-mode +1))
 (use-package exec-path-from-shell
   :if (eq system-type 'darwin)
   :ensure
