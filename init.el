@@ -816,7 +816,7 @@ targets."
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
   :hook (eshell-mode . setup-color-for-eshell)
-  :bind ("C-`" . eshell)
+  ;; :bind ("C-`" . eshell)
   :config
   (defun setup-color-for-eshell ()
     (setenv "TERM" "xterm-256color")
@@ -1249,6 +1249,7 @@ targets."
  ([remap suspend-frame]. ignore)
  ([remap kill-buffer]  . kill-this-buffer)
  ("C-TAB"              . other-window)
+ ("C-`"                . shell)
  ("C-."                . next-error)
  ("C-,"                . previous-error)
  ("M-K"                . kill-this-buffer)
@@ -1277,7 +1278,7 @@ targets."
  ("x e"                . erase-buffer)
 
  :map mode-specific-map
+ ("0"                  . recursive-edit)
  ("SPC"                . cycle-spacing)
- ("C-_"                . recursive-edit)
  ("r"                  . replace-regexp)
  ("s"                  . replace-string))

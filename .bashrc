@@ -1,7 +1,7 @@
 # expr "$-" : .*i.* >/dev/null 2>&1 || return
-if [[ -n $INSIDE_EMACS ]];then
-  PS1=''
-fi
+# if [[ -n $INSIDE_EMACS ]];then
+#   PS1=''
+# fi
 
 shopt -s checkwinsize
 shopt -s histappend
@@ -40,6 +40,11 @@ if ! shopt -oq posix; then
   fi
 fi
 
-if [[ -z $INSIDE_EMACS ]];then
+if [[ -z $EMACS_BASH_COMPLETE ]];then
   PS0='\r`printf "%*s" $(($COLUMNS - 20)) ""`\t \d\n' PS1='\h:\w \$ '
+fi
+
+if test -f $HOME/.asdf/asdf.sh; then
+    . $HOME/.asdf/asdf.sh
+    expr "$-" : .*i.* >/dev/null 2>&1 && . $HOME/.asdf/completions/asdf.bash
 fi
