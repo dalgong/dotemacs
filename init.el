@@ -630,15 +630,15 @@
   (defun consult-buffer-state-no-tramp ()
     "Buffer state function that doesn't preview Tramp buffers."
     (let ((orig-state (consult--buffer-state))
-          (filter (lambda (cand restore)
-                    (if (or restore
+          (filter (lambda (action cand)
+                    (if (or action
                             (let ((buffer (get-buffer cand)))
                               (and buffer
                                    (not (file-remote-p (buffer-local-value 'default-directory buffer))))))
                         cand
                       nil))))
-      (lambda (cand restore)
-        (funcall orig-state (funcall filter cand restore) restore))))
+      (lambda (action cand)
+        (funcall orig-state action (funcall filter action cand)))))
   (setq consult--source-buffer
         (plist-put consult--source-buffer :state #'consult-buffer-state-no-tramp)))
 (use-package consult-flycheck
