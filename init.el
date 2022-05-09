@@ -651,7 +651,7 @@
   ;; (corfu-auto t)
   ;; (corfu-quit-at-boundary t)
   ;; (corfu-quit-no-match t)
-  :hook (after-init . corfu-global-mode))
+  :hook (after-init . global-corfu-mode))
 (use-package coterm
   :ensure
   :bind (:map comint-mode-map
@@ -1168,17 +1168,7 @@ targets."
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
          (rfn-eshadow-update-overlay . vertico-directory-tidy))
-  :custom
-  (read-extended-command-predicate #'command-completion-default-include-p)
   :config
-  ;; (advice-add #'vertico--format-candidate :around
-  ;;             (defun indicate-current-entry (orig cand prefix suffix index start)
-  ;;               (setq cand (funcall orig cand prefix suffix index start))
-  ;;               (concat
-  ;;                (if (= vertico--index index)
-  ;;                    (propertize "» " 'face 'vertico-current)
-  ;;                  "  ")
-  ;;                cand)))
   (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
   (use-package consult-dir :ensure t))
 (use-package vlf
