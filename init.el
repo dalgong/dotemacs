@@ -242,6 +242,9 @@
 (use-package ace-window
   :ensure
   :bind ("C-x o" . ace-window))
+(use-package ample-themes
+  :config
+  (load-theme 'ample-flat t))
 (use-package amx
   :ensure
   :hook (after-init . amx-mode))
@@ -957,6 +960,7 @@ targets."
                                  (funcall original filename)))))
                     (apply o args))))))
 (use-package modus-themes
+  :disabled
   :custom
   (modus-themes-bold-constructs t)
   (modus-themes-hl-line '(accented intense))
