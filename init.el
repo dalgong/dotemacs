@@ -579,7 +579,9 @@
       (cond ((eq 'buffer type)
              (kill-buffer (plist-get target :target)))
             ((eq 'file type)
-             (delete-file (plist-get target :target)))
+             (when-let (filename (plist-get target :target))
+               (when (y-or-n-p (format "delete %s? " filename))
+                 (delete-file filename))))
             (t
              (apply o args)))))
   (advice-add #'substitute-in-file-name :around
@@ -761,7 +763,7 @@
          :map minibuffer-local-map
          ("M-E"   . embark-export))
   :custom
-  (embark-cycle-key (kbd "M-SPC"))
+  (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
   (embark-help-key "?")
   (embark-indicators '(embark--vertico-indicator
