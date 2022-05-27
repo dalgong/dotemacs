@@ -243,6 +243,7 @@
   :ensure
   :bind ("C-x o" . ace-window))
 (use-package ample-themes
+  :disabled
   :config
   (load-theme 'ample-flat t))
 (use-package amx
@@ -599,8 +600,6 @@
                       (browse-url (car r))
                       (exit-minibuffer))
                   r)))
-  (advice-add #'completing-read-multiple :override
-              #'consult-completing-read-multiple)
   ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
   ;; (nconc consult--source-file (list :state #'consult--file-preview))
   ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
