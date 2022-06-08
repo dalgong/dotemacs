@@ -562,6 +562,8 @@
     (selectrum-count-style nil)
     (selectrum-max-window-height .15)
     (file-name-shadow-properties '(invisible t))
+    (orderless-skip-highlighting (lambda () selectrum-is-active))
+    (selectrum-highlight-candidates-function #'orderless-highlight-matches)
     :config
     (use-package prescient
       :ensure
@@ -571,7 +573,11 @@
       :custom
       (selectrum-prescient-enable-filtering nil)
       :config
-      (selectrum-prescient-mode 1)))
+      (selectrum-prescient-mode 1))
+    (use-package consult-dir
+      :ensure t
+      :bind ( :map minibuffer-local-map
+              ("M-/" . consult-dir-jump-file))))
   (use-package consult
     :ensure
     :bind (("M-\"" . consult-register-load)

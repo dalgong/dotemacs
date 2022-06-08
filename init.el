@@ -29,7 +29,7 @@
  '(column-number-indicator-zero-based nil)
  '(completion-auto-help 'lazy)
  '(completion-category-defaults nil)
- '(completion-category-overrides '((file (styles . (partial-completion)))))
+ '(completion-category-overrides '((file (styles partial-completion))))
  '(completion-cycle-threshold 1)
  '(completion-ignore-case t)
  '(completion-pcm-complete-word-inserts-delimiters t)
@@ -887,7 +887,7 @@ targets."
   (add-to-list 'display-buffer-alist '("\\*hermes.*" display-buffer-same-window)))
 (use-package hlinum
   :ensure
-  :hook ((after-init . global-linum-mode)
+  :hook (((prog-mode text-mode) . display-line-numbers-mode)
          (after-init . hlinum-activate))
   :custom
   (linum-format "%4d\u2502 "))
@@ -1168,16 +1168,20 @@ targets."
           ("M-F" . vertico-flat-mode)
           ("M-'" . vertico-quick-insert)
           ("M-m" . vertico-quick-exit)
-          ("M-j" . consult-dir)
+          ("C-x C-d" . consult-dir)
           ("M-/" . consult-dir-jump-file)
           :map mode-specific-map
           ("C-r" . vertico-repeat))
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
          (rfn-eshadow-update-overlay . vertico-directory-tidy))
+  :custom
+  (vertico-count-format nil)
   :config
-  (advice-add #'tmm-add-prompt :after #'minibuffer-hide-completions)
-  (use-package consult-dir :ensure t))
+  (use-package consult-dir
+    :ensure t
+    :config
+    (advice-add #'consult-dir-jump-file :before #'vertico-insert)))
 (use-package vlf
   :ensure
   :defer t
