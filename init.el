@@ -85,14 +85,7 @@
  '(mode-line-position '(""))
  '(mode-line-mule-info '(""))
  '(mode-line-end-spaces
-   '(:eval (concat (propertize " " 'display `(space :align-to (- right 15)))
-                   (let* ((tabs (frame-parameter nil 'tabs))
-                          (current (cdr (assq 'name (and (> (length tabs) 1) (assq 'current-tab tabs))))))
-                     (if current
-                         (concat "[" current "]")
-                       ""))
-                   (propertize " " 'display `(space :align-to (- right 6)))
-                   "%l:%c")))
+   '(:eval (concat (propertize " " 'display `(space :align-to (- right 4))) "%c")))
  '(next-error-message-highlight t)
  '(ns-alternate-modifier 'super)
  '(ns-command-modifier 'meta)
@@ -768,8 +761,7 @@
   (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
   (embark-help-key "?")
-  (embark-indicators '(embark--vertico-indicator
-                       embark-highlight-indicator
+  (embark-indicators '(embark-highlight-indicator
                        embark-isearch-highlight-indicator))
   (embark-quit-after-action nil)
   :config
@@ -893,6 +885,12 @@ targets."
   :bind (:map mode-specific-map ("v" . hermes))
   :config
   (add-to-list 'display-buffer-alist '("\\*hermes.*" display-buffer-same-window)))
+(use-package hlinum
+  :ensure
+  :hook ((after-init . global-linum-mode)
+         (after-init . hlinum-activate))
+  :custom
+  (linum-format "%4d\u2502 "))
 (use-package hl-line
   :hook ((prog-mode conf-mode compilation-mode) . hl-line-mode)
   :custom
