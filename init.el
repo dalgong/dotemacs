@@ -568,19 +568,14 @@
   (xref-show-xrefs-function #'consult-xref)
   (xref-show-definitions-function #'consult-xref)
   :config
+  (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (advice-add 'kill-line :around #'consult-kill-line-dwim)
   (defun consult-kill-line-dwim (o &rest args)
     (require 'embark nil t)
-    (let* ((target (and (minibufferp) (car (embark--targets))))
-           (type (plist-get target :type)))
-      (cond ((eq 'buffer type)
-             (kill-buffer (plist-get target :target)))
-            ((eq 'file type)
-             (when-let (filename (plist-get target :target))
-               (when (y-or-n-p (format "delete %s? " filename))
-                 (delete-file filename))))
-            (t
-             (apply o args)))))
+    (if (not (eq 'buffer (plist-get (and (minibufferp) (car (embark--targets))) :type)))
+        (apply o args)
+      (setq unread-command-events (listify-key-sequence "k"))
+      (call-interactively 'embark-act)))
   (advice-add #'substitute-in-file-name :around
               (defun keep-url (o arg)
                 (if (string-match "^https?://" arg)
@@ -644,11 +639,18 @@
               ("!" . consult-flycheck)))
 (use-package corfu
   :ensure
+  :bind (:map corfu-map ("M-m" . corfu-move-to-minibuffer))
   ;; :custom
   ;; (corfu-auto t)
   ;; (corfu-quit-at-boundary t)
   ;; (corfu-quit-no-match t)
-  :hook (after-init . global-corfu-mode))
+  :hook (after-init . global-corfu-mode)
+  :config
+  (defun corfu-move-to-minibuffer ()
+    (interactive)
+    (let ((completion-extra-properties corfu--extra)
+          completion-cycle-threshold completion-cycling)
+      (apply #'consult-completion-in-region completion-in-region--data))))
 (use-package coterm
   :ensure
   :bind (:map comint-mode-map
@@ -661,6 +663,7 @@
   :custom
   (abbrev-suggest t)
   (dabbrev-case-fold-search nil)
+  (dabbrev-ignored-buffer-regexps '("\\.\\(?:pdf\\|jpe?g\\|png\\)\\'"))
   :config
   (advice-add 'dabbrev--find-expansion :around
               (defun suppress-message (o &rest args)
@@ -1161,7 +1164,7 @@ targets."
   :bind ( :map vertico-map
           ("?" . minibuffer-completion-help)
           ("C-j" . vertico-exit-input)
-          ("RET" . vertico-directory-enter)
+          ;; ("RET" . vertico-directory-enter)
           ("DEL" . vertico-directory-delete-char)
           ("M-DEL" . vertico-directory-delete-word)
           ("M-G" . vertico-grid-mode)
