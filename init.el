@@ -224,7 +224,14 @@
 
 (eval-and-compile
   (defmacro csetq (sym val)
-    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val)))
+    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val))
+  (defmacro repeatize (keymap)
+    "Add `repeat-mode' support to a KEYMAP."
+    `(map-keymap
+      (lambda (_key cmd)
+        (when (symbolp cmd)
+          (put cmd 'repeat-map ',keymap)))
+      ,keymap)))
 (use-package diminish
   :ensure
   :config
@@ -526,12 +533,12 @@
          ("C-g" . consult-grep)
          ("G"   . consult-git-grep)
          ("k"   . consult-kmacro)
-         ("m"   . consult-mode-command)
 
          :map ctl-x-map
          ("M-:" . consult-complex-command)
          ("b"   . consult-buffer)
          ("C-r" . consult-recent-file)
+         ("m"   . consult-mode-command)
          ("`"   . consult-compile-error)
 
          :map ctl-x-4-map
@@ -764,9 +771,8 @@
   (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
   (embark-help-key "?")
-  (embark-indicators '(embark-highlight-indicator
-                       embark-isearch-highlight-indicator))
   (embark-quit-after-action nil)
+  (repeat-echo-function #'ignore)
   :config
   ;; https://github.com/oantolin/embark/issues/464
   (push 'embark--ignore-target
@@ -775,40 +781,32 @@
         (alist-get 'xref-find-references embark-target-injection-hooks))
   (push #'embark--xref-push-marker
         (alist-get 'find-file embark-pre-action-hooks))
-  (eval-after-load "which-key"
-    (progn
-      (add-to-list 'embark-indicators 'embark-which-key-indicator)
-      (defun embark-which-key-indicator ()
-        "An embark indicator that displays keymaps using which-key.
-The which-key help message will show the type and value of the
-current target followed by an ellipsis if there are further
-targets."
-        (lambda (&optional keymap targets prefix)
-          (if (null keymap)
-              (which-key--hide-popup-ignore-command)
-            (which-key--show-keymap
-             (if (eq (plist-get (car targets) :type) 'embark-become)
-                 "Become"
-               (format "Act on %s '%s'%s"
-                       (plist-get (car targets) :type)
-                       (embark--truncate-target (plist-get (car targets) :target))
-                       (if (cdr targets) "…" "")))
-             (if prefix
-                 (pcase (lookup-key keymap prefix 'accept-default)
-                   ((and (pred keymapp) km) km)
-                   (_ (key-binding prefix 'accept-default)))
-               keymap)
-             nil nil t (lambda (binding)
-                         (not (string-suffix-p "-argument" (cdr binding))))))))
-
-      (defun embark-hide-which-key-indicator (fn &rest args)
-        "Hide the which-key indicator immediately when using the completing-read prompter."
-        (which-key--hide-popup-ignore-command)
-        (let ((embark-indicators
-               (remq #'embark-which-key-indicator embark-indicators)))
-          (apply fn args)))
-      (advice-add #'embark-completing-read-prompter
-                  :around #'embark-hide-which-key-indicator))))
+  (defun repeat-help--embark-indicate ()
+    (if-let ((cmd (or this-command real-this-command))
+             (keymap (or repeat-map
+                         (repeat--command-property 'repeat-map))))
+        (run-at-time
+         0 nil
+         (lambda ()
+           (let* ((bufname "*Repeat Commands*")
+                  (embark-verbose-indicator-buffer-sections
+                   '(bindings))
+                  (embark--verbose-indicator-buffer bufname)
+                  (embark-verbose-indicator-display-action
+                   '(display-buffer-at-bottom
+                     (window-height . fit-window-to-buffer)
+                     (window-parameters . ((no-other-window . t)
+                                           (mode-line-format))))))
+             (funcall
+              (embark-verbose-indicator)
+              (symbol-value keymap))
+             (setq other-window-scroll-buffer (get-buffer bufname)))))
+      (when-let ((win
+                  (get-buffer-window
+                   "*Repeat Commands*" 'visible)))
+        (kill-buffer (window-buffer win))
+        (delete-window win))))
+  (advice-add 'repeat-post-hook :after #'repeat-help--embark-indicate))
 (use-package embark-consult
   :ensure
   :after (embark consult)
@@ -1116,7 +1114,9 @@ targets."
   (advice-add 'read-shell-command :around #'use-region-if-active))
 (use-package smerge-mode
   :custom
-  (smerge-command-prefix "\C-z"))
+  (smerge-command-prefix "\C-cm")
+  :config
+  (repeatize smerge-basic-map))
 (use-package string-inflection
   :ensure
   :after embark
@@ -1194,6 +1194,14 @@ targets."
   :ensure
   :diminish
   :hook (after-init . volatile-highlights-mode))
+(use-package vterm
+  :ensure
+  :bind (:map mode-specific-map
+              ("x" . vterm))
+  :config
+  (advice-add #'vterm-mode :after
+              (defun disable-mode-line-format-for-vterm ()
+                (setq-local mode-line-format nil))))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
@@ -1212,11 +1220,6 @@ targets."
   (defun move-to-wrapped-region ()
     (when (< (point) (region-end))
       (forward-char 1))))
-(use-package which-key
-  :ensure t
-  :functions
-  which-key--show-keymap
-  which-key--hide-popup-ignore-command)
 (use-package windresize
   :ensure
   :bind (:map mode-specific-map ("w" . windresize)))
