@@ -84,8 +84,8 @@
  '(mode-line-front-space '("  "))
  '(mode-line-position '(""))
  '(mode-line-mule-info '(""))
- '(mode-line-end-spaces
-   '(:eval (concat (propertize " " 'display `(space :align-to (- right 4))) "%c")))
+ '(mode-line-end-spaces nil)
+ ;; '(:eval (concat (propertize " " 'display `(space :align-to (- right 4))) "%c")))
  '(next-error-message-highlight t)
  '(ns-alternate-modifier 'super)
  '(ns-command-modifier 'meta)
@@ -772,7 +772,8 @@
   (prefix-help-command #'embark-prefix-help-command)
   (embark-help-key "?")
   (embark-quit-after-action nil)
-  (repeat-echo-function #'ignore)
+  (embark-verbose-indicator-display-action
+   '((display-buffer-below-selected (window-height . fit-window-to-buffer))))
   :config
   ;; https://github.com/oantolin/embark/issues/464
   (push 'embark--ignore-target
@@ -781,32 +782,41 @@
         (alist-get 'xref-find-references embark-target-injection-hooks))
   (push #'embark--xref-push-marker
         (alist-get 'find-file embark-pre-action-hooks))
-  (defun repeat-help--embark-indicate ()
-    (if-let ((cmd (or this-command real-this-command))
-             (keymap (or repeat-map
-                         (repeat--command-property 'repeat-map))))
-        (run-at-time
-         0 nil
-         (lambda ()
-           (let* ((bufname "*Repeat Commands*")
-                  (embark-verbose-indicator-buffer-sections
-                   '(bindings))
-                  (embark--verbose-indicator-buffer bufname)
-                  (embark-verbose-indicator-display-action
-                   '(display-buffer-at-bottom
-                     (window-height . fit-window-to-buffer)
-                     (window-parameters . ((no-other-window . t)
-                                           (mode-line-format))))))
-             (funcall
-              (embark-verbose-indicator)
-              (symbol-value keymap))
-             (setq other-window-scroll-buffer (get-buffer bufname)))))
-      (when-let ((win
-                  (get-buffer-window
-                   "*Repeat Commands*" 'visible)))
-        (kill-buffer (window-buffer win))
-        (delete-window win))))
-  (advice-add 'repeat-post-hook :after #'repeat-help--embark-indicate))
+  (use-package which-key
+    :config
+    (defun embark-which-key-indicator ()
+      "An embark indicator that displays keymaps using which-key.
+The which-key help message will show the type and value of the
+current target followed by an ellipsis if there are further
+targets."
+      (lambda (&optional keymap targets prefix)
+        (if (null keymap)
+            (which-key--hide-popup-ignore-command)
+          (which-key--show-keymap
+           (if (eq (plist-get (car targets) :type) 'embark-become)
+               "Become"
+             (format "Act on %s '%s'%s"
+                     (plist-get (car targets) :type)
+                     (embark--truncate-target (plist-get (car targets) :target))
+                     (if (cdr targets) "…" "")))
+           (if prefix
+               (pcase (lookup-key keymap prefix 'accept-default)
+                 ((and (pred keymapp) km) km)
+                 (_ (key-binding prefix 'accept-default)))
+             keymap)
+           nil nil t (lambda (binding)
+                       (not (string-suffix-p "-argument" (cdr binding))))))))
+    (setq embark-indicators
+          (cons 'embark-which-key-indicator
+                (remove 'embark-mixed-indicator  embark-indicators)))
+    (defun embark-hide-which-key-indicator (fn &rest args)
+      "Hide the which-key indicator immediately when using the completing-read prompter."
+      (which-key--hide-popup-ignore-command)
+      (let ((embark-indicators
+             (remq #'embark-which-key-indicator embark-indicators)))
+        (apply fn args)))
+    (advice-add #'embark-completing-read-prompter
+                :around #'embark-hide-which-key-indicator)))
 (use-package embark-consult
   :ensure
   :after (embark consult)
@@ -1211,6 +1221,14 @@
           ("C-c C-c" . save-buffer)
           :map grep-mode-map
           ("e" . wgrep-change-to-wgrep-mode)))
+(use-package which-key
+  :ensure
+  :functions
+  which-key--show-keymap
+  which-key--hide-popup-ignore-command)
+(use-package windresize
+  :ensure
+  :bind (:map mode-specific-map ("w" . windresize)))
 (use-package wrap-region
   :ensure
   :diminish
@@ -1220,9 +1238,6 @@
   (defun move-to-wrapped-region ()
     (when (< (point) (region-end))
       (forward-char 1))))
-(use-package windresize
-  :ensure
-  :bind (:map mode-specific-map ("w" . windresize)))
 (use-package xref
   :bind (("<f3>" . xref-find-definitions)
          ("<f4>" . xref-find-references))
