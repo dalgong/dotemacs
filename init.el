@@ -757,7 +757,24 @@
 (use-package eldoc
   :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
 (use-package elec-pair
-  :hook (after-init . electric-pair-mode))
+  :hook (after-init . electric-pair-mode)
+  :config
+  (advice-add #'electric-pair-open-newline-between-pairs-psif
+              :override
+              (defun electric-pair-open-newline-between-pairs-psif-fix ()
+                (when (and (if (functionp electric-pair-open-newline-between-pairs)
+                               (funcall electric-pair-open-newline-between-pairs)
+                             electric-pair-open-newline-between-pairs)
+                           (eq last-command-event ?\n)
+                           (< (1+ (point-min)) (point) (point-max))
+                           (eq (save-excursion
+                                 (skip-chars-backward "\t\s")
+                                 (char-before (1- (point))))
+                               (matching-paren (char-after))))
+                  (save-excursion
+                    (newline 1 t)
+                    ;; this is missing
+                    (indent-according-to-mode))))))
 (use-package elfeed
   :bind ("C-x !" . elfeed))
 (use-package embark
