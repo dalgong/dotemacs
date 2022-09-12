@@ -575,7 +575,6 @@
   (xref-show-xrefs-function #'consult-xref)
   (xref-show-definitions-function #'consult-xref)
   :config
-  (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (advice-add 'kill-line :around #'consult-kill-line-dwim)
   (defun consult-kill-line-dwim (o &rest args)
     (require 'embark nil t)
@@ -792,6 +791,7 @@
   (embark-verbose-indicator-display-action
    '((display-buffer-below-selected (window-height . fit-window-to-buffer))))
   :config
+  (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   ;; https://github.com/oantolin/embark/issues/464
   (push 'embark--ignore-target
         (alist-get 'xref-find-definitions embark-target-injection-hooks))
@@ -856,18 +856,14 @@ targets."
   :config
   (eshell-syntax-highlighting-global-mode +1))
 (use-package exec-path-from-shell
-  :if (eq system-type 'darwin)
   :ensure
-  :hook (after-init . exec-path-from-shell-initialize)
+  :hook (after-init . exec-path-from-shell-initialize-on-mac)
   :custom
   (exec-path-from-shell-arguments '("-l"))
   :config
-  (dolist (env (split-string (shell-command-to-string "bash -lc env") "\n" t))
-    (let* ((p (split-string env "=" nil))
-           (name (car p))
-           (values (cdr p)))
-      (unless (member name exec-path-from-shell-variables)
-        (setenv name (mapconcat #'identity values "="))))))
+  (defun exec-path-from-shell-initialize-on-mac ()
+    (when (memq window-system '(mac ns))
+      (exec-path-from-shell-initialize))))
 (use-package gcmh
   :ensure
   :diminish
@@ -1173,6 +1169,7 @@ targets."
   :config
   (add-to-list 'tramp-remote-path "~/bin"))
 (use-package tree-sitter
+  :disabled
   :ensure
   :diminish
   :hook ((after-init . global-tree-sitter-mode)
@@ -1240,9 +1237,13 @@ targets."
           ("e" . wgrep-change-to-wgrep-mode)))
 (use-package which-key
   :ensure
+  :diminish
   :functions
   which-key--show-keymap
-  which-key--hide-popup-ignore-command)
+  which-key--hide-popup-ignore-command
+  :hook (after-init . which-key-mode)
+  :config
+  (which-key-setup-side-window-right))
 (use-package windresize
   :ensure
   :bind (:map mode-specific-map ("w" . windresize)))
