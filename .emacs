@@ -7,3 +7,5 @@
 
 (let ((file-name-handler-alist nil))
   (load "~/.emacs.d/init" nil t))
+
+(setq frame-title-format "%b")
