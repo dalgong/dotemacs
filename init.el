@@ -1083,10 +1083,6 @@ targets."
   :custom
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 300))
-(use-package racer
-  :ensure
-  :bind (:map rust-mode-map ("C-h d" . racer-describe))
-  :hook (rust-mode . racer-mode))
 (use-package python
   :mode ("\\.py\\'" . python-mode)
   :interpreter ("python" . python-mode)
