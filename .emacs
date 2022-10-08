@@ -5,7 +5,9 @@
         "https://blog.codinghorror.com/rss/"
         "https://daringfireball.net/feeds/main"))
 
-(let ((file-name-handler-alist nil))
+(let ((inhibit-redisplay t)
+      (inhibit-message t)
+      (file-name-handler-alist nil))
   (load "~/.emacs.d/init" nil t))
 
 (setq frame-title-format "%b")

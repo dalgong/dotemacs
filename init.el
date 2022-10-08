@@ -54,6 +54,7 @@
  '(hscroll-margin 2)
  '(hscroll-step 1)
  '(help-char ?^)
+ '(help-window-select t)
  '(history-delete-duplicates t)
  '(history-length 1000)
  '(highlight-nonselected-windows nil)
@@ -675,6 +676,13 @@
               (defun suppress-message (o &rest args)
                 (let ((inhibit-message t))
                   (apply o args)))))
+(use-package dictionary
+  :bind
+  (:map mode-specific-map
+        ("$" . dictionary-lookup-definition))
+  :custom
+  (dictionary-server "dict.org")
+  (dictionary-use-single-buffer t))
 (use-package diffview
   :ensure
   :after diff-mode
@@ -1083,6 +1091,11 @@ targets."
   :custom
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 300))
+(use-package rustic
+  :ensure
+  :custom
+  (rustic-lsp-client 'eglot)
+  :hook (rustic-mode . eglot-ensure))
 (use-package python
   :mode ("\\.py\\'" . python-mode)
   :interpreter ("python" . python-mode)
@@ -1165,11 +1178,10 @@ targets."
   :config
   (add-to-list 'tramp-remote-path "~/bin"))
 (use-package tree-sitter
-  :disabled
   :ensure
   :diminish
-  :hook ((after-init . global-tree-sitter-mode)
-         (tree-sitter-after-on . tree-sitter-hl-mode))
+  :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
+         ((rustic-mode c-mode-common) . tree-sitter-mode))
   :config
   (use-package tree-sitter-langs :ensure))
 (use-package uniquify
