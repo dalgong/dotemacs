@@ -39,6 +39,7 @@
  '(create-lockfiles nil)
  '(cursor-in-non-selected-windows nil)
  '(delete-old-versions t)
+ '(dired-switches-in-mode-line 'as-is)
  '(disabled-command-function nil)
  '(display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)))
  '(enable-recursive-minibuffers t)
@@ -58,12 +59,14 @@
  '(history-delete-duplicates t)
  '(history-length 1000)
  '(highlight-nonselected-windows nil)
+ '(file-name-at-point-functions nil)
  '(find-file-visit-truename nil)
  '(idle-update-delay 1)
  '(indent-tabs-mode nil)
  '(inhibit-compacting-font-caches t)
  '(inhibit-startup-screen t)
  '(initial-scratch-message nil)
+ '(isearch-repeat-on-direction-change t)
  '(kill-buffer-query-functions nil)
  '(kill-do-not-save-duplicates t)
  '(kill-read-only-ok t)
@@ -98,6 +101,7 @@
  '(read-file-name-completion-ignore-case t)
  '(read-process-output-max (* 1024 1024))
  '(redisplay-skip-fontification-on-input t)
+ '(remote-file-name-inhibit-locks t)
  '(require-final-newline t)
  '(resize-mini-windows 'grow-only)
  '(revert-without-query '(""))
@@ -373,10 +377,6 @@
                        (and (equal tab-first-completion 'word-or-paren-or-punct)
                             (not (member 1 syn)))))
           (completion-at-point))))))
-(use-package color-identifiers-mode
-  :ensure
-  :diminish
-  :hook (after-init . global-color-identifiers-mode))
 (use-package comint
   :bind (:map comint-mode-map
               ([C-up]   . nil)
@@ -679,6 +679,7 @@
 (use-package dictionary
   :bind
   (:map mode-specific-map
+        ("d" . dictionary-lookup-definition)
         ("$" . dictionary-lookup-definition))
   :custom
   (dictionary-server "dict.org")
@@ -782,8 +783,6 @@
                     (newline 1 t)
                     ;; this is missing
                     (indent-according-to-mode))))))
-(use-package elfeed
-  :bind ("C-x !" . elfeed))
 (use-package embark
   :ensure
   :commands (embark-act embark-prefix-help-command)
@@ -1127,6 +1126,7 @@ targets."
   :bind (:map shell-mode-map
               ([remap read-only-mode] . shell-toggle-compile-mode))
   :config
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
   (defun shell-toggle-compile-mode ()
     (interactive)
     (setq buffer-read-only t)
@@ -1184,6 +1184,10 @@ targets."
          ((rustic-mode c-mode-common) . tree-sitter-mode))
   :config
   (use-package tree-sitter-langs :ensure))
+(use-package undo-tree
+  :ensure
+  :diminish
+  :hook (after-init . global-undo-tree-mode))
 (use-package uniquify
   :defer t
   :custom
