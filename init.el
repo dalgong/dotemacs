@@ -34,6 +34,10 @@
  '(completion-ignore-case t)
  '(completion-pcm-complete-word-inserts-delimiters t)
  '(completion-show-help nil)
+ '(completions-format 'one-column)
+ '(completions-header-format nil)
+ '(completions-max-height 20)
+ '(completion-auto-select nil)
  '(confirm-kill-emacs nil)
  '(confirm-nonexistent-file-or-buffer nil)
  '(create-lockfiles nil)
@@ -645,6 +649,7 @@
   :bind (:map flycheck-command-map
               ("!" . consult-flycheck)))
 (use-package corfu
+  :disabled
   :ensure
   :bind (:map corfu-map ("M-m" . corfu-move-to-minibuffer))
   ;; :custom
@@ -987,18 +992,6 @@ targets."
                                    filename
                                  (funcall original filename)))))
                     (apply o args))))))
-(use-package modus-themes
-  :disabled
-  :custom
-  (modus-themes-bold-constructs t)
-  (modus-themes-hl-line '(accented intense))
-  (modus-themes-italic-constructs t)
-  (modus-themes-mode-line '(moody accented borderless))
-  (modus-themes-region '(bg-only))
-  (modus-themes-scale-headings t)
-  (modus-themes-slanted-constructs t)
-  :config
-  (load-theme 'modus-operandi t))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
@@ -1196,6 +1189,7 @@ targets."
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
 (use-package vertico
+  :if (< emacs-major-version 29)
   :ensure t
   :bind ( :map vertico-map
           ("?" . minibuffer-completion-help)
@@ -1334,3 +1328,12 @@ targets."
  ("SPC"                . cycle-spacing)
  ("r"                  . replace-regexp)
  ("s"                  . replace-string))
+
+(when (>= emacs-major-version 29)
+  (bind-keys
+   :map minibuffer-mode-map
+   ("C-n" . minibuffer-next-completion)
+   ("C-p" . minibuffer-previous-completion)
+   :map completion-in-region-mode-map
+   ("C-n" . minibuffer-next-completion)
+   ("C-p" . minibuffer-previous-completion)))
