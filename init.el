@@ -838,7 +838,9 @@
   :bind (("M-SPC" . embark-act)
          ("M-."   . embark-dwim)
          :map minibuffer-local-map
-         ("M-E"   . embark-export))
+         ("M-E"   . embark-export)
+         ("M-L"   . embark-live)
+         ("M-S"   . embark-collect))
   :custom
   (embark-cycle-key (kbd "C-SPC"))
   (prefix-help-command #'embark-prefix-help-command)
@@ -847,6 +849,10 @@
   (embark-verbose-indicator-display-action
    '((display-buffer-below-selected (window-height . fit-window-to-buffer))))
   :config
+  (add-to-list 'display-buffer-alist
+               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+                 display-buffer-at-bottom
+                 (window-parameters (mode-line-format . none))))
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   ;; https://github.com/oantolin/embark/issues/464
   (push 'embark--ignore-target
@@ -1227,6 +1233,11 @@ targets."
 (use-package undo-tree
   :ensure
   :diminish
+  :custom
+  (undo-tree-enable-undo-in-region t)
+  (undo-tree-auto-save-history nil)
+  (undo-tree-visualizer-timestamps t)
+  (undo-tree-visualizer-diff t)
   :hook (after-init . global-undo-tree-mode))
 (use-package uniquify
   :defer t
