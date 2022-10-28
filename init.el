@@ -48,7 +48,6 @@
    ([remap suspend-frame]. ignore)
    ([remap kill-buffer]  . kill-this-buffer)
    ("C-TAB"              . other-window)
-   ("C-`"                . shell)
    ("C-."                . next-error)
    ("C-,"                . previous-error)
    ("M-K"                . kill-this-buffer)
@@ -902,8 +901,15 @@ targets."
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
   :hook (eshell-mode . setup-color-for-eshell)
-  ;; :bind ("C-`" . eshell)
+  :bind ("C-`" . eshell)
   :config
+  (defun eshell/: (&rest args)
+    (let ((compilation-process-setup-function
+	   (list 'lambda nil
+	         (list 'setq 'process-environment
+		       (list 'quote (eshell-copy-environment))))))
+      (compile (eshell-flatten-and-stringify args))))
+  (put 'eshell/: 'eshell-no-numeric-conversions t)
   (defun setup-color-for-eshell ()
     (setenv "TERM" "xterm-256color")
     (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
