@@ -48,6 +48,7 @@
    ([remap suspend-frame]. ignore)
    ([remap kill-buffer]  . kill-this-buffer)
    ("C-TAB"              . other-window)
+   ("C-`"                . shell)
    ("C-."                . next-error)
    ("C-,"                . previous-error)
    ("M-K"                . kill-this-buffer)
@@ -901,7 +902,6 @@ targets."
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
   :hook (eshell-mode . setup-color-for-eshell)
-  :bind ("C-`" . eshell)
   :config
   (defun eshell/: (&rest args)
     (let ((compilation-process-setup-function
