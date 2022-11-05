@@ -135,7 +135,6 @@
   (history-delete-duplicates t)
   (history-length 1000)
   (highlight-nonselected-windows nil)
-  (file-name-at-point-functions nil)
   (find-file-visit-truename nil)
   (idle-update-delay 1)
   (indent-tabs-mode nil)
@@ -559,6 +558,7 @@
          ("M-'"  . consult-register-store)
          ([remap yank-pop] . consult-yank-pop)
          ("M-T" . consult-imenu)
+         ("M-Y" . consult-imenu-multi)
 
          :map help-map
          ("a"     . consult-apropos)
@@ -639,6 +639,21 @@
                       (browse-url (car r))
                       (exit-minibuffer))
                   r)))
+  (advice-add #'find-file :around #'find-file--line-number)  
+  (defun find-file--line-number (o filename &optional wildcards)
+    "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
+    (let (line-number)
+      (unless (file-exists-p filename)
+        (save-match-data
+          (when (and (string-match "^\\(.*\\):\\([0-9]+\\):?$" filename)
+                     (match-string 2 filename))
+            (setq line-number (string-to-number (match-string 2 filename)))
+            (setq filename (match-string 1 filename)))))
+      (apply o (list filename wildcards))
+      (when line-number
+          ;; goto-line is for interactive use
+          (goto-char (point-min))
+          (forward-line (1- line-number)))))
   ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
   ;; (nconc consult--source-file (list :state #'consult--file-preview))
   ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
@@ -854,11 +869,6 @@
                  display-buffer-at-bottom
                  (window-parameters (mode-line-format . none))))
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
-  ;; https://github.com/oantolin/embark/issues/464
-  (push 'embark--ignore-target
-        (alist-get 'xref-find-definitions embark-target-injection-hooks))
-  (push 'embark--ignore-target
-        (alist-get 'xref-find-references embark-target-injection-hooks))
   (push #'embark--xref-push-marker
         (alist-get 'find-file embark-pre-action-hooks))
   (use-package which-key
