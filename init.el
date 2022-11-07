@@ -791,7 +791,8 @@
   :hook ((prog-mode text-mode) . display-line-numbers-mode))
 (use-package easy-kill
   :ensure
-  :bind (([remap kill-ring-save]              . easy-kill)
+  :bind (([remap mark-sexp]                   . easy-mark)
+         ([remap kill-ring-save]              . easy-kill)
          :map easy-kill-base-map
          ([remap exchange-point-and-mark]     . easy-kill-exchange-point-and-mark)
          ([remap set-mark]                    . easy-kill-mark-region)
