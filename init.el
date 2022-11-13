@@ -253,7 +253,7 @@
   (defun dispatch-goto-line ()
     (interactive)
     (setq unread-command-events (nconc (list (logand ?\xff last-command-event)) unread-command-events))
-    (call-interactively 'goto-line))
+    (call-interactively (key-binding (kbd "M-g M-g"))))
   (advice-add #'recursive-edit :around
               (defun preseve-window-configuration-if-interactive (o)
                 (let ((wc (and (called-interactively-p 'interactive)
