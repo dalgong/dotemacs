@@ -1324,7 +1324,7 @@ targets."
   which-key--hide-popup-ignore-command
   :hook (after-init . which-key-mode)
   :config
-  (which-key-setup-side-window-right))
+  (which-key-setup-minibuffer))
 (use-package windresize
   :ensure
   :bind (:map mode-specific-map ("w" . windresize)))
