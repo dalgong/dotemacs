@@ -444,6 +444,7 @@
   :hook (after-init . global-company-mode)
   :bind ( :map prog-mode-map
           ("C-i"   . company-indent-or-complete-common)
+          ([remap c-indent-line-or-region] . company-indent-or-complete-common)
           :map mode-specific-map
           ("/" . company-manual-begin)
           :map company-active-map
