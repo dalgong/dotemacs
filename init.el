@@ -1109,6 +1109,10 @@ targets."
   (org-startup-indented t)
   (org-use-speed-commands t)
   :config
+  (defvar my-emacs-lisp-params nil)
+  (advice-add #'org-babel-execute:emacs-lisp :around 
+    (defun save-my-emacs-lisp-params (o body params)
+      (funcall o body (setq my-emacs-lisp-params params))))
   ;; #+NAME: embed
   ;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
   ;;   (save-excursion
@@ -1116,9 +1120,7 @@ targets."
   ;;     (setq datum (org-element-at-point))
   ;;     t)
   ;;   (setq info (org-babel-get-src-block-info nil datum))
-  ;;   (cl-callf org-babel-merge-params
-  ;;             (nth 2 info)
-  ;;             (org-with-point-at (org-element-property :begin datum) (org-babel-params-from-properties)))
+  ;;   (cl-callf org-babel-merge-params my-emacs-lisp-params)
   ;;   (cl-callf org-babel-process-params (nth 2 info))
   ;;   (setq lang (nth 0 info))
   ;;   (setq body (org-babel-expand-src-block nil info))
