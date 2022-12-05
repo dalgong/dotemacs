@@ -1116,7 +1116,9 @@ targets."
   ;;     (setq datum (org-element-at-point))
   ;;     t)
   ;;   (setq info (org-babel-get-src-block-info nil datum))
-  ;;   (cl-callf org-babel-merge-params (nth 2 info) params)
+  ;;   (cl-callf org-babel-merge-params
+  ;;             (nth 2 info)
+  ;;             (org-with-point-at (org-element-property :begin datum) (org-babel-params-from-properties)))
   ;;   (cl-callf org-babel-process-params (nth 2 info))
   ;;   (setq lang (nth 0 info))
   ;;   (setq body (org-babel-expand-src-block nil info))
