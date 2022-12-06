@@ -1228,6 +1228,16 @@ targets."
   :after embark
   :bind ( :map embark-identifier-map
           ("y" . symbol-overlay-put)))
+(use-package tempel
+  :ensure
+  :hook ((prog-mode text-mode) . tempel-setup-capf)
+  :config
+  (defun tempel-setup-capf ()
+    (setq-local completion-at-point-functions
+                (cons #'tempel-expand
+                      completion-at-point-functions))))
+(use-package tempel-collection
+  :ensure t)
 (use-package tramp
   :defer t
   :custom
