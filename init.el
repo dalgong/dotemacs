@@ -1134,6 +1134,17 @@ targets."
   (use-package ob-async :ensure)
   (use-package ob-compile
     :bind (:map mode-specific-map ("8" . ob-compile)))
+  (use-package ob-tmux
+    :ensure t
+    :custom
+    (org-babel-default-header-args:tmux
+     '((:async . t)
+       (:results . "silent")
+       (:session . "emacs")
+       (:socket  . nil)))
+    (org-babel-tmux-session-prefix "")
+    (org-babel-tmux-terminal "")
+    (org-babel-tmux-terminal-opts nil))
   (defun lazy-load-org-babel-languages (o &rest args)
     (when-let (lang (org-element-property :language (org-element-at-point)))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
@@ -1230,7 +1241,7 @@ targets."
           ("y" . symbol-overlay-put)))
 (use-package tempel
   :ensure
-  :hook ((prog-mode text-mode) . tempel-setup-capf)
+  :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
   :config
   (defun tempel-setup-capf ()
     (setq-local completion-at-point-functions
