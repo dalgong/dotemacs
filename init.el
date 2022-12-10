@@ -1258,6 +1258,7 @@ targets."
   :config
   (put 'temporary-file-directory 'standard-value '("/tmp")))
 (use-package tramp-sh
+  :after tramp
   :custom
   (tramp-ssh-controlmaster-options
    (concat
@@ -1265,7 +1266,20 @@ targets."
     "-o ControlMaster=auto -o ControlPersist=yes"))
   :config
   (add-to-list 'tramp-remote-path "~/bin"))
+(use-package treesit
+  :if (and (fboundp 'treesit-available-p) (treesit-available-p))
+  :config
+  (dolist (p auto-mode-alist)
+    (when-let (r (pcase (cdr p)
+                   ('c-mode
+                    (and (treesit-ready-p 'c) 'c-ts-mode))
+                   ('c++-mode
+                    (and (treesit-ready-p 'cpp) 'c++-ts-mode))
+                   ('sh-mode
+                    'bash-ts-mode)))
+      (setcdr p r))))
 (use-package tree-sitter
+  :disabled
   :ensure
   :diminish
   :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
