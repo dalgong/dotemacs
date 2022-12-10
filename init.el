@@ -11,7 +11,7 @@
               (advice-remove #'tty-run-terminal-initialization #'ignore)
               (tty-run-terminal-initialization (selected-frame) nil t))))
 
-(defvar enable-vertico (< emacs-major-version 29))
+(defvar enable-vertico t)
 
 (when (require 'package nil t)
   (custom-set-variables
@@ -1269,15 +1269,11 @@ targets."
 (use-package treesit
   :if (and (fboundp 'treesit-available-p) (treesit-available-p))
   :config
-  (dolist (p auto-mode-alist)
-    (when-let (r (pcase (cdr p)
-                   ('c-mode
-                    (and (treesit-ready-p 'c) 'c-ts-mode))
-                   ('c++-mode
-                    (and (treesit-ready-p 'cpp) 'c++-ts-mode))
-                   ('sh-mode
-                    'bash-ts-mode)))
-      (setcdr p r))))
+  (when (treesit-ready-p 'c)
+    (push '(c-mode . c-ts-mode) major-mode-remap-alist))
+  (when (treesit-ready-p 'cpp)
+    (push '(c++-mode . c++-ts-mode) major-mode-remap-alist))
+  (push '(sh-mode . bash-ts-mode) major-mode-remap-alist))
 (use-package tree-sitter
   :disabled
   :ensure
