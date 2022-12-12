@@ -1269,13 +1269,12 @@ targets."
 (use-package treesit
   :if (and (fboundp 'treesit-available-p) (treesit-available-p))
   :config
-  (when (treesit-ready-p 'c)
-    (push '(c-mode . c-ts-mode) major-mode-remap-alist))
-  (when (treesit-ready-p 'cpp)
-    (push '(c++-mode . c++-ts-mode) major-mode-remap-alist))
+  ;;(when (treesit-ready-p 'c)
+  ;;  (push '(c-mode . c-ts-mode) major-mode-remap-alist))
+  ;;(when (treesit-ready-p 'cpp)
+  ;;  (push '(c++-mode . c++-ts-mode) major-mode-remap-alist))
   (push '(sh-mode . bash-ts-mode) major-mode-remap-alist))
 (use-package tree-sitter
-  :disabled
   :ensure
   :diminish
   :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
