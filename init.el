@@ -650,11 +650,12 @@
                      (match-string 2 filename))
             (setq line-number (string-to-number (match-string 2 filename)))
             (setq filename (match-string 1 filename)))))
-      (apply o (list filename wildcards))
-      (when line-number
+      (prog1
+          (apply o (list filename wildcards))
+        (when line-number
           ;; goto-line is for interactive use
           (goto-char (point-min))
-          (forward-line (1- line-number)))))
+          (forward-line (1- line-number))))))
   ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
   ;; (nconc consult--source-file (list :state #'consult--file-preview))
   ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
