@@ -656,6 +656,13 @@
           ;; goto-line is for interactive use
           (goto-char (point-min))
           (forward-line (1- line-number))))))
+  (advice-add #'ffap-file-at-point :filter-return #'ffap-file-at-point-add-line-number)
+  (defun ffap-file-at-point-add-line-number (r)
+    (let ((s (ffap-string-at-point)))
+      (save-match-data
+        (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
+            (concat r (match-string 1 s))
+          r))))
   ;; (nconc consult--source-bookmark (list :state #'consult--bookmark-preview))
   ;; (nconc consult--source-file (list :state #'consult--file-preview))
   ;; (nconc consult--source-project-file (list :state #'consult--file-preview))
