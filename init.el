@@ -942,6 +942,10 @@ targets."
   :after eshell-mode
   :config
   (eshell-syntax-highlighting-global-mode +1))
+(use-package evil
+  :ensure
+  :custom
+  (evil-default-state 'emacs))
 (use-package executable
   :hook (after-save . executable-make-buffer-file-executable-if-script-p))
 (use-package exec-path-from-shell
