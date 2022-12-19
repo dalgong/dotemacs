@@ -11,8 +11,6 @@
               (advice-remove #'tty-run-terminal-initialization #'ignore)
               (tty-run-terminal-initialization (selected-frame) nil t))))
 
-(defvar enable-vertico t)
-
 (when (require 'package nil t)
   (custom-set-variables
    '(package-archives
@@ -216,15 +214,6 @@
   (window-resize-pixelwise nil)
   (words-include-escapes t)
   :config
-  (unless enable-vertico
-    (bind-keys
-     :map minibuffer-mode-map
-     ("C-n" . minibuffer-next-completion)
-     ("C-p" . minibuffer-previous-completion)
-     :map completion-in-region-mode-map
-     ("C-n" . minibuffer-next-completion)
-     ("C-p" . minibuffer-previous-completion)))
-
   (put 'backup-inhibited 'safe-local-variable 'booleanp)
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
@@ -1310,7 +1299,6 @@ targets."
   (uniquify-ignore-buffers-re "^\\*")
   (uniquify-separator "|"))
 (use-package vertico
-  :if enable-vertico
   :ensure t
   :bind ( :map vertico-map
           ("?" . minibuffer-completion-help)
@@ -1318,13 +1306,16 @@ targets."
           ;; ("RET" . vertico-directory-enter)
           ("DEL" . vertico-directory-delete-char)
           ("M-DEL" . vertico-directory-delete-word)
-          ("M-G" . vertico-grid-mode)
-          ("M-F" . vertico-flat-mode)
-          ("M-U" . vertico-unobtrusive-mode)
+          ("M-F" . vertico-multiform-flat)
+          ("M-G" . vertico-multiform-grid)
+          ("M-R" . vertico-multiform-reverse)
+          ("M-U" . vertico-multiform-unobtrusive)
+          ("M-V" . vertico-multiform-vertical)
           ("M-'" . vertico-quick-insert)
           ("M-m" . vertico-quick-exit)
           ("C-x C-d" . consult-dir)
           ("M-/" . consult-dir-jump-file)
+          ("C-c SPC" . +vertico-restrict-to-matches)
           :map mode-specific-map
           ("C-r" . vertico-repeat))
   :hook ((after-init . vertico-mode)
@@ -1332,7 +1323,18 @@ targets."
          (rfn-eshadow-update-overlay . vertico-directory-tidy))
   :custom
   (vertico-count-format nil)
+  (vertico-multiform-commands   '((consult-imenu buffer indexed)
+                                  (execute-extended-command unobtrusive)))
+  (vertico-multiform-categories '((consult-grep buffer)))
   :config
+  (vertico-multiform-mode t)
+  (defun +vertico-restrict-to-matches ()
+    (interactive)
+    (let ((inhibit-read-only t))
+      (goto-char (point-max))
+      (insert " ")
+      (add-text-properties (minibuffer-prompt-end) (point-max)
+                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
   (use-package consult-dir
     :ensure t
     :config
