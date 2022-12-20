@@ -14,9 +14,10 @@
 (when (require 'package nil t)
   (custom-set-variables
    '(package-archives
-     '(("gnu"   . "http://elpa.gnu.org/packages/")
-       ("melpa" . "http://melpa.org/packages/")
-       ("org"   . "http://orgmode.org/elpa/"))))
+     '(("gnu"    . "http://elpa.gnu.org/packages/")
+       ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+       ("melpa"  . "http://melpa.org/packages/")
+       ("org"    . "http://orgmode.org/elpa/"))))
   (dolist (p '(use-package diminish bind-key))
     (unless (require p nil t)
       (package-refresh-contents)
