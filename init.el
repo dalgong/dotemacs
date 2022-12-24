@@ -697,26 +697,11 @@
       (lambda (action cand)
         (funcall orig-state action (funcall filter action cand)))))
   (setq consult--source-buffer
-        (plist-put consult--source-buffer :state #'consult-buffer-state-no-tramp)))
-(use-package consult-flycheck
-  :ensure
-  :bind (:map flycheck-command-map
-              ("!" . consult-flycheck)))
-(use-package corfu
-  :disabled
-  :ensure
-  :bind (:map corfu-map ("M-m" . corfu-move-to-minibuffer))
-  ;; :custom
-  ;; (corfu-auto t)
-  ;; (corfu-quit-at-boundary t)
-  ;; (corfu-quit-no-match t)
-  :hook (after-init . global-corfu-mode)
-  :config
-  (defun corfu-move-to-minibuffer ()
-    (interactive)
-    (let ((completion-extra-properties corfu--extra)
-          completion-cycle-threshold completion-cycling)
-      (apply #'consult-completion-in-region completion-in-region--data))))
+        (plist-put consult--source-buffer :state #'consult-buffer-state-no-tramp))
+  (use-package consult-flycheck
+    :ensure
+    :bind (:map flycheck-command-map
+                ("!" . consult-flycheck))))
 (use-package coterm
   :ensure
   :bind (:map comint-mode-map
@@ -825,8 +810,6 @@
     :custom
     (ediff-split-window-function #'split-window-horizontally)
     (ediff-window-setup-function #'ediff-setup-windows-plain)))
-(use-package eldoc
-  :hook ((lisp-interaction-mode emacs-lisp-mode python-mode) . turn-on-eldoc-mode))
 (use-package elec-pair
   :hook (after-init . electric-pair-mode)
   :config
@@ -909,43 +892,16 @@ targets."
   :ensure
   :after (embark consult)
   :hook (embark-collect-mode . consult-preview-at-point-mode))
-(use-package eshell
-  :hook (eshell-mode . setup-color-for-eshell)
-  :config
-  (defun eshell/: (&rest args)
-    (let ((compilation-process-setup-function
-	   (list 'lambda nil
-	         (list 'setq 'process-environment
-		       (list 'quote (eshell-copy-environment))))))
-      (compile (eshell-flatten-and-stringify args))))
-  (put 'eshell/: 'eshell-no-numeric-conversions t)
-  (defun setup-color-for-eshell ()
-    (setenv "TERM" "xterm-256color")
-    (add-to-list 'eshell-preoutput-filter-functions 'xterm-color-filter)
-    (setq eshell-output-filter-functions
-          (remove 'eshell-handle-ansi-color eshell-output-filter-functions))))
-(use-package esh-autosuggest
-  :ensure
-  :hook (eshell-mode . esh-autosuggest-mode))
-(use-package eshell-syntax-highlighting
-  :ensure
-  :after eshell-mode
-  :config
-  (eshell-syntax-highlighting-global-mode +1))
 (use-package evil
   :ensure
   :custom
   (evil-default-state 'emacs))
-(use-package executable
-  :hook (after-save . executable-make-buffer-file-executable-if-script-p))
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
   :hook (after-init . exec-path-from-shell-initialize)
   :custom
   (exec-path-from-shell-arguments '("-l")))
-(use-package find-func
-  :hook (after-init . find-function-setup-keys))
 (use-package frame
   :hook (after-init . window-divider-mode))
 (use-package gcmh
@@ -1060,8 +1016,6 @@ targets."
                     (apply o args))))))
 (use-package mb-depth
   :hook (after-init . minibuffer-depth-indicate-mode))
-(use-package minibuf-eldef
-  :hook (after-init . minibuffer-electric-default-mode))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
@@ -1229,18 +1183,6 @@ targets."
   (smerge-command-prefix "\C-cm")
   :config
   (repeatize smerge-basic-map))
-(use-package string-inflection
-  :ensure
-  :after embark
-  :bind ( :map embark-identifier-map
-          ("-" . string-inflection-cycle))
-  :config
-  (add-to-list 'embark-repeat-actions #'string-inflection-cycle))
-(use-package symbol-overlay
-  :ensure
-  :after embark
-  :bind ( :map embark-identifier-map
-          ("y" . symbol-overlay-put)))
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
@@ -1283,15 +1225,6 @@ targets."
          ((rustic-mode c-mode-common) . tree-sitter-mode))
   :config
   (use-package tree-sitter-langs :ensure))
-(use-package undo-tree
-  :ensure
-  :diminish
-  :custom
-  (undo-tree-enable-undo-in-region t)
-  (undo-tree-auto-save-history nil)
-  (undo-tree-visualizer-timestamps t)
-  (undo-tree-visualizer-diff t)
-  :hook (after-init . global-undo-tree-mode))
 (use-package uniquify
   :defer t
   :custom
@@ -1340,23 +1273,9 @@ targets."
     :ensure t
     :config
     (advice-add #'consult-dir-jump-file :before #'vertico-insert)))
-(use-package vlf
+(use-package vundo
   :ensure
-  :defer t
-  :config
-  (require 'vlf-setup))
-(use-package volatile-highlights
-  :ensure
-  :diminish
-  :hook (after-init . volatile-highlights-mode))
-(use-package vterm
-  :ensure
-  :bind (:map mode-specific-map
-              ("x" . vterm))
-  :config
-  (advice-add #'vterm-mode :after
-              (defun disable-mode-line-format-for-vterm ()
-                (setq-local mode-line-format nil))))
+  :bind ("C-x u" . vundo))
 (use-package wgrep
   :ensure
   :hook (grep-setup . wgrep-setup)
@@ -1378,15 +1297,6 @@ targets."
 (use-package windresize
   :ensure
   :bind (:map mode-specific-map ("w" . windresize)))
-(use-package wrap-region
-  :ensure
-  :diminish
-  :hook ((after-init . wrap-region-global-mode)
-         (wrap-region-after-wrap . move-to-wrapped-region))
-  :config
-  (defun move-to-wrapped-region ()
-    (when (< (point) (region-end))
-      (forward-char 1))))
 (use-package xref
   :bind (("<f3>" . xref-find-definitions)
          ("<f4>" . xref-find-references))
