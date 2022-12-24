@@ -1,5 +1,4 @@
 ;; -*- lexical-binding: t -*-
-;; jay+nospam@kldp_remove_me_.org
 (setq custom-file "/dev/null")
 (advice-add #'custom-save-all :override #'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
@@ -27,16 +26,6 @@
   (require 'use-package nil t)
   (require 'bind-key nil t))
 
-(eval-and-compile
-  (defmacro csetq (sym val)
-    `(funcall (or (get ',sym 'custom-set) 'set-default) ',sym ,val))
-  (defmacro repeatize (keymap)
-    "Add `repeat-mode' support to a KEYMAP."
-    `(map-keymap
-      (lambda (_key cmd)
-        (when (symbolp cmd)
-          (put cmd 'repeat-map ',keymap)))
-      ,keymap)))
 (use-package emacs
   :bind
   (([C-tab]              . other-window)
@@ -114,6 +103,8 @@
   (create-lockfiles nil)
   (cursor-in-non-selected-windows nil)
   (delete-old-versions t)
+  (dabbrev-case-fold-search nil)
+  (dabbrev-ignored-buffer-regexps '("\\.\\(?:pdf\\|jpe?g\\|png\\)\\'"))
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
   (display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)))
@@ -418,12 +409,8 @@
   :custom
   (comint-buffer-maximum-size 10240)
   (comint-move-point-for-output nil)
-  ;; (comint-prompt-read-only t)
   (comint-scroll-to-bottom-on-input nil)
-  ;; (comint-use-prompt-regexp t)
   :config
-  ;; (add-hook 'comint-output-filter-functions 'comint-watch-for-password-prompt)
-  ;; (add-hook 'comint-output-filter-functions 'comint-truncate-buffer)
   (defun do-silently (o &rest args)
     (let ((inhibit-message t))
       (apply o args)))
@@ -442,7 +429,6 @@
           ("C-p" . company-select-previous)
           ("M-s" . company-filter-candidates))
   :custom
-  ;; (company-auto-complete t)
   (company-idle-delay nil)
   (company-tooltip-idle-delay nil)
   (company-tooltip-align-annotations t))
@@ -453,8 +439,6 @@
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
          :map compilation-mode-map
-         ("M-{" . nil)
-         ("M-}" . nil)
          ("." . rename-uniquely)
          ("t" . toggle-truncate-lines)
          ([remap read-only-mode] . compilation-toggle-shell-mode))
@@ -702,24 +686,7 @@
     :ensure
     :bind (:map flycheck-command-map
                 ("!" . consult-flycheck))))
-(use-package coterm
-  :ensure
-  :bind (:map comint-mode-map
-              ("C-;" . coterm-char-mode-cycle)
-              ("C-c j" . coterm-char-mode-cycle))
-  :hook (after-init . coterm-mode))
-(use-package dabbrev
-  :bind (("C-M-_" . dabbrev-completion)
-         ("C-M-/" . dabbrev-completion))
-  :custom
-  (abbrev-suggest t)
-  (dabbrev-case-fold-search nil)
-  (dabbrev-ignored-buffer-regexps '("\\.\\(?:pdf\\|jpe?g\\|png\\)\\'"))
-  :config
-  (advice-add 'dabbrev--find-expansion :around
-              (defun suppress-message (o &rest args)
-                (let ((inhibit-message t))
-                  (apply o args)))))
+(use-package coterm :ensure :hook (after-init . coterm-mode))
 (use-package delsel
   :hook (after-init . delete-selection-mode))
 (use-package dictionary
@@ -843,8 +810,6 @@
   (prefix-help-command #'embark-prefix-help-command)
   (embark-help-key "?")
   (embark-quit-after-action nil)
-  (embark-verbose-indicator-display-action
-   '((display-buffer-below-selected (window-height . fit-window-to-buffer))))
   :config
   (add-to-list 'display-buffer-alist
                '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
@@ -852,42 +817,7 @@
                  (window-parameters (mode-line-format . none))))
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (push #'embark--xref-push-marker
-        (alist-get 'find-file embark-pre-action-hooks))
-  (use-package which-key
-    :config
-    (defun embark-which-key-indicator ()
-      "An embark indicator that displays keymaps using which-key.
-The which-key help message will show the type and value of the
-current target followed by an ellipsis if there are further
-targets."
-      (lambda (&optional keymap targets prefix)
-        (if (null keymap)
-            (which-key--hide-popup-ignore-command)
-          (which-key--show-keymap
-           (if (eq (plist-get (car targets) :type) 'embark-become)
-               "Become"
-             (format "Act on %s '%s'%s"
-                     (plist-get (car targets) :type)
-                     (embark--truncate-target (plist-get (car targets) :target))
-                     (if (cdr targets) "…" "")))
-           (if prefix
-               (pcase (lookup-key keymap prefix 'accept-default)
-                 ((and (pred keymapp) km) km)
-                 (_ (key-binding prefix 'accept-default)))
-             keymap)
-           nil nil t (lambda (binding)
-                       (not (string-suffix-p "-argument" (cdr binding))))))))
-    (setq embark-indicators
-          (cons 'embark-which-key-indicator
-                (remove 'embark-mixed-indicator  embark-indicators)))
-    (defun embark-hide-which-key-indicator (fn &rest args)
-      "Hide the which-key indicator immediately when using the completing-read prompter."
-      (which-key--hide-popup-ignore-command)
-      (let ((embark-indicators
-             (remq #'embark-which-key-indicator embark-indicators)))
-        (apply fn args)))
-    (advice-add #'embark-completing-read-prompter
-                :around #'embark-hide-which-key-indicator)))
+        (alist-get 'find-file embark-pre-action-hooks)))
 (use-package embark-consult
   :ensure
   :after (embark consult)
@@ -986,27 +916,15 @@ targets."
           (isearch-repeat-backward))))))
 (use-package jka-cmpr-hook
   :hook (after-init . auto-compression-mode))
-(use-package magit
-  :ensure
-  :bind (:map ctl-x-map ("g" . magit-status))
-  :custom
-  (magit-diff-refine-hunk t)
-  (magit-display-buffer-function 'magit-display-buffer-same-window)
-  :config
-  (setq magit-status-buffer-switch-function 'switch-to-buffer)
-  (defun magit-display-buffer-same-window (buffer)
-    (display-buffer buffer '(display-buffer-same-window))))
 (use-package marginalia
   :ensure
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :custom
-  (marginalia-annotators
-   '(marginalia-annotators-light marginalia-annotators-heavy))
+  (marginalia-annotators '(marginalia-annotators-light marginalia-annotators-heavy))
   :hook (after-init . marginalia-mode)
   :config
   (advice-add #'marginalia--buffer-file :around
               (lambda (o &rest args)
-                ;; marginalia--buffer-file calls abbreviate-file-name which is very slow for remote path.
                 (let ((original (symbol-function #'abbreviate-file-name)))
                   (cl-letf (((symbol-function #'abbreviate-file-name)
                              (lambda (filename)
@@ -1090,17 +1008,6 @@ targets."
   (use-package ob-async :ensure)
   (use-package ob-compile
     :bind (:map mode-specific-map ("8" . ob-compile)))
-  (use-package ob-tmux
-    :ensure t
-    :custom
-    (org-babel-default-header-args:tmux
-     '((:async . t)
-       (:results . "silent")
-       (:session . "emacs")
-       (:socket  . nil)))
-    (org-babel-tmux-session-prefix "")
-    (org-babel-tmux-terminal "")
-    (org-babel-tmux-terminal-opts nil))
   (defun lazy-load-org-babel-languages (o &rest args)
     (when-let (lang (org-element-property :language (org-element-at-point)))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
@@ -1121,41 +1028,16 @@ targets."
   :hook (after-init . recentf-mode)
   :custom
   (recentf-auto-cleanup (* 3 3600))
-  (recentf-max-saved-items 300))
-(use-package repeat
-  :hook (after-init . repeat-mode))
+  (recentf-max-saved-items 1000))
+(use-package repeat    :hook (after-init . repeat-mode))
 (use-package rustic
   :ensure
   :custom
   (rustic-lsp-client 'eglot)
   :hook (rustic-mode . eglot-ensure))
-(use-package python
-  :mode ("\\.py\\'" . python-mode)
-  :interpreter ("python" . python-mode)
-  :custom
-  (python-shell-interpreter "ipython3")
-  (python-shell-interpreter-args "--simple-prompt -i"))
-(use-package reveal
-  :hook (after-init . global-reveal-mode))
-(use-package savehist
-  :hook (after-init . savehist-mode)
-  :custom
-  (history-delete-duplicates t)
-  (savehist-additional-variables
-   '(kill-ring command-history regexp-search-ring))
-  :config
-  (put 'savehist-minibuffer-history-variables 'history-length 300)
-  (put 'org-read-date-history                 'history-length 300)
-  (put 'read-expression-history               'history-length 300)
-  (put 'org-table-formula-history             'history-length 300)
-  (put 'extended-command-history              'history-length 300)
-  (put 'minibuffer-history                    'history-length 300)
-  (put 'buffer-name-history                   'history-length 300)
-  (put 'file-name-history                     'history-length 300))
-(use-package saveplace
-  :hook (after-init . save-place-mode)
-  :custom
-  (save-place-forget-unreadable-files nil))
+(use-package reveal    :hook (after-init . global-reveal-mode))
+(use-package savehist  :hook (after-init . savehist-mode))
+(use-package saveplace :hook (after-init . save-place-mode))
 (use-package shell
   :bind (:map shell-mode-map
               ([remap read-only-mode] . shell-toggle-compile-mode))
@@ -1178,11 +1060,7 @@ targets."
                   r))
           (mapconcat #'identity (nreverse r) "\n")))))
   (advice-add 'read-shell-command :around #'use-region-if-active))
-(use-package smerge-mode
-  :custom
-  (smerge-command-prefix "\C-cm")
-  :config
-  (repeatize smerge-basic-map))
+(use-package smerge-mode :custom (smerge-command-prefix "\C-cm"))
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
@@ -1190,9 +1068,9 @@ targets."
   (defun tempel-setup-capf ()
     (setq-local completion-at-point-functions
                 (cons #'tempel-expand
-                      completion-at-point-functions))))
-(use-package tempel-collection
-  :ensure t)
+                      completion-at-point-functions)))
+  (use-package tempel-collection
+    :ensure t))
 (use-package tramp
   :defer t
   :custom
@@ -1200,24 +1078,8 @@ targets."
   (tramp-persistency-file-name "~/.emacs.d/data/tramp")
   (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
   :config
-  (put 'temporary-file-directory 'standard-value '("/tmp")))
-(use-package tramp-sh
-  :after tramp
-  :custom
-  (tramp-ssh-controlmaster-options
-   (concat
-    "-o ControlPath=~/.ssh/sockets/%%u@%%h:%%p "
-    "-o ControlMaster=auto -o ControlPersist=yes"))
-  :config
+  (put 'temporary-file-directory 'standard-value '("/tmp"))
   (add-to-list 'tramp-remote-path "~/bin"))
-(use-package treesit
-  :if (and (fboundp 'treesit-available-p) (treesit-available-p))
-  :config
-  ;;(when (treesit-ready-p 'c)
-  ;;  (push '(c-mode . c-ts-mode) major-mode-remap-alist))
-  ;;(when (treesit-ready-p 'cpp)
-  ;;  (push '(c++-mode . c++-ts-mode) major-mode-remap-alist))
-  (push '(sh-mode . bash-ts-mode) major-mode-remap-alist))
 (use-package tree-sitter
   :ensure
   :diminish
@@ -1225,13 +1087,6 @@ targets."
          ((rustic-mode c-mode-common) . tree-sitter-mode))
   :config
   (use-package tree-sitter-langs :ensure))
-(use-package uniquify
-  :defer t
-  :custom
-  (uniquify-after-kill-buffer-p t)
-  (uniquify-buffer-name-style 'reverse)
-  (uniquify-ignore-buffers-re "^\\*")
-  (uniquify-separator "|"))
 (use-package vertico
   :ensure t
   :bind ( :map vertico-map
@@ -1285,18 +1140,6 @@ targets."
           ("C-c C-c" . save-buffer)
           :map grep-mode-map
           ("e" . wgrep-change-to-wgrep-mode)))
-(use-package which-key
-  :ensure
-  :diminish
-  :functions
-  which-key--show-keymap
-  which-key--hide-popup-ignore-command
-  :hook (after-init . which-key-mode)
-  :config
-  (which-key-setup-minibuffer))
-(use-package windresize
-  :ensure
-  :bind (:map mode-specific-map ("w" . windresize)))
 (use-package xref
   :bind (("<f3>" . xref-find-definitions)
          ("<f4>" . xref-find-references))
