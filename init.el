@@ -932,6 +932,7 @@
   (vertico-count-format nil)
   :config
   (require 'vertico-repeat)
+  (require 'vertico-directory)
   (defun +vertico-restrict-to-matches ()
     (interactive)
     (let ((inhibit-read-only t))
