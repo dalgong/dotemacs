@@ -959,15 +959,3 @@
                                     xref-find-definitions-other-frame
                                     xref-find-references))
   (xref-search-program 'ripgrep))
-(use-package xterm-color
-  :ensure
-  :after shell
-  :hook (shell-mode . setup-color-for-shell)
-  :config
-  (defun setup-color-for-shell ()
-    (font-lock-mode -1)
-    (setq-local font-lock-function (lambda (_) nil))
-    (when (require 'xterm-color nil t)
-      (setq comint-output-filter-functions
-            (remove 'ansi-color-process-output comint-output-filter-functions))
-      (add-hook 'comint-preoutput-filter-functions 'xterm-color-filter nil t))))
