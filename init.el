@@ -44,6 +44,8 @@
    ("RET"                . newline-and-indent)
    ("M-C"                . compile)
    ("M-D"                . recompile)
+   ("M-H"                . ff-find-other-file)
+   ("M-K"                . kill-this-buffer)
    ("M-n"                . forward-paragraph)
    ("M-p"                . backward-paragraph)
 
@@ -364,15 +366,16 @@
                    ;; 1 -> beginning of screen to point
                    ;; 2 -> entire screen
                    ;; 3 -> entire screen & all lines in scollback buffer
-                   (replace-match "")))
-            (setq compilation-filter-start (min (point) compilation-filter-start))))
+                   (replace-match "")))))
+        (setq compilation-filter-start (min (point) compilation-filter-start))
         (goto-char end-marker)
-        (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
-               (ns (ansi-color-apply (xterm-color-filter s))))
-          (unless (string-equal s ns)
-            (delete-region compilation-filter-start end-marker)
-            (insert ns)))
-        (set-marker end-marker (point)))))
+        (when (< compilation-filter-start end-marker)
+          (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
+                 (ns (ansi-color-apply (xterm-color-filter s))))
+            (unless (string-equal s ns)
+              (delete-region compilation-filter-start end-marker)
+              (insert ns)
+              (set-marker end-marker (point))))))))
   (defun ascend-to-directory-with-file (file &optional dir)
     (setq dir (expand-file-name (or dir default-directory)))
     (while (and (not (file-exists-p (concat dir file)))
@@ -568,27 +571,12 @@
   :after diff-mode
   :bind (:map diff-mode-map ("|" . diffview-current)))
 (use-package dired
-  :bind ( :map dired-mode-map
-          ("^" . dired-up-directory-inplace)
-          ([remap dired-do-find-regexp] . dired-do-multi-occur))
   :custom
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-no-confirm t)
   (dired-recursive-copies 'always)
   (dired-recursive-deletes 'always)
-  (dired-use-ls-dired nil)
-  :config
-  (defun dired-up-directory-inplace ()
-    (interactive)
-    (find-alternate-file ".."))
-  (defun dired-do-multi-occur (regexp)
-    "Run `dired-do-multi-occur` with REGEXP on all marked files."
-    (interactive (list (read-regexp "Regexp: ")))
-    (multi-occur (mapcar 'find-file-noselect (dired-get-marked-files)) regexp))
-  (advice-add #'dired-find-file-other-window :around
-              (defun force-horizontal-split (o &rest args)
-                (let ((split-width-threshold (frame-width)))
-                  (apply o args)))))
+  (dired-use-ls-dired nil))
 (use-package dired-subtree :ensure :after dired :bind (:map dired-mode-map ("TAB" . dired-subtree-toggle)))
 (use-package dired-x               :after dired :hook (dired-mode . dired-extra-startup))
 (use-package display-line-numbers  :hook ((prog-mode text-mode) . display-line-numbers-mode))
