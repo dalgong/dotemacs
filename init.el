@@ -333,6 +333,9 @@
   (compilation-save-buffers-predicate (lambda ()))
   (compilation-scroll-output 'first-error)
   :config
+  (use-package xterm-color
+    :ensure
+    :functions xterm-color-filter)
   (defun apply-xterm-color-filter ()
     (let* ((proc (get-buffer-process (current-buffer)))
            (end-marker (and proc (process-mark proc)))
@@ -861,6 +864,11 @@
   (rustic-lsp-client 'eglot)
   :hook (rustic-mode . eglot-ensure))
 (use-package reveal    :hook (after-init . global-reveal-mode))
+(use-package pdf-tools
+  :if window-system
+  :ensure
+  :config
+  (pdf-tools-install))
 (use-package savehist  :hook (after-init . savehist-mode))
 (use-package saveplace :hook (after-init . save-place-mode))
 (use-package shell
