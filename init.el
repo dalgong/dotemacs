@@ -9,6 +9,16 @@
             (advice-remove #'tty-run-terminal-initialization #'ignore)
             (unless (display-graphic-p)
               (tty-run-terminal-initialization (selected-frame) nil t))))
+(setq after-init-hook
+      (nconc after-init-hook
+             '(delete-selection-mode
+               electric-pair-mode
+               global-reveal-mode
+               minibuffer-depth-indicate-mode
+               recentf-mode
+               repeat-mode
+               savehist-mode
+               save-place-mode)))
 
 (when (require 'package nil t)
   (custom-set-variables
@@ -162,6 +172,8 @@
   (read-extended-command-predicate #'command-completion-default-include-p)
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 1024 1024))
+  (recentf-auto-cleanup (* 3 3600))
+  (recentf-max-saved-items 1000)
   (redisplay-skip-fontification-on-input t)
   (remote-file-name-inhibit-locks t)
   (require-final-newline t)
@@ -233,7 +245,24 @@
                  (cons (region-beginning) (region-end))
                (and (fboundp 'easy-kill--bounds)
                     (ignore-errors (funcall 'easy-kill--bounds))))))
-      (and p (car p) (buffer-substring-no-properties (car p) (cdr p))))))
+      (and p (car p) (buffer-substring-no-properties (car p) (cdr p)))))
+  (advice-add #'electric-pair-open-newline-between-pairs-psif
+              :override
+              #'electric-pair-open-newline-between-pairs-psif-fix)
+  (defun electric-pair-open-newline-between-pairs-psif-fix ()
+    (when (and (if (functionp electric-pair-open-newline-between-pairs)
+                   (funcall electric-pair-open-newline-between-pairs)
+                 electric-pair-open-newline-between-pairs)
+               (eq last-command-event ?\n)
+               (< (1+ (point-min)) (point) (point-max))
+               (eq (save-excursion
+                     (skip-chars-backward "\t\s")
+                     (char-before (1- (point))))
+                   (matching-paren (char-after))))
+      (save-excursion
+        (newline 1 t)
+        ;; this is missing
+        (indent-according-to-mode)))))
 (use-package diminish
   :ensure
   :config
@@ -366,16 +395,15 @@
                    ;; 1 -> beginning of screen to point
                    ;; 2 -> entire screen
                    ;; 3 -> entire screen & all lines in scollback buffer
-                   (replace-match "")))))
-        (setq compilation-filter-start (min (point) compilation-filter-start))
+                   (replace-match "")))
+            (setq compilation-filter-start (min (point) compilation-filter-start))))
         (goto-char end-marker)
-        (when (< compilation-filter-start end-marker)
-          (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
-                 (ns (ansi-color-apply (xterm-color-filter s))))
-            (unless (string-equal s ns)
-              (delete-region compilation-filter-start end-marker)
-              (insert ns)
-              (set-marker end-marker (point))))))))
+        (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
+               (ns (ansi-color-apply (xterm-color-filter s))))
+          (unless (string-equal s ns)
+            (delete-region compilation-filter-start end-marker)
+            (insert ns)))
+        (set-marker end-marker (point)))))
   (defun ascend-to-directory-with-file (file &optional dir)
     (setq dir (expand-file-name (or dir default-directory)))
     (while (and (not (file-exists-p (concat dir file)))
@@ -565,7 +593,6 @@
     :bind (:map flycheck-command-map
                 ("!" . consult-flycheck))))
 (use-package coterm :ensure :hook (after-init . coterm-mode))
-(use-package delsel         :hook (after-init . delete-selection-mode))
 (use-package diffview
   :ensure
   :after diff-mode
@@ -617,25 +644,6 @@
     :custom
     (ediff-split-window-function #'split-window-horizontally)
     (ediff-window-setup-function #'ediff-setup-windows-plain)))
-(use-package elec-pair
-  :hook (after-init . electric-pair-mode)
-  :config
-  (advice-add #'electric-pair-open-newline-between-pairs-psif
-              :override
-              (defun electric-pair-open-newline-between-pairs-psif-fix ()
-                (when (and (if (functionp electric-pair-open-newline-between-pairs)
-                               (funcall electric-pair-open-newline-between-pairs)
-                             electric-pair-open-newline-between-pairs)
-                           (eq last-command-event ?\n)
-                           (< (1+ (point-min)) (point) (point-max))
-                           (eq (save-excursion
-                                 (skip-chars-backward "\t\s")
-                                 (char-before (1- (point))))
-                               (matching-paren (char-after))))
-                  (save-excursion
-                    (newline 1 t)
-                    ;; this is missing
-                    (indent-according-to-mode))))))
 (use-package embark
   :ensure
   :commands (embark-act embark-prefix-help-command)
@@ -749,7 +757,6 @@
                                    filename
                                  (funcall original filename)))))
                     (apply o args))))))
-(use-package mb-depth :hook (after-init . minibuffer-depth-indicate-mode))
 (use-package multiple-cursors
   :ensure
   :bind (:map mode-specific-map
@@ -840,25 +847,16 @@
 (use-package outline-magic
   :ensure
   :bind (("<backtab>" . outline-cycle)))
-(use-package recentf
-  :hook (after-init . recentf-mode)
-  :custom
-  (recentf-auto-cleanup (* 3 3600))
-  (recentf-max-saved-items 1000))
-(use-package repeat    :hook (after-init . repeat-mode))
 (use-package rustic
   :ensure
   :custom
   (rustic-lsp-client 'eglot)
   :hook (rustic-mode . eglot-ensure))
-(use-package reveal    :hook (after-init . global-reveal-mode))
 (use-package pdf-tools
   :if window-system
   :ensure
   :config
   (pdf-tools-install))
-(use-package savehist  :hook (after-init . savehist-mode))
-(use-package saveplace :hook (after-init . save-place-mode))
 (use-package shell
   :bind (:map shell-mode-map ([remap read-only-mode] . shell-toggle-compile-mode))
   :config
