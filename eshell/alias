@@ -1,2 +1,2 @@
-alias : bash -lc {eshell-flatten-and-stringify $*}
+alias : bash -ilc {eshell-flatten-and-stringify $*}
 alias rg rg --no-heading $*

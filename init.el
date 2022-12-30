@@ -671,11 +671,9 @@
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
   :bind (("C-`"  . eshell))
-  :hook (eshell-mode . eshell-smart-initialize)
   :custom
   (eshell-hist-ignoredups t)
   :config
-  (require 'em-smart)
   (advice-add 'eshell-list-history :override 'consult-history))
 (use-package esh-autosuggest
   :ensure
