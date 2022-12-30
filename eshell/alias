@@ -1,0 +1,2 @@
+alias : bash -lc {eshell-flatten-and-stringify $*}
+alias rg rg --no-heading $*

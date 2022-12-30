@@ -46,7 +46,6 @@
    ([remap suspend-frame]. ignore)
    ([remap kill-buffer]  . kill-this-buffer)
    ("C-TAB"              . other-window)
-   ("C-`"                . shell)
    ("C-."                . next-error)
    ("C-,"                . previous-error)
    ("M-o"                . other-window)
@@ -670,6 +669,17 @@
   :ensure
   :after (embark consult)
   :hook (embark-collect-mode . consult-preview-at-point-mode))
+(use-package eshell
+  :bind (("C-`"  . eshell))
+  :hook (eshell-mode . eshell-smart-initialize)
+  :custom
+  (eshell-hist-ignoredups t)
+  :config
+  (require 'em-smart)
+  (advice-add 'eshell-list-history :override 'consult-history))
+(use-package esh-autosuggest
+  :ensure
+  :hook (eshell-mode . esh-autosuggest-mode))
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
