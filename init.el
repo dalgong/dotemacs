@@ -348,13 +348,12 @@
   (company-tooltip-align-annotations t))
 (use-package compile
   :diminish compilation-in-progress
-  :hook ((compilation-mode . run-before-compile)
-         (compilation-filter . apply-xterm-color-filter))
+  :hook (compilation-start . enable-coterm-on-compilation)
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
+         :map compilation-shell-minor-mode-map
+         ("g" . recompile)
          :map compilation-mode-map
-         ("." . rename-uniquely)
-         ("t" . toggle-truncate-lines)
          ([remap read-only-mode] . compilation-toggle-shell-mode))
   :custom
   (compilation-environment '("TERM=xterm-256color"))
@@ -363,72 +362,27 @@
   (compilation-save-buffers-predicate (lambda ()))
   (compilation-scroll-output 'first-error)
   :config
-  (use-package xterm-color
-    :ensure
-    :functions xterm-color-filter)
-  (defun apply-xterm-color-filter ()
-    (let* ((proc (get-buffer-process (current-buffer)))
-           (end-marker (and proc (process-mark proc)))
-           (buffer-undo-list t))
-      ;; (let ((s (buffer-substring-no-properties compilation-filter-start end-marker)))
-      ;;   (unless (string= s "\033[J")
-      ;;     (with-current-buffer (get-buffer-create "*OUTPUT*")
-      ;;       (insert "\n" s "\n"))))
-      (save-excursion
-        (goto-char compilation-filter-start)
-        (while (re-search-forward (rx "\033[" (group (*? num)) (group (any "GAJK"))) end-marker t)
-          (let ((count (and (> (length (match-string 1)) 0) (string-to-number (match-string 1))))
-                (c (aref (match-string 2) 0)))
-            (cond ((= c ?G)
-                   (delete-region (point-at-bol) (point)))
-                  ((= c ?A)
-                   (delete-region (point-at-bol (- (1- (or count 1)))) (point)))
-                  ((= c ?K)
-                   ;; 0 (or missing) -> point to eol
-                   ;; 1 -> bol to point
-                   ;; 2 -> bol to eol
-                   (unless (= 0 (or count 0))
-                     (delete-region (point-at-bol) (point))))
-                  ((= c ?J)
-                   ;; 0 (or missing) -> point to end of screen
-                   ;; 1 -> beginning of screen to point
-                   ;; 2 -> entire screen
-                   ;; 3 -> entire screen & all lines in scollback buffer
-                   (replace-match "")))
-            (setq compilation-filter-start (min (point) compilation-filter-start))))
-        (goto-char end-marker)
-        (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
-               (ns (ansi-color-apply (xterm-color-filter s))))
-          (unless (string-equal s ns)
-            (delete-region compilation-filter-start end-marker)
-            (insert ns)))
-        (set-marker end-marker (point)))))
+  (defun enable-coterm-on-compilation (proc)
+    (with-current-buffer (process-buffer proc)
+      (buffer-disable-undo)
+      (coterm--init)))
+  (advice-add #'compilation-start :filter-args
+              (defun use-comint-always (args)
+                (setcar (cdr args) t)
+                args))
   (defun ascend-to-directory-with-file (file &optional dir)
     (setq dir (expand-file-name (or dir default-directory)))
     (while (and (not (file-exists-p (concat dir file)))
                 (not (string= dir "/")))
       (setq dir (file-name-directory (directory-file-name dir))))
     (and (file-exists-p (concat dir file)) dir))
-  (advice-add 'compilation-start :around
-              (defun compilation-start-ascend-to-rust-topdir (o command &rest args)
-                (let ((default-directory default-directory)
-                      dir)
-                  (when (and (string-match "^cargo " command)
-                             (setq dir
-                                   (ascend-to-directory-with-file "Cargo.toml")))
-                    (setq default-directory dir))
-                  (apply o command args))))
   (advice-add #'recompile :around
               (defun do-kill-compilation (o &rest args)
                 (when (and (called-interactively-p 'interactive)
-                           (eq major-mode 'compilation-mode)
+                           (memq major-mode '(comint-mode compilation-mode))
                            (get-buffer-process (current-buffer)))
                   (kill-compilation))
                 (apply o args)))
-  (defun run-before-compile ()
-    (let ((buffer (compilation-buffer-name mode-name major-mode nil)))
-      (when (get-buffer buffer)
-        (buffer-disable-undo (get-buffer buffer)))))
   (defun compilation-toggle-shell-mode ()
     (interactive) (setq buffer-read-only nil)
     (shell-mode)))
@@ -674,7 +628,13 @@
   :custom
   (eshell-hist-ignoredups t)
   :config
-  (advice-add 'eshell-list-history :override 'consult-history))
+  (advice-add 'eshell-list-history :override 'consult-history)
+  (defun eshell-show-time ()
+    (eshell-interactive-print
+     (let ((s (format-time-string "%m-%d %T\n")))
+       (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
+               s))))
+  (add-hook 'eshell-pre-command-hook #'eshell-show-time))
 (use-package esh-autosuggest
   :ensure
   :hook (eshell-mode . esh-autosuggest-mode))
