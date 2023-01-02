@@ -365,7 +365,8 @@
   (defun enable-coterm-on-compilation (proc)
     (with-current-buffer (process-buffer proc)
       (buffer-disable-undo)
-      (coterm--init)))
+      (coterm--init)
+      (setq-local comint-input-ring compile-history)))
   (advice-add #'compilation-start :filter-args
               (defun use-comint-always (args)
                 (setcar (cdr args) t)
