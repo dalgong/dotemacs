@@ -351,8 +351,6 @@
   :hook (compilation-start . enable-coterm-on-compilation)
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
-         :map compilation-shell-minor-mode-map
-         ("g" . recompile)
          :map compilation-mode-map
          ([remap read-only-mode] . compilation-toggle-shell-mode))
   :custom
@@ -366,7 +364,10 @@
     (with-current-buffer (process-buffer proc)
       (buffer-disable-undo)
       (coterm--init)
-      (setq-local comint-input-ring compile-history)))
+      (setq-local comint-input-ring compile-history)
+      (use-local-map compilation-mode-map)
+      (setq-local jit-lock-defer-time nil)
+      (setq buffer-read-only t)))
   (advice-add #'compilation-start :filter-args
               (defun use-comint-always (args)
                 (setcar (cdr args) t)
@@ -625,6 +626,7 @@
   :after (embark consult)
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
+  :hook (eshell-pre-command . eshell-show-time)
   :bind (("C-`"  . eshell))
   :custom
   (eshell-hist-ignoredups t)
@@ -634,8 +636,7 @@
     (eshell-interactive-print
      (let ((s (format-time-string "%m-%d %T\n")))
        (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
-               s))))
-  (add-hook 'eshell-pre-command-hook #'eshell-show-time))
+               s)))))
 (use-package esh-autosuggest
   :ensure
   :hook (eshell-mode . esh-autosuggest-mode))
