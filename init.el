@@ -348,30 +348,44 @@
   (company-tooltip-align-annotations t))
 (use-package compile
   :diminish compilation-in-progress
-  :hook (compilation-start . enable-coterm-on-compilation)
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
          :map compilation-mode-map
          ([remap read-only-mode] . compilation-toggle-shell-mode))
   :custom
-  (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
   (compilation-ask-about-save nil)
   (compilation-save-buffers-predicate (lambda ()))
   (compilation-scroll-output 'first-error)
   :config
-  (defun enable-coterm-on-compilation (proc)
-    (with-current-buffer (process-buffer proc)
-      (buffer-disable-undo)
-      (coterm--init)
-      (setq-local comint-input-ring compile-history)
-      (use-local-map compilation-mode-map)
-      (setq-local jit-lock-defer-time nil)
-      (setq buffer-read-only t)))
-  (advice-add #'compilation-start :filter-args
-              (defun use-comint-always (args)
-                (setcar (cdr args) t)
-                args))
+  (defun start-file-process-shell-command-using-eat-exec
+      (name buffer command)
+    (require 'eat)
+    (with-current-buffer (eat-exec buffer name "bash" nil (list "-ilc" command))
+      (eat-emacs-mode)
+      (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
+      (get-buffer-process (current-buffer))))
+  (advice-add #'compilation-start :around
+              (defun hijack-start-file-process-shell-command (o &rest args)
+                (advice-add #'start-file-process-shell-command :override
+                            #'start-file-process-shell-command-using-eat-exec)
+                (unwind-protect
+                    (apply o args)
+                  (advice-remove
+                   #'start-file-process-shell-command
+                   #'start-file-process-shell-command-using-eat-exec))))
+  (add-hook #'compilation-start-hook
+            (defun revert-to-eat-setup (proc)
+              (set-process-filter proc #'eat--filter)
+              (add-function :after (process-sentinel proc)
+                            #'eat--sentinel)))
+  (advice-add #'kill-compilation :override
+              (defun kill-compilation-by-sending-C-c ()
+                (interactive)
+                (let ((buffer (compilation-find-buffer)))
+                  (if (get-buffer-process buffer)
+	              (process-send-string (get-buffer-process buffer) (kbd "C-c"))
+                    (error "The %s process is not running" (downcase mode-name))))))
   (defun ascend-to-directory-with-file (file &optional dir)
     (setq dir (expand-file-name (or dir default-directory)))
     (while (and (not (file-exists-p (concat dir file)))
@@ -547,7 +561,6 @@
     :ensure
     :bind (:map flycheck-command-map
                 ("!" . consult-flycheck))))
-(use-package coterm :ensure :hook (after-init . coterm-mode))
 (use-package diffview
   :ensure
   :after diff-mode
