@@ -17,6 +17,9 @@
                               (wait-for-wm      . nil)))
   (when (string-match "linux" system-configuration)
     (push '(font . "Fira Code Light-11") default-frame-alist))
+  (custom-set-faces
+   '(mode-line          ((t :inverse-video t :style nil)))
+   '(mode-line-inactive ((t :inverse-video nil :style nil))))
   (when nil
     (let ((fg-color "#dcdccc")
           (bg-color "#3f3f3f")

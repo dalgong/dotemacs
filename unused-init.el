@@ -353,6 +353,8 @@
     (ivy-magic-tilde t)
     (ivy-on-del-error-function nil)
     (ivy-read-action-function 'ivy-hydra-read-action)
+    (ivy-re-builders-alist '((counsel-rg . ivy--regex-plus)
+                             (t . orderless-ivy-re-builder)))
     (ivy-use-selectable-prompt t)
     (ivy-use-virtual-buffers t)
     (ivy-virtual-abbreviate 'abbreviate)
