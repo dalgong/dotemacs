@@ -814,6 +814,48 @@
   (defun compilation-toggle-shell-mode ()
     (interactive) (setq buffer-read-only nil)
     (shell-mode)))
+(use-package compile
+  :diminish compilation-in-progress
+  :hook (compilation-start . enable-coterm-on-compilation)
+  :bind (("<f7>" . compile)
+         ("<f8>" . recompile)
+         :map compilation-mode-map
+         ([remap read-only-mode] . compilation-toggle-shell-mode))
+  :custom
+  (compilation-environment '("TERM=xterm-256color"))
+  (compilation-always-kill t)
+  (compilation-ask-about-save nil)
+  (compilation-save-buffers-predicate (lambda ()))
+  (compilation-scroll-output 'first-error)
+  :config
+  (defun enable-coterm-on-compilation (proc)
+    (with-current-buffer (process-buffer proc)
+      (buffer-disable-undo)
+      (coterm--init)
+      (setq-local comint-input-ring compile-history)
+      (use-local-map compilation-mode-map)
+      (setq-local jit-lock-defer-time nil)
+      (setq buffer-read-only t)))
+  (advice-add #'compilation-start :filter-args
+              (defun use-comint-always (args)
+                (setcar (cdr args) t)
+                args))
+  (defun ascend-to-directory-with-file (file &optional dir)
+    (setq dir (expand-file-name (or dir default-directory)))
+    (while (and (not (file-exists-p (concat dir file)))
+                (not (string= dir "/")))
+      (setq dir (file-name-directory (directory-file-name dir))))
+    (and (file-exists-p (concat dir file)) dir))
+  (advice-add #'recompile :around
+              (defun do-kill-compilation (o &rest args)
+                (when (and (called-interactively-p 'interactive)
+                           (memq major-mode '(comint-mode compilation-mode))
+                           (get-buffer-process (current-buffer)))
+                  (kill-compilation))
+                (apply o args)))
+  (defun compilation-toggle-shell-mode ()
+    (interactive) (setq buffer-read-only nil)
+    (shell-mode)))
 (use-package eshell
   :if (eq shell-variant 'eshell)
   :bind (("C-`"  . eshell)
