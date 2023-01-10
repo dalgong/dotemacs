@@ -24,6 +24,7 @@
    ([remap suspend-frame]. ignore)
    ([remap kill-buffer]  . kill-this-buffer)
    ("C-TAB"              . other-window)
+   ("C-`"                . shell)
    ("C-."                . next-error)
    ("C-,"                . previous-error)
    ("M-o"                . other-window)
@@ -51,7 +52,7 @@
    ("SPC"                . cycle-spacing)
    ("r"                  . replace-regexp)
    ("s"                  . replace-string))
- 
+
   :custom
   (ad-redefinition-action 'accept)
   (async-shell-command-buffer 'rename-buffer)
@@ -349,24 +350,18 @@
                          return (buffer-name b))
                 (generate-new-buffer-name name)))
         name)))
-  (defun start-file-process-shell-command-using-eat-exec
-      (name buffer command)
-    (require 'eat)
-    (with-current-buffer buffer
-      (setq-local eat--process nil)
-      (eat-exec buffer name "bash" nil (list "-ilc" command))
-      (eat-emacs-mode)
-      (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
-      (get-buffer-process (current-buffer))))
   (advice-add #'compilation-start :around
               (defun hijack-start-file-process-shell-command (o &rest args)
-                (advice-add #'start-file-process-shell-command :override
-                            #'start-file-process-shell-command-using-eat-exec)
-                (unwind-protect
-                    (apply o args)
-                  (advice-remove
-                   #'start-file-process-shell-command
-                   #'start-file-process-shell-command-using-eat-exec))))
+                (cl-letf ((symbol-function 'start-file-process-shell-command)
+                          (lambda (name buffer command)
+                            (require 'eat)
+                            (with-current-buffer buffer
+                              (setq-local eat--process nil)
+                              (eat-exec buffer name "bash" nil (list "-ilc" command))
+                              (eat-emacs-mode)
+                              (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
+                              (get-buffer-process (current-buffer)))))
+                  (apply o args))))
   (add-hook #'compilation-start-hook
             (defun revert-to-eat-setup (proc)
               (set-process-filter proc #'eat--filter)
@@ -468,7 +463,7 @@
                       (browse-url (car r))
                       (exit-minibuffer))
                   r)))
-  (advice-add #'find-file :around #'find-file--line-number)  
+  (advice-add #'find-file :around #'find-file--line-number)
   (defun find-file--line-number (o filename &optional wildcards)
     "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
     (let (line-number)
@@ -506,6 +501,7 @@
               consult-toggle-preview-orig nil)
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore))))
+(use-package coterm :ensure :hook (after-init . coterm-mode))
 (use-package diffview
   :ensure
   :after diff-mode
@@ -536,8 +532,7 @@
   (advice-add #'eat :around #'eat-shell)
   (defun handle-eat-paste (o &rest args)
     (if eat--terminal
-        (cl-letf ((symbol-function 'yank)
-                  (symbol-function 'eat-yank))
+        (cl-letf ((symbol-function 'yank) (symbol-function 'eat-yank))
           (apply o args))
       (apply o args)))
   (advice-add #'xterm-paste :around #'handle-eat-paste))
@@ -575,21 +570,6 @@
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (push #'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
 (use-package embark-consult :ensure :hook (embark-collect-mode . consult-preview-at-point-mode))
-(use-package eshell
-  :hook (eshell-pre-command . eshell-show-time)
-  :bind (("C-`"  . eshell)
-         :map eshell-mode-map
-         ([remap eshell-previous-matching-input] . consult-history))
-  :custom
-  (eshell-hist-ignoredups t)
-  :config
-  (use-package esh-autosuggest :ensure :hook (eshell-mode . esh-autosuggest-mode))
-  (advice-add 'eshell-list-history :override 'consult-history)
-  (defun eshell-show-time ()
-    (eshell-interactive-print
-     (let ((s (format-time-string "%m-%d %T\n")))
-       (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
-               s)))))
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
@@ -657,7 +637,7 @@
   (org-use-speed-commands t)
   :config
   (defvar my-emacs-lisp-params nil)
-  (advice-add #'org-babel-execute:emacs-lisp :around 
+  (advice-add #'org-babel-execute:emacs-lisp :around
     (defun save-my-emacs-lisp-params (o body params)
       (funcall o body (setq my-emacs-lisp-params params))))
   ;; #+NAME: embed
@@ -688,7 +668,11 @@
         (add-to-list 'org-babel-load-languages (cons (intern lang) t))
         (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages)))
     (apply o args))
-  (advice-add 'org-babel-execute-src-block :around #'lazy-load-org-babel-languages))
+  (advice-add 'org-babel-execute-src-block :around #'lazy-load-org-babel-languages)
+  (defun fix-missing-args (o &rest args)
+    (setf (nthcdr 4 args) nil)
+    (apply o args))
+  (advice-add #'ob-async-org-babel-execute-src-block :around #'fix-missing-args))
 (use-package outline-magic :ensure :bind (("<backtab>" . outline-cycle)))
 (use-package rustic
   :ensure
@@ -703,7 +687,17 @@
   (use-package tempel-collection :ensure t)
   (defun tempel-setup-capf ()
     (setq-local completion-at-point-functions (cons #'tempel-expand completion-at-point-functions))))
+(use-package treesit
+  :if (treesit-available-p)
+  :config
+  (when (treesit-ready-p 'c)
+    (advice-add #'c-mode   :override #'c-ts-mode))
+  (when (treesit-ready-p 'cpp)
+    (advice-add #'c++-mode :override #'c++-ts-mode))
+  (when (treesit-ready-p 'bash)
+    (advice-add #'sh-mode  :override #'bash-ts-mode)))
 (use-package tree-sitter
+  :unless (treesit-available-p)
   :ensure
   :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
          ((rustic-mode c-mode-common) . tree-sitter-mode))
