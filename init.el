@@ -533,7 +533,14 @@
   (defun eat-shell (o &rest args)
     (interactive (list (or explicit-shell-file-name shell-file-name) current-prefix-arg))
     (apply o args))
-  (advice-add #'eat :around #'eat-shell))
+  (advice-add #'eat :around #'eat-shell)
+  (defun handle-eat-paste (o &rest args)
+    (if eat--terminal
+        (cl-letf ((symbol-function 'yank)
+                  (symbol-function 'eat-yank))
+          (apply o args))
+      (apply o args)))
+  (advice-add #'xterm-paste :around #'handle-eat-paste))
 (use-package ediff
   :bind (:map mode-specific-map ("=" . ediff-current-file))
   :custom
