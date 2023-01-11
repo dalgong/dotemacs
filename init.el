@@ -352,15 +352,15 @@
         name)))
   (advice-add #'compilation-start :around
               (defun hijack-start-file-process-shell-command (o &rest args)
-                (cl-letf ((symbol-function 'start-file-process-shell-command)
-                          (lambda (name buffer command)
-                            (require 'eat)
-                            (with-current-buffer buffer
-                              (setq-local eat--process nil)
-                              (eat-exec buffer name "bash" nil (list "-ilc" command))
-                              (eat-emacs-mode)
-                              (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
-                              (get-buffer-process (current-buffer)))))
+                (cl-letf (((symbol-function 'start-file-process-shell-command)
+                           (lambda (name buffer command)
+                             (require 'eat)
+                             (with-current-buffer buffer
+                               (setq-local eat--process nil)
+                               (eat-exec buffer name "bash" nil (list "-ilc" command))
+                               (eat-emacs-mode)
+                               (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
+                               (get-buffer-process (current-buffer))))))
                   (apply o args))))
   (add-hook #'compilation-start-hook
             (defun revert-to-eat-setup (proc)
