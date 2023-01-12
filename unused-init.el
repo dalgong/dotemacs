@@ -51,6 +51,14 @@
 
   ;; Manual preview key for `affe-grep'
   (consult-customize affe-grep :preview-key (kbd "M-.")))
+(use-package cc-mode
+  :custom
+  (c-electric-flag nil)
+  :hook (c-mode-common . set-outline-regexp)
+  :config
+  (defun set-outline-regexp ()
+    (require 'outline)
+    (setq outline-regexp "\\s-*\\S-")))
 (use-package dired-sidebar
   :disabled
   :ensure
@@ -67,6 +75,23 @@
   :config
   (dolist (c '(goto-last-change tab-next tab-previous tab-move))
     (cl-pushnew c easy-repeat-command-list)))
+(use-package eat
+  :ensure
+  :hook (after-init . eat-eshell-mode)
+  :bind ("M-`" . eat)
+  :custom
+  (eshell-visual-commands nil)
+  :config
+  (defun eat-shell (o &rest args)
+    (interactive (list (or explicit-shell-file-name shell-file-name) current-prefix-arg))
+    (apply o args))
+  (advice-add #'eat :around #'eat-shell)
+  (defun handle-eat-paste (o &rest args)
+    (if eat--terminal
+        (cl-letf ((symbol-function 'yank) (symbol-function 'eat-yank))
+          (apply o args))
+      (apply o args)))
+  (advice-add #'xterm-paste :around #'handle-eat-paste))
 (use-package rtags
   :disabled
   :after company

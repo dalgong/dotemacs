@@ -24,7 +24,6 @@
    ([remap suspend-frame]. ignore)
    ([remap kill-buffer]  . kill-this-buffer)
    ("C-TAB"              . other-window)
-   ("C-`"                . shell)
    ("C-."                . next-error)
    ("C-,"                . previous-error)
    ("M-o"                . other-window)
@@ -299,14 +298,6 @@
   :hook (after-init . bash-completion-setup)
   :custom
   (bash-completion-use-separate-processes t))
-(use-package cc-mode
-  :custom
-  (c-electric-flag nil)
-  :hook (c-mode-common . set-outline-regexp)
-  :config
-  (defun set-outline-regexp ()
-    (require 'outline)
-    (setq outline-regexp "\\s-*\\S-")))
 (use-package company
   :ensure
   :hook (after-init . global-company-mode)
@@ -324,17 +315,81 @@
   (company-tooltip-idle-delay nil)
   (company-tooltip-align-annotations t))
 (use-package compile
+  :hook (compilation-start . enable-coterm-on-compilation)
   :bind (("<f7>" . compile)
          ("<f8>" . recompile)
          :map compilation-mode-map
          ([remap read-only-mode] . compilation-toggle-shell-mode))
   :custom
+  (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
   (compilation-ask-about-save nil)
   (compilation-buffer-name-function #'get-idle-compilation--buffer-name)
   (compilation-save-buffers-predicate (lambda ()))
   (compilation-scroll-output 'first-error)
   :config
+  (defvar-local bpo-queue nil)
+  (defvar-local bpo-queue-timer nil)
+  (defun bpo-flush (proc)
+    (when (buffer-live-p (process-buffer proc))
+      (with-current-buffer (process-buffer proc)
+        (when bpo-queue-timer
+          (cancel-timer bpo-queue-timer)
+          (setq bpo-queue-timer nil))
+        (let ((inhibit-quit t)
+              (inhibit-read-only t)
+              (inhibit-modification-hooks t)
+              (queue bpo-queue))
+          (setq bpo-queue nil)
+          ;; By the time delayed filter is called, process may be dead.
+          (cl-letf (((symbol-function 'get-buffer-process)
+                     (lambda (&rest _) proc)))
+            (get-buffer-process (current-buffer))
+            (dolist (p (nreverse queue))
+              (funcall (car p) proc (cdr p))))))))
+  (defun bpo-enqueue (ofun proc o)
+    (when (buffer-live-p (process-buffer proc))
+      (with-current-buffer (process-buffer proc)
+        (if (and (stringp o) (eq ofun (caar bpo-queue)))
+            (cl-callf concat (cdr (car bpo-queue)) o)
+          (push (cons ofun o) bpo-queue))
+        (unless bpo-queue-timer
+          (setq bpo-queue-timer
+                (run-with-timer 0.2 nil #'bpo-flush proc))))))
+  (defun handle-process-buffered (proc)
+    (with-current-buffer (process-buffer proc)
+      (setq-local bpo-queue nil)
+      (setq-local bpo-queue-timer nil))
+    (add-function :around (process-filter proc) #'bpo-enqueue)
+    (add-function :around (process-sentinel proc) #'bpo-enqueue))
+  (defun enable-coterm-on-compilation (proc)
+    (with-current-buffer (process-buffer proc)
+      (buffer-disable-undo)
+      (coterm--init)
+      (handle-process-buffered proc)
+      (setq-local comint-input-ring compile-history)
+      (use-local-map compilation-mode-map)
+      (setq-local jit-lock-defer-time nil)
+      (setq buffer-read-only t)))
+  (defun use-comint-always (args)
+    (cl-list* (car args) t (cddr args)))
+  (advice-add #'compilation-start :filter-args #'use-comint-always)
+  (defun do-kill-compilation (o &rest args)
+    (when (and (called-interactively-p 'interactive)
+               (memq major-mode '(comint-mode compilation-mode))
+               (get-buffer-process (current-buffer)))
+      (kill-compilation))
+    (apply o args))
+  (advice-add #'recompile :around #'do-kill-compilation)
+  (defun kill-compilation-for-comint (o &rest args)
+    (interactive)
+    (let* ((buffer (compilation-find-buffer))
+           (proc (get-buffer-process buffer)))
+      (if (and proc (eq 'comint-mode
+                        (with-current-buffer buffer major-mode)))
+          (comint-send-string proc (kbd "C-c"))
+        (apply o args))))
+  (advice-add #'kill-compilation :around #'kill-compilation-for-comint)
   (defun get-idle-compilation--buffer-name (name-of-mode)
     (let ((name (compilation--default-buffer-name name-of-mode)))
       (if (and (get-buffer name)
@@ -350,23 +405,6 @@
                          return (buffer-name b))
                 (generate-new-buffer-name name)))
         name)))
-  (advice-add #'compilation-start :around
-              (defun hijack-start-file-process-shell-command (o &rest args)
-                (cl-letf (((symbol-function 'start-file-process-shell-command)
-                           (lambda (name buffer command)
-                             (require 'eat)
-                             (with-current-buffer buffer
-                               (setq-local eat--process nil)
-                               (eat-exec buffer name "bash" nil (list "-ilc" command))
-                               (eat-emacs-mode)
-                               (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
-                               (get-buffer-process (current-buffer))))))
-                  (apply o args))))
-  (add-hook #'compilation-start-hook
-            (defun revert-to-eat-setup (proc)
-              (set-process-filter proc #'eat--filter)
-              (add-function :after (process-sentinel proc)
-                            #'eat--sentinel)))
   (defun shell-toggle-compile-mode ()
     (interactive)
     (setq buffer-read-only t)
@@ -519,23 +557,6 @@
          ([remap cua-set-mark]                . easy-kill-mark-region)
          ("o" . easy-kill-expand)
          ("i" . easy-kill-shrink)))
-(use-package eat
-  :ensure
-  :hook (after-init . eat-eshell-mode)
-  :bind ("M-`" . eat)
-  :custom
-  (eshell-visual-commands nil)
-  :config
-  (defun eat-shell (o &rest args)
-    (interactive (list (or explicit-shell-file-name shell-file-name) current-prefix-arg))
-    (apply o args))
-  (advice-add #'eat :around #'eat-shell)
-  (defun handle-eat-paste (o &rest args)
-    (if eat--terminal
-        (cl-letf ((symbol-function 'yank) (symbol-function 'eat-yank))
-          (apply o args))
-      (apply o args)))
-  (advice-add #'xterm-paste :around #'handle-eat-paste))
 (use-package ediff
   :bind (:map mode-specific-map ("=" . ediff-current-file))
   :custom
@@ -670,7 +691,8 @@
     (apply o args))
   (advice-add 'org-babel-execute-src-block :around #'lazy-load-org-babel-languages)
   (defun fix-missing-args (o &rest args)
-    (setf (nthcdr 4 args) nil)
+    (when (> (length args) 4)
+      (setf (nthcdr 4 args) nil))
     (apply o args))
   (advice-add #'ob-async-org-babel-execute-src-block :around #'fix-missing-args))
 (use-package outline-magic :ensure :bind (("<backtab>" . outline-cycle)))
@@ -680,6 +702,12 @@
   (rustic-lsp-client 'eglot)
   :hook (rustic-mode . eglot-ensure))
 (use-package pdf-tools :ensure :if window-system :config (pdf-tools-install))
+(use-package shell
+  :bind (("C-`" . shell)
+         :map shell-mode-map
+         ("M-." . comint-insert-previous-argument))
+  :config
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output))
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
@@ -690,12 +718,12 @@
 (use-package treesit
   :if (treesit-available-p)
   :config
-  (when (treesit-ready-p 'c)
-    (advice-add #'c-mode   :override #'c-ts-mode))
-  (when (treesit-ready-p 'cpp)
-    (advice-add #'c++-mode :override #'c++-ts-mode))
-  (when (treesit-ready-p 'bash)
-    (advice-add #'sh-mode  :override #'bash-ts-mode)))
+  (dolist (p '((c c-mode c-ts-mode)
+               (cpp c++-mode c++-ts-mode)
+               (python python-mode python-ts-mode)
+               (bash sh-mode bash-ts-mode)))
+    (when (treesit-ready-p (cl-first p))
+      (advice-add (cl-second p) :override (cl-third p)))))
 (use-package tree-sitter
   :unless (treesit-available-p)
   :ensure
