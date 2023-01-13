@@ -21,7 +21,17 @@
 (custom-set-faces
  '(mode-line          ((t :inverse-video nil :bold t :style nil)))
  '(mode-line-inactive ((t :inverse-video nil :style nil))))
-(set-display-table-slot standard-display-table 'vertical-border (make-glyph-code ?┃))
+(defvar original-mode-line-format mode-line-format)
+(advice-add #'what-cursor-position :after
+            (lambda (_)
+              (let ((cv mode-line-format))
+                (unwind-protect
+                    (progn
+                      (setq-local mode-line-format original-mode-line-format)
+                      (force-mode-line-update)
+                      (sit-for 3))
+                  (setq-local mode-line-format cv)
+                  (force-mode-line-update)))))
 (setq-default mode-line-format
               '("%e %* %b "
                 (:propertize (" ")

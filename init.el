@@ -126,7 +126,8 @@
   (inhibit-startup-screen t)
   (initial-scratch-message nil)
   (inhibit-startup-echo-area-message (user-login-name))
-  (isearch-allow-scroll t)
+  (isearch-allow-scroll 'unlimited)
+  (isearch-yank-on-move 'shift)
   (isearch-lazy-count t)
   (isearch-repeat-on-direction-change t)
   (kill-buffer-query-functions nil)
@@ -214,6 +215,9 @@
   (window-resize-pixelwise nil)
   (words-include-escapes t)
   :config
+  (or standard-display-table (setq standard-display-table (make-display-table)))
+  (set-display-table-slot standard-display-table 'vertical-border (make-glyph-code ?┃))
+  (put 'other-window 'repeat-map nil)
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
   (defvar set-mark-dwim-timeout-action 'company-indent-or-complete-common)
@@ -256,10 +260,21 @@
                   r))
           (mapconcat #'identity (nreverse r) "\n")))))
   (advice-add 'read-shell-command :around #'use-region-if-active)
-  (defun fix-newline ()
-    (when (eq last-command-event ?\n)
-      (indent-according-to-mode)))
-  (advice-add #'electric-pair-open-newline-between-pairs-psif :after #'fix-newline))
+  (advice-add #'electric-pair-open-newline-between-pairs-psif
+              :after (lambda ()
+                       (when (eq last-command-event ?\n)
+                         (indent-according-to-mode))))
+  (add-hook 'next-error-hook 'reposition-window)
+  (add-hook 'find-function-after-hook 'reposition-window)
+  (add-hook 'xref-after-return-hook 'reposition-window)
+  (add-hook 'xref-after-jump-hook 'reposition-window)
+  (remove-hook 'xref-after-jump-hook 'recenter)
+  (add-hook 'outline-mode-hook
+            (lambda ()
+              (setq-local beginning-of-defun-function
+                          (lambda () (outline-previous-visible-heading 1)))
+              (setq-local end-of-defun-function
+                          (lambda () (outline-next-visible-heading 1))))))
 (use-package ace-window :ensure :bind ("C-x o" . ace-window))
 (use-package amx        :ensure :hook (after-init . amx-mode))
 (use-package auto-highlight-symbol
@@ -462,9 +477,9 @@
          ("I" . consult-imenu-multi)
          ("e" . consult-compile-error)
          :map search-map
+         ("o" . consult-line)
          ("l" . consult-line)
          ("L" . consult-line-multi)
-         ("m" . consult-multi-occur)
          ("k" . consult-keep-lines)
          ("u" . consult-focus-lines)
          ("e" . consult-isearch-history)
@@ -704,10 +719,27 @@
 (use-package pdf-tools :ensure :if window-system :config (pdf-tools-install))
 (use-package shell
   :bind (("C-`" . shell)
+         :map comint-mode-map
+         ([C-up]   . nil)
+         ([C-down] . nil)
          :map shell-mode-map
+         ("C-z" . comint-stop-subjob)
          ("M-." . comint-insert-previous-argument))
+  :custom
+  (comint-input-ignoredups t)
   :config
-  (add-hook 'comint-output-filter-functions #'comint-osc-process-output))
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
+  (add-hook 'comint-input-filter-functions #'show-prompt-time)
+  (defun show-prompt-time (input)
+    (unless (string-match "^[ \t\n\r]+$" input)
+      (let ((s (format-time-string "%m/%d %T"))
+            (ov (make-overlay (point-at-eol 0) (point-at-eol 0))))
+        (overlay-put ov 'after-string
+                     (concat
+                      (propertize " "
+                                  'display
+                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
+                      (propertize s 'face 'font-lock-doc-face)))))))
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
@@ -718,13 +750,16 @@
 (use-package treesit
   :if (treesit-available-p)
   :config
-  (dolist (p '((c c-mode c-ts-mode)
-               (cpp c++-mode c++-ts-mode)
-               (python python-mode python-ts-mode)
-               (bash sh-mode bash-ts-mode)))
-    (when (treesit-ready-p (cl-first p))
-      (advice-add (cl-second p) :override (cl-third p)))))
+  (dolist (p '((c c-mode . c-ts-mode)
+               (cpp c++-mode . c++-ts-mode)
+               (python python-mode . python-ts-mode)
+               (bash sh-mode . bash-ts-mode)
+               (yaml yaml-mode . yaml-ts-mode)
+               (toml conf-toml-mode . toml-ts-mode)))
+    (when (treesit-ready-p (car p))
+      (add-to-list 'major-mode-remap-alist (cdr p)))))
 (use-package tree-sitter
+  :disabled
   :unless (treesit-available-p)
   :ensure
   :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
