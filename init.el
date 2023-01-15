@@ -713,9 +713,12 @@
 (use-package outline-magic :ensure :bind (("<backtab>" . outline-cycle)))
 (use-package rustic
   :ensure
+  :hook (rustic-mode . eglot-ensure)
+  :bind ( :map rustic-mode-map
+          ("C-c n" . flymake-goto-next-error)
+          ("C-c p" . flymake-goto-prev-error))
   :custom
-  (rustic-lsp-client 'eglot)
-  :hook (rustic-mode . eglot-ensure))
+  (rustic-lsp-client 'eglot))
 (use-package pdf-tools :ensure :if window-system :config (pdf-tools-install))
 (use-package shell
   :bind (("C-`" . shell)
