@@ -49,6 +49,7 @@
    :map mode-specific-map
    ("0"                  . recursive-edit)
    ("SPC"                . cycle-spacing)
+   ("q"                  . [C-tab 24 48])
    ("r"                  . replace-regexp)
    ("s"                  . replace-string))
 
@@ -215,8 +216,7 @@
   (window-resize-pixelwise nil)
   (words-include-escapes t)
   :config
-  (global-set-key (kbd "C-c q") (kbd "C-u C-x o"))
-  (dotimes (c 3)
+  (dotimes (c 4)
     (global-set-key (kbd (format "M-%d" c)) (kbd (format "C-x %d" c))))
   (or standard-display-table (setq standard-display-table (make-display-table)))
   (set-display-table-slot standard-display-table 'vertical-border (make-glyph-code ?┃))
@@ -756,6 +756,27 @@
                                   'display
                                   `(space :align-to (- right-fringe ,(+ 1 (length s)))))
                       (propertize s 'face 'font-lock-doc-face)))))))
+(use-package smerge-mode
+  :defer t
+  :config
+  (when (require 'transient nil t)
+    (transient-define-prefix smerge-dispatch ()
+      "Invoke an SMerge command from a list of available commands."
+      [["Keep"
+        ("b" "Base" smerge-keep-base)
+        ("u" "Upper" smerge-keep-upper)
+        ("l" "Lower" smerge-keep-lower)
+        ("a" "All" smerge-keep-all) ("RET" "Current" smerge-keep-current)]
+       ["Diff"
+        ("<" "Base/upper" smerge-diff-base-upper)
+        ("=" "Upper/lower" smerge-diff-upper-lower)
+        (">" "Base/lower" smerge-diff-base-lower)
+        ("R" "Refine" smerge-refine :transient t)]
+       ["Other"
+        ("C" "Combine" smerge-combine-with-next)
+        ("r" "Resolve" smerge-resolve) ("x" "Kill current" smerge-kill-current)]])
+    (define-key (plist-get smerge-text-properties 'keymap)
+                (kbd "RET") 'smerge-dispatch)))
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
