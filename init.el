@@ -161,6 +161,7 @@
   (ns-tool-bar-display-mode 'both)
   (ns-tool-bar-size-mode 'regular)
   (ns-use-thin-smoothing t)
+  (proced-enable-color-flag t)
   (read-buffer-completion-ignore-case t)
   (read-extended-command-predicate #'command-completion-default-include-p)
   (read-file-name-completion-ignore-case t)
