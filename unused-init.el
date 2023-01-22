@@ -898,6 +898,21 @@
      (let ((s (format-time-string "%m-%d %T\n")))
        (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
                s)))))
+(use-package tempel
+  :ensure
+  :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
+  :config
+  (use-package tempel-collection :ensure t)
+  (defun tempel-setup-capf ()
+    (setq-local completion-at-point-functions (cons #'tempel-expand completion-at-point-functions))))
+(use-package tree-sitter
+  :disabled
+  :unless (treesit-available-p)
+  :ensure
+  :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
+         ((rustic-mode c-mode-common) . tree-sitter-mode))
+  :config
+  (use-package tree-sitter-langs :ensure))
 (when (file-directory-p "~/work/nano-emacs")
   ;; git clone https://github.com/rougier/nano-emacs.git
   (add-hook 'emacs-startup-hook

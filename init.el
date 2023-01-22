@@ -778,13 +778,6 @@
         ("r" "Resolve" smerge-resolve) ("x" "Kill current" smerge-kill-current)]])
     (define-key (plist-get smerge-text-properties 'keymap)
                 (kbd "RET") 'smerge-dispatch)))
-(use-package tempel
-  :ensure
-  :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
-  :config
-  (use-package tempel-collection :ensure t)
-  (defun tempel-setup-capf ()
-    (setq-local completion-at-point-functions (cons #'tempel-expand completion-at-point-functions))))
 (use-package treesit
   :if (treesit-available-p)
   :config
@@ -796,14 +789,6 @@
                (toml conf-toml-mode . toml-ts-mode)))
     (when (treesit-ready-p (car p))
       (add-to-list 'major-mode-remap-alist (cdr p)))))
-(use-package tree-sitter
-  :disabled
-  :unless (treesit-available-p)
-  :ensure
-  :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
-         ((rustic-mode c-mode-common) . tree-sitter-mode))
-  :config
-  (use-package tree-sitter-langs :ensure))
 (use-package vertico
   :ensure t
   :bind ( :map vertico-map
@@ -811,10 +796,7 @@
           ("C-j"     . vertico-exit-input)
           ("DEL"     . vertico-directory-delete-char)
           ("M-DEL"   . vertico-directory-delete-word)
-          ("M-'"     . vertico-quick-insert)
-          ("M-m"     . vertico-quick-exit)
           ("M-P"     . consult-toggle-preview)
-          ("C-x C-d" . consult-dir)
           ("M-/"     . consult-dir-jump-file)
           ("C-c SPC" . vertico-restrict-to-matches)
           :map mode-specific-map
