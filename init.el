@@ -373,15 +373,12 @@
           ;; By the time delayed filter is called, process may be dead.
           (cl-letf (((symbol-function 'get-buffer-process)
                      (lambda (&rest _) proc)))
-            (get-buffer-process (current-buffer))
             (dolist (p (nreverse queue))
               (funcall (car p) proc (cdr p))))))))
   (defun bpo-enqueue (ofun proc o)
     (when (buffer-live-p (process-buffer proc))
       (with-current-buffer (process-buffer proc)
-        (if (and (stringp o) (eq ofun (caar bpo-queue)))
-            (cl-callf concat (cdr (car bpo-queue)) o)
-          (push (cons ofun o) bpo-queue))
+        (push (cons ofun o) bpo-queue)
         (unless bpo-queue-timer
           (setq bpo-queue-timer
                 (run-with-timer 0.2 nil #'bpo-flush proc))))))
@@ -397,6 +394,7 @@
       (coterm--init)
       (handle-process-buffered proc)
       (setq-local comint-input-ring compile-history)
+      (setq-local comint-output-filter-functions '(ansi-color-process-output))
       (use-local-map compilation-mode-map)
       (setq-local jit-lock-defer-time nil)
       (setq buffer-read-only t)))
