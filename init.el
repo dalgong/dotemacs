@@ -290,7 +290,7 @@
               (setq-local end-of-defun-function
                           (lambda () (outline-next-visible-heading 1))))))
 (use-package ace-window :ensure :bind ("C-x o" . ace-window))
-(use-package amx        :ensure :hook (after-init . amx-mode))
+(use-package amx        :ensure :hook after-init)
 (use-package auto-highlight-symbol
   :ensure
   :hook (after-init . global-auto-highlight-symbol-mode)
@@ -329,7 +329,7 @@
   (bash-completion-use-separate-processes t))
 (use-package company
   :ensure
-  :hook (after-init . global-company-mode)
+  :hook (prog-mode text-mode)
   :bind ( :map prog-mode-map
           ("C-i"   . company-indent-or-complete-common)
           ([remap c-indent-line-or-region] . company-indent-or-complete-common)
@@ -481,7 +481,6 @@
     (setq buffer-read-only nil)
     (shell-mode)
     (bind-key [remap read-only-mode] #'shell-toggle-compile-mode (current-local-map))))
-(use-package compiler-explorer :ensure :bind (:map help-map ("C" . compiler-explorer)))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -606,14 +605,14 @@
               consult-toggle-preview-orig nil)
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore))))
-(use-package coterm :ensure :hook (after-init . coterm-mode))
+(use-package coterm :ensure :hook after-init)
 (use-package diffview
   :ensure
   :after diff-mode
   :bind (:map diff-mode-map ("|" . diffview-current)))
 (use-package dired-subtree :ensure :after dired :bind (:map dired-mode-map ("TAB" . dired-subtree-toggle)))
 (use-package dired-x               :after dired :defer t)
-(use-package display-line-numbers  :hook ((prog-mode text-mode) . display-line-numbers-mode))
+(use-package display-line-numbers  :hook (prog-mode text-mode))
 (use-package easy-kill
   :ensure
   :bind (([remap kill-ring-save]              . easy-kill)
@@ -664,10 +663,11 @@
   :hook (after-init . exec-path-from-shell-initialize)
   :custom
   (exec-path-from-shell-arguments '("-l")))
-(use-package gcmh    :ensure :hook (after-init . gcmh-mode))
+(use-package gcmh    :ensure :hook after-init)
 (use-package go-mode :ensure :hook (go-mode . eglot-ensure))
-(use-package hermes  :load-path "~/work/hermes" :commands hermes)
-(use-package hl-line :hook ((prog-mode conf-mode compilation-mode) . hl-line-mode))
+(when (file-directory-p "~/work/hermes")
+  (use-package hermes  :load-path "~/work/hermes" :commands hermes))
+(use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package ibuffer :bind ([remap list-buffers] . ibuffer))
 (use-package iedit   :ensure :bind (("C-c E" . iedit-mode) ("M-s E" . iedit-mode-from-isearch)))
 (use-package isearch
@@ -771,7 +771,11 @@
           ("C-c p" . flymake-goto-prev-error))
   :custom
   (rustic-lsp-client 'eglot))
-(use-package pdf-tools :ensure :if window-system :config (pdf-tools-install))
+(use-package pdf-tools
+  :ensure
+  :magic ("%PDF" . pdf-view-mode)
+  :config
+  (pdf-tools-install :no-query))
 (use-package shell
   :bind (("C-`" . shell)
          :map comint-mode-map
@@ -816,19 +820,25 @@
         ("r" "Resolve" smerge-resolve) ("x" "Kill current" smerge-kill-current)]])
     (define-key (plist-get smerge-text-properties 'keymap)
                 (kbd "RET") 'smerge-dispatch)))
-(use-package treesit
-  :if (treesit-available-p)
-  :config
-  (dolist (p '((c c-mode . c-ts-mode)
-               (cpp c++-mode . c++-ts-mode)
-               (python python-mode . python-ts-mode)
-               (bash sh-mode . bash-ts-mode)
-               (yaml yaml-mode . yaml-ts-mode)
-               (toml conf-toml-mode . toml-ts-mode)))
-    (when (treesit-ready-p (car p))
-      (add-to-list 'major-mode-remap-alist (cdr p)))))
+(if (and (fboundp 'treesit-available-p) (treesit-available-p))
+    (use-package treesit
+      :config
+      (dolist (p '((c c-mode . c-ts-mode)
+                   (cpp c++-mode . c++-ts-mode)
+                   (python python-mode . python-ts-mode)
+                   (bash sh-mode . bash-ts-mode)
+                   (yaml yaml-mode . yaml-ts-mode)
+                   (toml conf-toml-mode . toml-ts-mode)))
+        (when (treesit-ready-p (car p))
+          (add-to-list 'major-mode-remap-alist (cdr p)))))
+  (use-package tree-sitter
+    :ensure
+    :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
+           ((rustic-mode c-mode-common) . tree-sitter-mode)))
+  (use-package tree-sitter-langs :ensure :after tree-sitter))
 (use-package vertico
   :ensure t
+  :hook after-init
   :bind ( :map vertico-map
           ("?"       . minibuffer-completion-help)
           ("C-j"     . vertico-exit-input)
@@ -839,11 +849,10 @@
           ("C-c SPC" . vertico-restrict-to-matches)
           :map mode-specific-map
           ("C-r"     . vertico-repeat))
-  :hook ((after-init . vertico-mode)
-         (minibuffer-setup . vertico-repeat-save))
   :custom
   (vertico-count-format nil)
   :config
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
   (defun vertico-restrict-to-matches ()
     (interactive)
     (let ((inhibit-read-only t))
