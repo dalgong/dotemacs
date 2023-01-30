@@ -15,9 +15,6 @@
         "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/rss.xml"
         "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/technology/rss.xml"))
 
-(when (eq 'ns window-system)
-  (setenv "LIBRARY_PATH"
-          "/Applications/Emacs.app/Contents/Frameworks/gcc/12:/Applications/Emacs.app/Contents/Frameworks/gcc/12/gcc/x86_64-apple-darwin20/12:/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib"))
 (let ((file-name-handler-alist nil))
   (load "~/.emacs.d/init" nil t))
 
