@@ -8,6 +8,7 @@
          global-reveal-mode minibuffer-depth-indicate-mode repeat-mode
          recentf-mode savehist-mode save-place-mode))
 
+(setq use-package-expand-minimally t)
 (when (require 'package nil t)
   (nconc package-archives '(("melpa"  . "http://melpa.org/packages/")
                             ("org"    . "http://orgmode.org/elpa/")))
@@ -838,16 +839,7 @@
     (define-key (plist-get smerge-text-properties 'keymap)
                 (kbd "RET") 'smerge-dispatch)))
 (if (and (fboundp 'treesit-available-p) (treesit-available-p))
-    (use-package treesit
-      :config
-      (dolist (p '((c c-mode . c-ts-mode)
-                   (cpp c++-mode . c++-ts-mode)
-                   (python python-mode . python-ts-mode)
-                   (bash sh-mode . bash-ts-mode)
-                   (yaml yaml-mode . yaml-ts-mode)
-                   (toml conf-toml-mode . toml-ts-mode)))
-        (when (treesit-ready-p (car p))
-          (add-to-list 'major-mode-remap-alist (cdr p)))))
+    (use-package treesit-auto :ensure t :hook (after-init . global-treesit-auto-mode))
   (use-package tree-sitter
     :ensure
     :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
