@@ -667,7 +667,7 @@
          ("M-L"   . embark-live)
          ("M-S"   . embark-collect))
   :custom
-  (embark-cycle-key (kbd "C-SPC"))
+  (embark-cycle-key "C-SPC")
   (prefix-help-command #'embark-prefix-help-command)
   (embark-help-key "?")
   (embark-quit-after-action nil)
