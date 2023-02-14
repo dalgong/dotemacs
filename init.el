@@ -805,6 +805,9 @@
   :custom
   (comint-input-ignoredups t)
   :config
+  ;; fix comint bug
+  (advice-add #'comint-get-old-input-default :around 
+              (defun dont-move (o &rest args) (save-excursion (apply o args))))
   (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
   (add-hook 'comint-input-filter-functions #'show-prompt-time)
   (defun show-prompt-time (input)
