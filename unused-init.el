@@ -138,19 +138,30 @@
   (icomplete-prospects-height 1)
   (icomplete-hide-common-prefix nil))
 (use-package vertico
-  :disabled
-  :ensure
-  :hook (after-init . vertico-mode)
+  :ensure t
+  :hook after-init
   :bind ( :map vertico-map
-          ("?" . minibuffer-completion-help))
+          ("?"       . minibuffer-completion-help)
+          ("C-j"     . vertico-exit-input)
+          ("DEL"     . vertico-directory-delete-char)
+          ("M-DEL"   . vertico-directory-delete-word)
+          ("M-P"     . consult-toggle-preview)
+          ("M-/"     . consult-dir-jump-file)
+          ("C-c SPC" . vertico-restrict-to-matches)
+          :map mode-specific-map
+          ("C-r"     . vertico-repeat))
   :custom
   (vertico-count-format nil)
   :config
-  (advice-add #'vertico--setup :after
-              (lambda (&rest _)
-                (setq-local completion-auto-help nil
-                            completion-show-inline-help nil))))
-
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  (defun vertico-restrict-to-matches ()
+    (interactive)
+    (let ((inhibit-read-only t))
+      (goto-char (point-max))
+      (insert " ")
+      (add-text-properties (minibuffer-prompt-end) (point-max)
+                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
+  (use-package consult-dir :ensure :config (advice-add #'consult-dir-jump-file :before #'vertico-insert)))
 (use-package cua-base
   :hook (after-init . cua-mode)
   :custom

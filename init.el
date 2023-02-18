@@ -71,7 +71,7 @@
   (blink-matching-paren t)
   (calc-display-trail nil)
   (column-number-indicator-zero-based nil)
-  (completion-auto-help 'lazy)
+  (completion-auto-help nil)
   (completion-category-defaults nil)
   (completion-category-overrides '((file (styles partial-completion))))
   (completion-cycle-threshold 1)
@@ -291,12 +291,6 @@
               (setq-local end-of-defun-function
                           (lambda () (outline-next-visible-heading 1))))))
 (use-package ace-window :ensure :bind ("C-x o" . ace-window))
-(use-package amx        :ensure :hook after-init)
-(use-package auto-highlight-symbol
-  :ensure
-  :hook (after-init . global-auto-highlight-symbol-mode)
-  :bind ( :map auto-highlight-symbol-mode-map
-          ("C-x '" . ahs-change-range)))
 (use-package avy
   :ensure
   :bind (("C-'"       . avy-goto-char-timer)
@@ -428,6 +422,7 @@
                (insert ns)))
            (set-marker end-marker (point))))))
     ('coterm
+     (use-package coterm :ensure)
      (add-hook 'compilation-start-hook #'enable-coterm-on-compilation)
      (defun enable-coterm-on-compilation (proc)
        (with-current-buffer (process-buffer proc)
@@ -445,6 +440,7 @@
      (defun use-comint-always (args)
        (cl-list* (car args) t (cddr args))))
     ('eat
+     (use-package eat :ensure)
      (advice-add #'compilation-start :around #'start-file-process-shell-command-with-eat)
      (defun start-file-process-shell-command-with-eat (o &rest args)
        (cl-letf (((symbol-function 'start-file-process-shell-command)
@@ -623,7 +619,6 @@
               consult-toggle-preview-orig nil)
       (setq consult-toggle-preview-orig consult--preview-function
             consult--preview-function #'ignore))))
-(use-package coterm :ensure :hook after-init)
 (use-package diffview
   :ensure
   :after diff-mode
@@ -687,6 +682,16 @@
   (use-package hermes  :load-path "~/work/hermes" :commands hermes))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package ibuffer :bind ([remap list-buffers] . ibuffer))
+(use-package icomplete
+  :hook (after-init . icomplete-vertical-mode)
+  :bind ( :map icomplete-minibuffer-map
+          ("SPC" . self-insert-command)
+          ("C-j" . icomplete-fido-exit)
+          ("RET" . icomplete-force-complete-and-exit)
+          ("<remap> <minibuffer-complete-and-exit>" . icomplete-force-complete-and-exit))
+  :custom
+  (icomplete-matches-format nil)
+  (icomplete-show-matches-on-no-input t))
 (use-package iedit   :ensure :bind (("C-c E" . iedit-mode) ("M-s E" . iedit-mode-from-isearch)))
 (use-package isearch
   :hook (isearch-mode . search-for-region)
@@ -704,7 +709,7 @@
 (use-package orderless
   :ensure
   :custom
-  (completion-styles '(substring orderless basic))
+  (completion-styles '(orderless basic))
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism))
   (orderless-style-dispatchers '(negate-if-bang))
@@ -848,29 +853,4 @@
     :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
            ((rustic-mode c-mode-common) . tree-sitter-mode)))
   (use-package tree-sitter-langs :ensure :after tree-sitter))
-(use-package vertico
-  :ensure t
-  :hook after-init
-  :bind ( :map vertico-map
-          ("?"       . minibuffer-completion-help)
-          ("C-j"     . vertico-exit-input)
-          ("DEL"     . vertico-directory-delete-char)
-          ("M-DEL"   . vertico-directory-delete-word)
-          ("M-P"     . consult-toggle-preview)
-          ("M-/"     . consult-dir-jump-file)
-          ("C-c SPC" . vertico-restrict-to-matches)
-          :map mode-specific-map
-          ("C-r"     . vertico-repeat))
-  :custom
-  (vertico-count-format nil)
-  :config
-  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
-  (defun vertico-restrict-to-matches ()
-    (interactive)
-    (let ((inhibit-read-only t))
-      (goto-char (point-max))
-      (insert " ")
-      (add-text-properties (minibuffer-prompt-end) (point-max)
-                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
-  (use-package consult-dir :ensure :config (advice-add #'consult-dir-jump-file :before #'vertico-insert)))
 (use-package wgrep :ensure)
