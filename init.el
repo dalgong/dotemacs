@@ -16,43 +16,37 @@
   (require 'use-package nil t))
 
 (use-package emacs
-  :bind
-  (([C-tab]              . other-window)
-   ([C-up]               . windmove-up)
-   ([C-down]             . windmove-down)
-   ([C-left]             . windmove-left)
-   ([C-right]            . windmove-right)
-   ([remap suspend-frame]. ignore)
-   ([remap kill-buffer]  . kill-this-buffer)
-   ("C-TAB"              . other-window)
-   ("C-."                . next-error)
-   ("C-,"                . previous-error)
-   ("M-o"                . other-window)
-   ("RET"                . newline-and-indent)
-   ("M-C"                . compile)
-   ("M-D"                . recompile)
-   ("M-H"                . ff-find-other-file)
-   ("M-K"                . kill-this-buffer)
-   ("M-n"                . forward-paragraph)
-   ("M-p"                . backward-paragraph)
-
-   :map help-map
-   ("D"                  . toggle-debug-on-error)
-   ("E"                  . erase-buffer)
-   ("p"                  . package-list-packages-no-fetch)
-   ("C-b"                . describe-personal-keybindings)
-   ("C-o"                . proced)
-   ("="                  . quick-calc)
-
-   :map ctl-x-map
-   ("O"                  . ff-find-other-file)
-
-   :map mode-specific-map
-   ("0"                  . recursive-edit)
-   ("SPC"                . cycle-spacing)
-   ("q"                  . [C-tab 24 48])
-   ("r"                  . replace-regexp)
-   ("s"                  . replace-string))
+  :bind (([C-tab]              . other-window)
+         ([C-up]               . windmove-up)
+         ([C-down]             . windmove-down)
+         ([C-left]             . windmove-left)
+         ([C-right]            . windmove-right)
+         ([remap suspend-frame]. ignore)
+         ([remap kill-buffer]  . kill-this-buffer)
+         ("C-TAB"              . other-window)
+         ("C-."                . next-error)
+         ("C-,"                . previous-error)
+         ("M-o"                . other-window)
+         ("RET"                . newline-and-indent)
+         ("M-C"                . compile)
+         ("M-D"                . recompile)
+         ("M-H"                . ff-find-other-file)
+         ("M-K"                . kill-this-buffer)
+         ("M-n"                . forward-paragraph)
+         ("M-p"                . backward-paragraph)
+         ("C-x O"              . ff-find-other-file)
+         ("C-c 0"              . recursive-edit)
+         ("C-c SPC"            . cycle-spacing)
+         ("C-c q"              . [C-tab 24 48])
+         ("C-c r"              . replace-regexp)
+         ("C-c s"              . replace-string)
+         :map help-map
+         ("D"                  . toggle-debug-on-error)
+         ("E"                  . erase-buffer)
+         ("p"                  . package-list-packages-no-fetch)
+         ("C-b"                . describe-personal-keybindings)
+         ("C-o"                . proced)
+         ("="                  . quick-calc))
 
   :custom
   (ad-redefinition-action 'accept)
@@ -155,7 +149,6 @@
   (mode-line-position '(""))
   (mode-line-mule-info '(""))
   (mode-line-end-spaces nil)
-  ;; '(:eval (concat (propertize " " 'display `(space :align-to (- right 4))) "%c")))
   (next-error-message-highlight t)
   (ns-alternate-modifier 'super)
   (ns-command-modifier 'meta)
@@ -325,15 +318,14 @@
 (use-package company
   :ensure
   :hook (prog-mode text-mode)
-  :bind ( :map prog-mode-map
-          ("C-i"   . company-indent-or-complete-common)
-          ([remap c-indent-line-or-region] . company-indent-or-complete-common)
-          :map mode-specific-map
-          ("/" . company-manual-begin)
-          :map company-active-map
-          ("C-n" . company-select-next)
-          ("C-p" . company-select-previous)
-          ("M-s" . company-filter-candidates))
+  :bind (("C-c /" . company-manual-begin)
+         :map prog-mode-map
+         ("C-i"   . company-indent-or-complete-common)
+         ([remap c-indent-line-or-region] . company-indent-or-complete-common)
+         :map company-active-map
+         ("C-n" . company-select-next)
+         ("C-p" . company-select-previous)
+         ("M-s" . company-filter-candidates))
   :custom
   (company-idle-delay nil)
   (company-tooltip-idle-delay nil)
@@ -502,6 +494,19 @@
          ([remap yank-pop] . consult-yank-pop)
          ("M-T" . consult-imenu)
          ("M-Y" . consult-imenu-multi)
+         ("C-c h"   . consult-history)
+         ("C-c b"   . consult-bookmark)
+         ("C-c g"   . consult-ripgrep)
+         ("C-c C-g" . consult-grep)
+         ("C-c G"   . consult-git-grep)
+         ("C-c k"   . consult-kmacro)
+         ("C-x M-:" . consult-complex-command)
+         ("C-x b"   . consult-buffer)
+         ("C-x C-r" . consult-recent-file)
+         ("C-x m"   . consult-mode-command)
+         ("C-x `"   . consult-compile-error)
+         ("C-x 4 b" . consult-buffer-other-window)
+         ("C-x 5 b" . consult-buffer-other-frame)
 
          :map help-map
          ("a"     . consult-apropos)
@@ -513,27 +518,6 @@
 
          :map minibuffer-local-map
          ("C-r"   . consult-history)
-
-         :map mode-specific-map
-         ("h"   . consult-history)
-         ("b"   . consult-bookmark)
-         ("g"   . consult-ripgrep)
-         ("C-g" . consult-grep)
-         ("G"   . consult-git-grep)
-         ("k"   . consult-kmacro)
-
-         :map ctl-x-map
-         ("M-:" . consult-complex-command)
-         ("b"   . consult-buffer)
-         ("C-r" . consult-recent-file)
-         ("m"   . consult-mode-command)
-         ("`"   . consult-compile-error)
-
-         :map ctl-x-4-map
-         ("b" . consult-buffer-other-window)
-
-         :map ctl-x-5-map
-         ("b" . consult-buffer-other-frame)
 
          :map goto-map
          ("g" . consult-goto-line)
@@ -555,7 +539,6 @@
   :custom
   (register-preview-delay 0)
   (register-preview-function #'consult-register-format)
-  ;; (consult-find-command "fd --color=never --full-path ARG OPTS")
   (consult-preview-key 'any)
   (consult-narrow-key "<")
   (xref-show-xrefs-function #'consult-xref)
@@ -594,7 +577,6 @@
       (prog1
           (apply o (list filename wildcards))
         (when line-number
-          ;; goto-line is for interactive use
           (goto-char (point-min))
           (forward-line (1- line-number))))))
   (advice-add #'ffap-file-at-point :filter-return #'ffap-file-at-point-add-line-number)
@@ -637,7 +619,7 @@
          ("o" . easy-kill-expand)
          ("i" . easy-kill-shrink)))
 (use-package ediff
-  :bind (:map mode-specific-map ("=" . ediff-current-file))
+  :bind ("C-=" . ediff-current-file)
   :custom
   (diff-switches "-wu")
   (ediff-diff-options "-w")
@@ -669,19 +651,29 @@
   :config
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (push #'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
-(use-package embark-consult :ensure :hook (embark-collect-mode . consult-preview-at-point-mode))
+(use-package embark-consult
+  :ensure
+  :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
   :hook (after-init . exec-path-from-shell-initialize)
   :custom
   (exec-path-from-shell-arguments '("-l")))
-(use-package gcmh    :ensure :hook after-init)
-(use-package go-mode :ensure :hook (go-mode . eglot-ensure))
+(use-package gcmh
+  :ensure
+  :hook after-init)
+(use-package go-mode
+  :ensure
+  :hook (go-mode . eglot-ensure))
 (when (file-directory-p "~/work/hermes")
-  (use-package hermes  :load-path "~/work/hermes" :commands hermes))
-(use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
-(use-package ibuffer :bind ([remap list-buffers] . ibuffer))
+  (use-package hermes
+    :load-path "~/work/hermes"
+    :bind ("C-c v" . hermes)))
+(use-package hl-line
+  :hook (prog-mode conf-mode compilation-mode text-mode))
+(use-package ibuffer
+  :bind ([remap list-buffers] . ibuffer))
 (use-package icomplete
   :hook (after-init . icomplete-vertical-mode)
   :bind ( :map icomplete-minibuffer-map
@@ -692,7 +684,10 @@
   :custom
   (icomplete-matches-format nil)
   (icomplete-show-matches-on-no-input t))
-(use-package iedit   :ensure :bind (("C-c E" . iedit-mode) ("M-s E" . iedit-mode-from-isearch)))
+(use-package iedit
+  :ensure
+  :bind (("C-c E" . iedit-mode)
+         ("M-s E" . iedit-mode-from-isearch)))
 (use-package isearch
   :hook (isearch-mode . search-for-region)
   :config
@@ -703,9 +698,8 @@
       (isearch-repeat (if isearch-forward 'forward 'backward)))))
 (use-package multiple-cursors
   :ensure
-  :bind (:map mode-specific-map
-              ("e" . mc/edit-lines)
-              ("A" . mc/mark-all-in-region)))
+  :bind (("C-c e" . mc/edit-lines)
+         ("C-c A" . mc/mark-all-in-region)))
 (use-package orderless
   :ensure
   :custom
@@ -718,14 +712,13 @@
     (when (string-prefix-p "!" pattern)
       `(orderless-without-literal . ,(substring pattern 1)))))
 (use-package org
-  :bind (:map mode-specific-map
-              ("l" . org-store-link)
-              ("a" . org-agenda)
-              ("c" . org-capture)
-              ("C" . org-goto-calendar)
-              :map org-mode-map
-              ("C-TAB" . nil)
-              ("C-c ;" . nil))
+  :bind (("C-c l" . org-store-link)
+         ("C-c a" . org-agenda)
+         ("C-c c" . org-capture)
+         ("C-c C" . org-goto-calendar)
+         :map org-mode-map
+         ("C-TAB" . nil)
+         ("C-c ;" . nil))
   :hook (org-babel-after-execute . org-redisplay-inline-images)
   :custom
   (org-agenda-span 'fortnight)
@@ -770,8 +763,8 @@
   ;; <<embed("name", arg1="...", arg2="...", ...)>>
   ;; #+end_src
   (require 'org-tempo nil t)
-  (use-package ob-async   :ensure)
-  (use-package ob-compile :bind (:map mode-specific-map ("8" . ob-compile)))
+  (use-package ob-async :ensure)
+  (use-package ob-compile)
   (defun lazy-load-org-babel-languages (o &rest args)
     (when-let (lang (org-element-property :language (org-element-at-point)))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
@@ -785,7 +778,9 @@
       (setf (nthcdr 4 args) nil))
     (apply o args))
   (advice-add #'ob-async-org-babel-execute-src-block :around #'fix-missing-args))
-(use-package outline-magic :ensure :bind (("<backtab>" . outline-cycle)))
+(use-package outline-magic
+  :ensure
+  :bind (("<backtab>" . outline-cycle)))
 (use-package rustic
   :ensure
   :hook (rustic-mode . eglot-ensure)
@@ -796,6 +791,7 @@
   (rustic-lsp-client 'eglot))
 (use-package pdf-tools
   :ensure
+  :if window-system
   :magic ("%PDF" . pdf-view-mode)
   :config
   (pdf-tools-install :no-query))
