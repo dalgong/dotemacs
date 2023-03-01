@@ -129,6 +129,16 @@
                   (cl-letf (((symbol-function 'insert-for-yank) #'vterm-insert))
                     (consult-yank-pop arg))))))
 (use-package icomplete
+  :hook (after-init . icomplete-vertical-mode)
+  :bind ( :map icomplete-minibuffer-map
+          ("SPC" . self-insert-command)
+          ("C-j" . icomplete-fido-exit)
+          ("RET" . icomplete-force-complete-and-exit)
+          ("<remap> <minibuffer-complete-and-exit>" . icomplete-force-complete-and-exit))
+  :custom
+  (icomplete-matches-format nil)
+  (icomplete-show-matches-on-no-input t))
+(use-package icomplete
   :demand t
   :bind ( :map icomplete-minibuffer-map
           ("RET" . icomplete-force-complete-and-exit)
@@ -137,31 +147,6 @@
   (icomplete-show-matches-on-no-input t)
   (icomplete-prospects-height 1)
   (icomplete-hide-common-prefix nil))
-(use-package vertico
-  :ensure t
-  :hook after-init
-  :bind ( :map vertico-map
-          ("?"       . minibuffer-completion-help)
-          ("C-j"     . vertico-exit-input)
-          ("DEL"     . vertico-directory-delete-char)
-          ("M-DEL"   . vertico-directory-delete-word)
-          ("M-P"     . consult-toggle-preview)
-          ("M-/"     . consult-dir-jump-file)
-          ("C-c SPC" . vertico-restrict-to-matches)
-          :map mode-specific-map
-          ("C-r"     . vertico-repeat))
-  :custom
-  (vertico-count-format nil)
-  :config
-  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
-  (defun vertico-restrict-to-matches ()
-    (interactive)
-    (let ((inhibit-read-only t))
-      (goto-char (point-max))
-      (insert " ")
-      (add-text-properties (minibuffer-prompt-end) (point-max)
-                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
-  (use-package consult-dir :ensure :config (advice-add #'consult-dir-jump-file :before #'vertico-insert)))
 (use-package cua-base
   :hook (after-init . cua-mode)
   :custom

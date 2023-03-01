@@ -674,16 +674,6 @@
   :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package ibuffer
   :bind ([remap list-buffers] . ibuffer))
-(use-package icomplete
-  :hook (after-init . icomplete-vertical-mode)
-  :bind ( :map icomplete-minibuffer-map
-          ("SPC" . self-insert-command)
-          ("C-j" . icomplete-fido-exit)
-          ("RET" . icomplete-force-complete-and-exit)
-          ("<remap> <minibuffer-complete-and-exit>" . icomplete-force-complete-and-exit))
-  :custom
-  (icomplete-matches-format nil)
-  (icomplete-show-matches-on-no-input t))
 (use-package iedit
   :ensure
   :bind (("C-c E" . iedit-mode)
@@ -849,4 +839,29 @@
     :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
            ((rustic-mode c-mode-common) . tree-sitter-mode)))
   (use-package tree-sitter-langs :ensure :after tree-sitter))
+(use-package vertico
+  :ensure t
+  :hook after-init
+  :bind ( :map vertico-map
+          ("?"       . minibuffer-completion-help)
+          ("C-j"     . vertico-exit-input)
+          ("DEL"     . vertico-directory-delete-char)
+          ("M-DEL"   . vertico-directory-delete-word)
+          ("M-P"     . consult-toggle-preview)
+          ("M-/"     . consult-dir-jump-file)
+          ("C-c SPC" . vertico-restrict-to-matches)
+          :map mode-specific-map
+          ("C-r"     . vertico-repeat))
+  :custom
+  (vertico-count-format nil)
+  :config
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  (defun vertico-restrict-to-matches ()
+    (interactive)
+    (let ((inhibit-read-only t))
+      (goto-char (point-max))
+      (insert " ")
+      (add-text-properties (minibuffer-prompt-end) (point-max)
+                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
+  (use-package consult-dir :ensure :config (advice-add #'consult-dir-jump-file :before #'vertico-insert)))
 (use-package wgrep :ensure)
