@@ -717,6 +717,7 @@
   (org-descriptive-links nil)
   (org-edit-src-content-indentation 0)
   (org-edit-src-persistent-message nil)
+  (org-element-use-cache nil)
   (org-fontify-quote-and-verse-blocks t)
   (org-hide-emphasis-markers t)
   (org-hide-leading-stars t)
