@@ -686,6 +686,9 @@
       (isearch-yank-string s)
       (deactivate-mark)
       (isearch-repeat (if isearch-forward 'forward 'backward)))))
+(use-package marginalia
+  :ensure
+  :hook after-init)
 (use-package multiple-cursors
   :ensure
   :bind (("C-c e" . mc/edit-lines)
