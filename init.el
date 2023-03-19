@@ -311,6 +311,7 @@
           (activate-mark)
           (goto-char pt))))
 (use-package bash-completion
+  :unless (memq window-system '(mac ns))
   :ensure
   :hook (after-init . bash-completion-setup)
   :custom
@@ -374,7 +375,7 @@
       (setq-local bpo-queue-timer nil))
     (add-function :around (process-filter proc) #'bpo-enqueue)
     (add-function :around (process-sentinel proc) #'bpo-enqueue))
-  (defvar compile-terminal-integration-mode 'mine) ; mine|coterm|eat
+  (defvar compile-terminal-integration-mode 'eat) ; mine|coterm|eat
   (pcase compile-terminal-integration-mode
     ('mine
      (add-hook 'compilation-start-hook #'handle-process-buffered)
@@ -657,9 +658,7 @@
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
-  :hook (after-init . exec-path-from-shell-initialize)
-  :custom
-  (exec-path-from-shell-arguments '("-l")))
+  :hook (after-init . exec-path-from-shell-initialize))
 (use-package gcmh
   :ensure
   :hook after-init)
