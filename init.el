@@ -793,7 +793,15 @@
     (define-key (plist-get smerge-text-properties 'keymap)
                 (kbd "RET") 'smerge-dispatch)))
 (if (and (fboundp 'treesit-available-p) (treesit-available-p))
-    (use-package treesit-auto :ensure t :hook (after-init . global-treesit-auto-mode))
+    (use-package treesit-auto
+      :ensure t
+      :hook ((after-init . global-treesit-auto-mode)
+             (c++-ts-mode . fix-forward-sexp-function))
+      :custom
+      (treesit-font-lock-level 4)
+      :config
+      (defun fix-forward-sexp-function ()
+        (setq forward-sexp-function nil)))
   (use-package tree-sitter
     :ensure
     :hook ((tree-sitter-after-on . tree-sitter-hl-mode)
