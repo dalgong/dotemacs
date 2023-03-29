@@ -405,12 +405,13 @@
                    ;; 1 -> beginning of screen to point
                    ;; 2 -> entire screen
                    ;; 3 -> entire screen & all lines in scollback buffer
-                   (replace-match "")))
+                   ))
             (setq compilation-filter-start (min (point) compilation-filter-start))))
-        (goto-char end-marker)
+        (goto-char compilation-filter-start)
         (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
                (ns (ansi-color-apply (xterm-color-filter s))))
-          (unless (string-equal s ns)
+          (if (string-equal s ns)
+              (goto-char end-marker)
             (delete-region compilation-filter-start end-marker)
             (insert ns)))
         (set-marker end-marker (point)))))
