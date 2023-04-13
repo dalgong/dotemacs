@@ -344,19 +344,17 @@
   (compilation-save-buffers-predicate (lambda ()))
   (compilation-scroll-output 'first-error)
   :config
-  (defvar-local bpo-queue nil)
-  (defvar-local bpo-queue-timer nil)
   (defun bpo-flush (proc)
     (when (buffer-live-p (process-buffer proc))
       (with-current-buffer (process-buffer proc)
-        (when bpo-queue-timer
-          (cancel-timer bpo-queue-timer)
-          (setq bpo-queue-timer nil))
+        (when-let (timer (process-get proc :timer))
+          (cancel-timer timer)
+          (process-put proc :timer nil))
         (let ((inhibit-quit t)
               (inhibit-read-only t)
               (inhibit-modification-hooks t)
-              (queue bpo-queue))
-          (setq bpo-queue nil)
+              (queue (process-get proc :queue)))
+          (process-put proc :queue nil)
           ;; By the time delayed filter is called, process may be dead.
           (cl-letf (((symbol-function 'get-buffer-process)
                      (lambda (&rest _) proc)))
@@ -365,14 +363,10 @@
   (defun bpo-enqueue (ofun proc o)
     (when (buffer-live-p (process-buffer proc))
       (with-current-buffer (process-buffer proc)
-        (push (cons ofun o) bpo-queue)
-        (unless bpo-queue-timer
-          (setq bpo-queue-timer
-                (run-with-timer 0.2 nil #'bpo-flush proc))))))
+        (process-put proc :queue (cons (cons ofun o) (process-get proc :queue)))
+        (unless (process-get proc :timer)
+          (process-put proc :timer (run-with-timer 0.2 nil #'bpo-flush proc))))))
   (defun handle-process-buffered (proc)
-    (with-current-buffer (process-buffer proc)
-      (setq-local bpo-queue nil)
-      (setq-local bpo-queue-timer nil))
     (add-function :around (process-filter proc) #'bpo-enqueue)
     (add-function :around (process-sentinel proc) #'bpo-enqueue))
   (add-hook 'compilation-start-hook #'handle-process-buffered)
@@ -389,9 +383,9 @@
                 (c (aref (match-string 2) 0)))
             (delete-region (match-beginning 0) (point))
             (cond ((= c ?G)
-                   (delete-region (point-at-bol) (point)))
+                   (delete-region (pos-bol) (point)))
                   ((= c ?A)
-                   (delete-region (point-at-bol (- (1- (or count 1)))) (point)))
+                   (delete-region (pos-bol (- (1- (or count 1)))) (point)))
                   ((= c ?D)
                    (delete-region (- (point) (or count 1)) (point)))
                   ((= c ?K)
@@ -399,7 +393,7 @@
                    ;; 1 -> bol to point
                    ;; 2 -> bol to eol
                    (unless (= 0 (or count 0))
-                     (delete-region (point-at-bol) (point))))
+                     (delete-region (pos-bol) (point))))
                   ((= c ?J)
                    ;; 0 (or missing) -> point to end of screen
                    ;; 1 -> beginning of screen to point
@@ -551,15 +545,14 @@
                 (if current-prefix-arg
                     (call-interactively 'consult-imenu-multi)
                   (apply o args))))
-  (defvar-local consult-toggle-preview-orig nil)
   (defun consult-toggle-preview ()
     "Command to enable/disable preview."
     (interactive)
-    (if consult-toggle-preview-orig
-        (setq consult--preview-function consult-toggle-preview-orig
-              consult-toggle-preview-orig nil)
-      (setq consult-toggle-preview-orig consult--preview-function
-            consult--preview-function #'ignore))))
+    (unless (plist-get (symbol-plist 'consult--preview-function) (current-buffer))
+      (plist-put (symbol-plist 'consult--preview-function) (current-buffer) #'ignore))
+    (cl-rotatef consult--preview-function
+                (plist-get (symbol-plist 'consult--preview-function)
+                           (current-buffer)))))
 (use-package diffview
   :ensure
   :after diff-mode
@@ -598,6 +591,7 @@
   :commands (embark-act embark-prefix-help-command)
   :bind (("M-SPC" . embark-act)
          ("M-."   . embark-dwim)
+         ("<f12>" . embark-dwim)
          :map minibuffer-local-map
          ("M-E"   . embark-export)
          ("M-L"   . embark-live)
@@ -765,7 +759,7 @@
   (defun show-prompt-time (input)
     (unless (string-match "^[ \t\n\r]+$" input)
       (let ((s (format-time-string "%m/%d %T"))
-            (ov (make-overlay (point-at-eol 0) (point-at-eol 0))))
+            (ov (make-overlay (pos-eol 0) (pos-eol 0))))
         (overlay-put ov 'after-string
                      (concat
                       (propertize " "
