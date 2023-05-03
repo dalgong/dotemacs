@@ -28,8 +28,6 @@
          ("C-,"                . previous-error)
          ("M-o"                . other-window)
          ("RET"                . newline-and-indent)
-         ("M-C"                . compile)
-         ("M-D"                . recompile)
          ("M-H"                . ff-find-other-file)
          ("M-K"                . kill-this-buffer)
          ("M-n"                . forward-paragraph)
@@ -283,7 +281,6 @@
                           (lambda () (outline-previous-visible-heading 1)))
               (setq-local end-of-defun-function
                           (lambda () (outline-next-visible-heading 1))))))
-(use-package ace-window :ensure :bind ("C-x o" . ace-window))
 (use-package avy
   :ensure
   :bind (("C-'"       . avy-goto-char-timer)
@@ -462,7 +459,6 @@
          ("C-x 5 b" . consult-buffer-other-frame)
 
          :map help-map
-         ("a"     . consult-apropos)
          ("C-m"   . consult-man)
          ("SPC"   . consult-mark)
          ("C-SPC" . consult-global-mark)
