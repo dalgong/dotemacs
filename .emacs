@@ -1,6 +1,8 @@
 (defun disable-display-update (&optional arg)
   (setq inhibit-message arg)
-  (or arg (use-package powerline :ensure t :config (powerline-default-theme))))
+  (unless arg
+    (load-theme 'modus-operandi t nil)
+    (use-package powerline :ensure t :config (powerline-default-theme))))
 (disable-display-update t)
 (add-hook #'after-init-hook #'disable-display-update 100)
 

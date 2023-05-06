@@ -607,6 +607,21 @@
   :if (memq window-system '(mac ns))
   :ensure
   :hook (after-init . exec-path-from-shell-initialize))
+(use-package fussy
+  :ensure
+  :config
+  (push 'fussy completion-styles)
+  (with-eval-after-load 'eglot
+    (add-to-list 'completion-category-overrides
+                 '(eglot (styles fussy basic))))
+  (use-package fuz
+    :ensure
+    :config
+    (when (or (require 'fuz-core nil t)
+              (condition-case nil
+                  (progn (fuz-build-and-load-dymod) t)
+                (error nil)))
+      (setq fussy-score-fn 'fussy-fuz-score))))
 (use-package gcmh
   :ensure
   :hook after-init)
@@ -650,7 +665,8 @@
   :config
   (defun negate-if-bang (pattern _index _total)
     (when (string-prefix-p "!" pattern)
-      `(orderless-without-literal . ,(substring pattern 1)))))
+      `(orderless-without-literal . ,(substring pattern 1))))
+  (setq fussy-filter-fn 'fussy-filter-orderless-flex))
 (use-package org
   :bind (("C-c l" . org-store-link)
          ("C-c a" . org-agenda)
