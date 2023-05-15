@@ -19,26 +19,3 @@
 
 (let ((file-name-handler-alist nil))
   (load "~/.emacs.d/init" nil t))
-
-(setq frame-title-format "%b")
-(when nil
-  ;; minimalistic
-  (custom-set-faces
-   '(mode-line          ((t :inverse-video nil :bold t :style nil)))
-   '(mode-line-inactive ((t :inverse-video nil :style nil))))
-  (defvar original-mode-line-format mode-line-format)
-  (advice-add #'what-cursor-position :after
-              (lambda (_)
-                (let ((cv mode-line-format))
-                  (unwind-protect
-                      (progn
-                        (setq-local mode-line-format original-mode-line-format)
-                        (force-mode-line-update)
-                        (sit-for 3))
-                    (setq-local mode-line-format cv)
-                    (force-mode-line-update)))))
-  (setq-default mode-line-format
-                '("%e %* %b "
-                  (:propertize (" ")
-                               display (space :align-to (- right 11)))
-                  "%l,%c  %p")))
