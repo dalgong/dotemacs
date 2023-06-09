@@ -63,7 +63,7 @@
   (blink-matching-paren t)
   (calc-display-trail nil)
   (column-number-indicator-zero-based nil)
-  (completion-auto-help nil)
+  (completion-auto-help 'visible)
   (completion-category-defaults nil)
   (completion-category-overrides '((file (styles partial-completion))))
   (completion-cycle-threshold 1)
@@ -73,7 +73,7 @@
   (completions-format 'one-column)
   (completions-header-format nil)
   (completions-max-height 20)
-  (completion-auto-select nil)
+  (completion-auto-select 'second-tab)
   (confirm-kill-emacs nil)
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
@@ -615,7 +615,6 @@
     (add-to-list 'completion-category-overrides
                  '(eglot (styles fussy basic))))
   (use-package fuz
-    :ensure
     :config
     (when (or (require 'fuz-core nil t)
               (condition-case nil
@@ -758,6 +757,7 @@
          ([C-up]   . nil)
          ([C-down] . nil)
          :map shell-mode-map
+         ("SPC" . comint-magic-space)
          ("C-z" . comint-stop-subjob)
          ("M-." . comint-insert-previous-argument))
   :custom
