@@ -566,6 +566,13 @@
          ([remap cua-set-mark]                . easy-kill-mark-region)
          ("o" . easy-kill-expand)
          ("i" . easy-kill-shrink)))
+(use-package eat
+  :ensure
+  :bind ("C-`" . eat)
+  :hook
+  (eshell-load . (eat-eshell-mode eat-eshell-visual-command-mode))
+  :custom
+  (eat-shell-prompt-annotation-position 'right-margin))
 (use-package ediff
   :bind ("C-=" . ediff-current-file)
   :custom
@@ -752,6 +759,7 @@
   :config
   (pdf-tools-install :no-query))
 (use-package shell
+  :disabled
   :bind (("C-`" . shell)
          :map comint-mode-map
          ([C-up]   . nil)
