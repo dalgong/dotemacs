@@ -568,7 +568,33 @@
          ("i" . easy-kill-shrink)))
 (use-package eat
   :ensure
-  :bind ("C-`" . eat)
+  :init
+  (defun override-eat-term-keymap (map)
+    (define-key map (kbd "M-o")  #'other-window)
+    (define-key map (kbd "M-\"") #'consult-register-load)
+    (define-key map (kbd "M-C")  #'eat-char-mode)
+    (define-key map (kbd "M-J")  #'eat-semi-char-mode)
+    (define-key map (kbd "M-E")  #'eat-emacs-mode)
+    map)
+  (advice-add #'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
+  (defun eat-insert-for-yank (o &rest args)
+    (if (null eat--terminal)
+        (apply o args)
+      (funcall eat--synchronize-scroll-function
+               (eat--synchronize-scroll-windows 'force-selected))
+      (eat-send-string-as-yank
+       eat--terminal
+       (let ((yank-hook (bound-and-true-p yank-transform-functions)))
+         (with-temp-buffer
+           (setq-local yank-transform-functions yank-hook)
+           (apply o args)
+           (buffer-string))))))
+  (advice-add #'insert-for-yank :around #'eat-insert-for-yank)
+  :bind (("C-`" . eat)
+         :map eat-mode-map
+         ("M-C" . eat-char-mode)
+         ("M-J" . eat-semi-char-mode)
+         ("M-E" . eat-emacs-mode))
   :hook
   (eshell-load . (eat-eshell-mode eat-eshell-visual-command-mode))
   :custom
