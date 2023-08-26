@@ -578,7 +578,7 @@
     map)
   (advice-add #'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
   (defun eat-insert-for-yank (o &rest args)
-    (if (null eat--terminal)
+    (if (null (ignore-errors eat--terminal))
         (apply o args)
       (funcall eat--synchronize-scroll-function
                (eat--synchronize-scroll-windows 'force-selected))
