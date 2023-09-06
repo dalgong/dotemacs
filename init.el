@@ -646,14 +646,7 @@
   (push 'fussy completion-styles)
   (with-eval-after-load 'eglot
     (add-to-list 'completion-category-overrides
-                 '(eglot (styles fussy basic))))
-  (use-package fuz
-    :config
-    (when (or (require 'fuz-core nil t)
-              (condition-case nil
-                  (progn (fuz-build-and-load-dymod) t)
-                (error nil)))
-      (setq fussy-score-fn 'fussy-fuz-score))))
+                 '(eglot (styles fussy basic)))))
 (use-package gcmh
   :ensure
   :hook after-init)
