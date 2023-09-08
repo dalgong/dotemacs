@@ -572,11 +572,14 @@
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "M-o")  #'other-window)
     (define-key map (kbd "M-\"") #'consult-register-load)
-    (define-key map (kbd "M-C")  #'eat-char-mode)
-    (define-key map (kbd "M-J")  #'eat-semi-char-mode)
-    (define-key map (kbd "M-E")  #'eat-emacs-mode)
+    (define-key map (kbd "M-;")  #'eat-toggle-char-mode)
     map)
   (advice-add #'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
+  (defun eat-toggle-char-mode ()
+    (interactive)
+    (call-interactively (if eat--semi-char-mode
+                            'eat-emacs-mode
+                          'eat-semi-char-mode)))
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat--terminal))
         (apply o args)
@@ -592,9 +595,7 @@
   (advice-add #'insert-for-yank :around #'eat-insert-for-yank)
   :bind (("C-`" . eat)
          :map eat-mode-map
-         ("M-C" . eat-char-mode)
-         ("M-J" . eat-semi-char-mode)
-         ("M-E" . eat-emacs-mode))
+         ("M-;" . eat-toggle-char-mode))
   :hook
   (eshell-load . (eat-eshell-mode eat-eshell-visual-command-mode))
   :custom

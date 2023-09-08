@@ -66,3 +66,5 @@ vterm_prompt_end(){
 if [[ "x$INSIDE_EMACS" = "xvterm" ]]; then
     PS1=$PS1'\[$(vterm_prompt_end)\]'
 fi
+
+[[ -n "$EAT_SHELL_INTEGRATION_DIR" ]] && source "$EAT_SHELL_INTEGRATION_DIR/bash"
