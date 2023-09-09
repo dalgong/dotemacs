@@ -313,6 +313,13 @@
   :hook (after-init . bash-completion-setup)
   :custom
   (bash-completion-use-separate-processes t))
+(use-package beardbolt
+  :ensure
+  :vc ( :url "https://github.com/joaotavora/beardbolt.git"
+        :rev :newest)
+  :bind (:map mode-specific-map (":" . beardbolt-starter))
+  :config
+  (push (cons 'c++-ts-mode (cdr (assq 'c++-mode beardbolt-languages))) beardbolt-languages))
 (use-package company
   :ensure
   :hook (prog-mode text-mode)
@@ -568,6 +575,8 @@
          ("i" . easy-kill-shrink)))
 (use-package eat
   :ensure
+  :vc ( :url "https://codeberg.org/akib/emacs-eat"
+        :rev :newest)
   :init
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "M-o")  #'other-window)
@@ -638,6 +647,7 @@
   :ensure
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package exec-path-from-shell
+  :disabled
   :if (memq window-system '(mac ns))
   :ensure
   :hook (after-init . exec-path-from-shell-initialize))
