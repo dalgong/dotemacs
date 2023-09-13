@@ -337,87 +337,21 @@
   (company-tooltip-align-annotations t))
 (use-package compile
   :bind (("<f7>" . compile)
-         ("<f8>" . recompile)
-         :map compilation-mode-map
-         ([remap read-only-mode] . compilation-toggle-shell-mode))
+         ("<f8>" . recompile))
   :custom
   (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
   (compilation-ask-about-save nil)
   (compilation-buffer-name-function #'get-idle-compilation--buffer-name)
   (compilation-save-buffers-predicate (lambda ()))
-  (compilation-scroll-output 'first-error)
   :config
-  (defun bpo-flush (proc)
-    (when (buffer-live-p (process-buffer proc))
-      (with-current-buffer (process-buffer proc)
-        (when-let (timer (process-get proc :timer))
-          (cancel-timer timer)
-          (process-put proc :timer nil))
-        (let ((inhibit-quit t)
-              (inhibit-read-only t)
-              (inhibit-modification-hooks t)
-              (queue (process-get proc :queue)))
-          (process-put proc :queue nil)
-          ;; By the time delayed filter is called, process may be dead.
-          (cl-letf (((symbol-function 'get-buffer-process)
-                     (lambda (&rest _) proc)))
-            (dolist (p (nreverse queue))
-              (funcall (car p) proc (cdr p))))))))
-  (defun bpo-enqueue (ofun proc o)
-    (when (buffer-live-p (process-buffer proc))
-      (with-current-buffer (process-buffer proc)
-        (process-put proc :queue (cons (cons ofun o) (process-get proc :queue)))
-        (unless (process-get proc :timer)
-          (process-put proc :timer (run-with-timer 0.2 nil #'bpo-flush proc))))))
-  (defun handle-process-buffered (proc)
-    (add-function :around (process-filter proc) #'bpo-enqueue)
-    (add-function :around (process-sentinel proc) #'bpo-enqueue))
-  (add-hook 'compilation-start-hook #'handle-process-buffered)
-  (add-hook 'compilation-filter-hook #'apply-xterm-color-filter)
-  (use-package xterm-color :ensure :functions xterm-color-filter)
-  (defun apply-xterm-color-filter ()
-    (let* ((proc (get-buffer-process (current-buffer)))
-           (end-marker (and proc (process-mark proc)))
-           (inhibit-redisplay t))
-      (save-excursion
-        (goto-char compilation-filter-start)
-        (while (re-search-forward (rx "\033[" (group (*? num)) (group (any "GADJK"))) end-marker t)
-          (let ((count (and (> (length (match-string 1)) 0) (string-to-number (match-string 1))))
-                (c (aref (match-string 2) 0)))
-            (delete-region (match-beginning 0) (point))
-            (cond ((= c ?G)
-                   (delete-region (pos-bol) (point)))
-                  ((= c ?A)
-                   (delete-region (pos-bol (- (1- (or count 1)))) (point)))
-                  ((= c ?D)
-                   (delete-region (- (point) (or count 1)) (point)))
-                  ((= c ?K)
-                   ;; 0 (or missing) -> point to eol
-                   ;; 1 -> bol to point
-                   ;; 2 -> bol to eol
-                   (unless (= 0 (or count 0))
-                     (delete-region (pos-bol) (point))))
-                  ((= c ?J)
-                   ;; 0 (or missing) -> point to end of screen
-                   ;; 1 -> beginning of screen to point
-                   ;; 2 -> entire screen
-                   ;; 3 -> entire screen & all lines in scollback buffer
-                   ))
-            (setq compilation-filter-start (min (point) compilation-filter-start))))
-        (goto-char compilation-filter-start)
-        (let* ((s (buffer-substring-no-properties compilation-filter-start end-marker))
-               (ns (ansi-color-apply (xterm-color-filter s))))
-          (if (string-equal s ns)
-              (goto-char end-marker)
-            (delete-region compilation-filter-start end-marker)
-            (insert ns)))
-        (set-marker end-marker (point)))))
   (defun do-kill-compilation (o &rest args)
     (when (and (called-interactively-p 'interactive)
-               (memq major-mode '(comint-mode compilation-mode))
+               (memq major-mode '(comint-mode compilation-mode eat-mode))
                (get-buffer-process (current-buffer)))
-      (kill-compilation))
+      (kill-compilation)
+      (while (get-buffer-process (current-buffer))
+        (sit-for .5)))
     (apply o args))
   (advice-add #'recompile :around #'do-kill-compilation)
   (defun get-idle-compilation--buffer-name (name-of-mode)
@@ -434,16 +368,7 @@
                                              (process-live-p (get-buffer-process b)))))
                          return (buffer-name b))
                 (generate-new-buffer-name name)))
-        name)))
-  (defun shell-toggle-compile-mode ()
-    (interactive)
-    (setq buffer-read-only t)
-    (compilation-mode))
-  (defun compilation-toggle-shell-mode ()
-    (interactive)
-    (setq buffer-read-only nil)
-    (shell-mode)
-    (bind-key [remap read-only-mode] #'shell-toggle-compile-mode (current-local-map))))
+        name))))
 (use-package consult
   :ensure
   :bind (("M-\"" . consult-register-load)
@@ -608,7 +533,43 @@
   :hook
   (eshell-load . (eat-eshell-mode eat-eshell-visual-command-mode))
   :custom
-  (eat-shell-prompt-annotation-position 'right-margin))
+  (eat-shell-prompt-annotation-position 'right-margin)
+  :config
+  (advice-add #'compilation-start :override #'eat-compilation-start)
+  (defun eat-compilation-start (command &optional mode name-function highlight-regexp continue)
+    (let ((name-of-mode "compilation")
+          (dir default-directory)
+          outbuf)
+      (if (or (not mode) (eq mode t))
+          (setq mode #'compilation-minor-mode)
+        (setq name-of-mode (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
+      (with-current-buffer
+          (setq outbuf
+                (get-buffer-create
+                 (compilation-buffer-name name-of-mode mode name-function)))
+        (setq default-directory dir)
+        (setq buffer-read-only nil)
+        (erase-buffer)
+        (compilation-insert-annotation
+         "-*- mode: " name-of-mode
+         "; default-directory: "
+         (prin1-to-string (abbreviate-file-name default-directory))
+         " -*-\n")
+        (compilation-insert-annotation
+         (format "%s started at %s\n\n"
+                 mode-name
+	         (substring (current-time-string) 0 19))
+         command "\n")
+        (eat-mode)
+        (eat-exec outbuf "*compile*" shell-file-name nil (list "-lc" command))
+        (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
+        (eat-emacs-mode)
+        (funcall mode)
+        (setq next-error-last-buffer outbuf)
+        (display-buffer outbuf '(nil (allow-no-window . t)))
+        (when-let (w (get-buffer-window outbuf))
+          (set-window-start w (point-min))))))
+  (advice-add #'compilation-start :override #'eat-compilation-start))
 (use-package ediff
   :bind ("C-=" . ediff-current-file)
   :custom
@@ -647,7 +608,6 @@
   :ensure
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package exec-path-from-shell
-  :disabled
   :if (memq window-system '(mac ns))
   :ensure
   :hook (after-init . exec-path-from-shell-initialize))
