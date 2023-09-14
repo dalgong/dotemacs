@@ -13,6 +13,4 @@
       (inhibit-message t))
   (load "~/.emacs.d/init" nil t)
   (load-theme 'modus-operandi t nil)
-  (if window-system
-      (use-package feebleline :ensure t :hook after-init)
-    (use-package mood-line :ensure t :hook after-init)))
+  (use-package mood-line :ensure t :hook after-init))
