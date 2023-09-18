@@ -546,7 +546,6 @@
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :config
-  (advice-add #'compilation-start :override #'eat-compilation-start)
   (defun eat-compilation-start (command &optional mode name-function highlight-regexp continue)
     (let ((name-of-mode "compilation")
           (dir default-directory)
