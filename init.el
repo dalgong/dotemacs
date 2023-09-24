@@ -546,6 +546,7 @@
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :config
+  (advice-add #'compilation-start :override #'eat-compilation-start)
   (defun eat-compilation-start (command &optional mode name-function highlight-regexp continue)
     (let ((name-of-mode "compilation")
           (dir default-directory)
@@ -578,8 +579,7 @@
              #'eat--eshell-synchronize-scroll)
         (funcall mode)
         (setq next-error-last-buffer outbuf)
-        (display-buffer outbuf '(nil (allow-no-window . t))))))
-  (advice-add #'compilation-start :override #'eat-compilation-start))
+        (display-buffer outbuf '(nil (allow-no-window . t)))))))
 (use-package ediff
   :bind ("C-=" . ediff-current-file)
   :custom
@@ -758,6 +758,21 @@
   :magic ("%PDF" . pdf-view-mode)
   :config
   (pdf-tools-install :no-query))
+(use-package popper
+  :ensure t ; or :straight t
+  :bind (("M-`"     . popper-toggle)
+         ("C-c M-`" . popper-toggle-type))
+  :custom
+  (popper-reference-buffers '("\\*Messages\\*" "Output\\*$" "\\*Async Shell Command\\*"
+                              compilation-mode grep-mode help-mode occur-mode))
+  :config
+  (popper-mode +1)
+  (popper-echo-mode +1)
+  (advice-add 'other-window :around #'maybe-popper-cycle)
+  (defun maybe-popper-cycle (o &rest args)
+    (if popper-open-popup-alist
+        (call-interactively 'popper-cycle)
+     (apply o args))))
 (use-package shell
   :disabled
   :bind (("C-`" . shell)
