@@ -1118,6 +1118,35 @@
      (let ((s (format-time-string "%m-%d %T\n")))
        (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
                s)))))
+(use-package shell
+  :disabled
+  :bind (("C-`" . shell)
+         :map comint-mode-map
+         ([C-up]   . nil)
+         ([C-down] . nil)
+         :map shell-mode-map
+         ("SPC" . comint-magic-space)
+         ("C-z" . comint-stop-subjob)
+         ("M-." . comint-insert-previous-argument))
+  :custom
+  (comint-input-ignoredups t)
+  :config
+  ;; fix comint bug
+  (advice-add #'comint-get-old-input-default :around 
+              (defun dont-move (o &rest args) (save-excursion (apply o args))))
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
+  (add-hook 'comint-input-filter-functions #'show-prompt-time)
+  (defun show-prompt-time (input)
+    (unless (string-match "^[ \t\n\r]+$" input)
+      (let ((s (format-time-string "%m/%d %T"))
+            (ov (make-overlay (pos-eol 0) (pos-eol 0))))
+        (overlay-put ov 'after-string
+                     (concat
+                      (propertize " "
+                                  'display
+                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
+                      (propertize s 'face 'font-lock-doc-face)))))))
+
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)

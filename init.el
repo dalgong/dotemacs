@@ -345,6 +345,7 @@
   (compilation-buffer-name-function #'get-idle-compilation--buffer-name)
   (compilation-save-buffers-predicate (lambda ()))
   :config
+  (advice-add #'compilation-start :override #'eat-compilation-start)
   (defun do-kill-compilation (o &rest args)
     (when (and (called-interactively-p 'interactive)
                (memq major-mode '(comint-mode compilation-mode eat-mode))
@@ -513,7 +514,13 @@
   :ensure
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
-  :init
+  :autoload eat-compilation-start
+  :bind (:map eat-mode-map ("M-;" . eat-toggle-char-mode))
+  :hook ((eshell-load . eat-eshell-mode)
+         (eshell-load . eat-eshell-visual-command-mode))
+  :custom
+  (eat-shell-prompt-annotation-position 'right-margin)
+  :config
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "M-o")  #'other-window)
     (define-key map (kbd "M-\"") #'consult-register-load)
@@ -538,14 +545,6 @@
            (apply o args)
            (buffer-string))))))
   (advice-add #'insert-for-yank :around #'eat-insert-for-yank)
-  :bind (("C-`" . eat)
-         :map eat-mode-map
-         ("M-;" . eat-toggle-char-mode))
-  :hook
-  (eshell-load . (eat-eshell-mode eat-eshell-visual-command-mode))
-  :custom
-  (eat-shell-prompt-annotation-position 'right-margin)
-  :config
   (advice-add #'compilation-start :override #'eat-compilation-start)
   (defun eat-compilation-start (command &optional mode name-function highlight-regexp continue)
     (let ((name-of-mode "compilation")
@@ -617,6 +616,33 @@
 (use-package embark-consult
   :ensure
   :hook (embark-collect-mode . consult-preview-at-point-mode))
+(use-package eshell
+  :commands eshell
+  :bind (("C-`"  . eshell)
+         :map eshell-mode-map
+         ([remap eshell-previous-matching-input] . consult-history))
+  :hook (eshell-pre-command . eshell-show-time)
+  :custom
+  (eshell-hist-ignoredups t)
+  :config
+  (use-package capf-autosuggest :ensure :hook eshell-mode)
+  (defun eshell-show-time ()
+    (eshell-interactive-print
+     (let ((s (format-time-string "%m-%d %T\n")))
+       (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
+               s))))
+  (advice-add 'eshell-list-history :override 'consult-history)
+  (defun eshell-expand-colon (b e)
+    (when (= (char-after b) ?:)
+      (let (s)
+        (goto-char b)
+        (while (re-search-forward "[^\\](\\\\|\')" e t)
+          (replace-match "\\\&" nil nil nil 1))
+        (setq s (substring (buffer-substring-no-properties b e) 2))
+        (delete-region b e)
+        (goto-char b)
+        (insert (format "bash -lc \'%s\'" s)))))
+  (add-to-list 'eshell-expand-input-functions #'eshell-expand-colon))
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
@@ -773,34 +799,6 @@
     (if popper-open-popup-alist
         (call-interactively 'popper-cycle)
      (apply o args))))
-(use-package shell
-  :disabled
-  :bind (("C-`" . shell)
-         :map comint-mode-map
-         ([C-up]   . nil)
-         ([C-down] . nil)
-         :map shell-mode-map
-         ("SPC" . comint-magic-space)
-         ("C-z" . comint-stop-subjob)
-         ("M-." . comint-insert-previous-argument))
-  :custom
-  (comint-input-ignoredups t)
-  :config
-  ;; fix comint bug
-  (advice-add #'comint-get-old-input-default :around 
-              (defun dont-move (o &rest args) (save-excursion (apply o args))))
-  (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
-  (add-hook 'comint-input-filter-functions #'show-prompt-time)
-  (defun show-prompt-time (input)
-    (unless (string-match "^[ \t\n\r]+$" input)
-      (let ((s (format-time-string "%m/%d %T"))
-            (ov (make-overlay (pos-eol 0) (pos-eol 0))))
-        (overlay-put ov 'after-string
-                     (concat
-                      (propertize " "
-                                  'display
-                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
-                      (propertize s 'face 'font-lock-doc-face)))))))
 (use-package smerge-mode
   :defer t
   :config
