@@ -345,7 +345,7 @@
   (compilation-buffer-name-function #'get-idle-compilation--buffer-name)
   (compilation-save-buffers-predicate (lambda ()))
   :config
-  (advice-add #'compilation-start :override #'eat-compilation-start)
+  (advice-add #'compilation-start :around #'maybe-eat-compilation-start)
   (defun do-kill-compilation (o &rest args)
     (when (and (called-interactively-p 'interactive)
                (memq major-mode '(comint-mode compilation-mode eat-mode))
@@ -379,6 +379,7 @@
          ("M-Y" . consult-imenu-multi)
          ("C-c h"   . consult-history)
          ("C-c b"   . consult-bookmark)
+         ("C-c g"   . grep)
          ("C-c k"   . consult-kmacro)
          ("C-x M-:" . consult-complex-command)
          ("C-x b"   . consult-buffer)
@@ -514,7 +515,7 @@
   :ensure
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
-  :autoload eat-compilation-start
+  :autoload maybe-eat-compilation-start
   :bind (:map eat-mode-map ("M-;" . eat-toggle-char-mode))
   :hook ((eshell-load . eat-eshell-mode)
          (eshell-load . eat-eshell-visual-command-mode))
@@ -545,7 +546,9 @@
            (apply o args)
            (buffer-string))))))
   (advice-add #'insert-for-yank :around #'eat-insert-for-yank)
-  (advice-add #'compilation-start :override #'eat-compilation-start)
+  (advice-add #'compilation-start :around #'maybe-eat-compilation-start)
+  (defun maybe-eat-compilation-start (o &rest args)
+    (apply (if (eq (cadr args) 'grep-mode) o #'eat-compilation-start) args))
   (defun eat-compilation-start (command &optional mode name-function highlight-regexp continue)
     (let ((name-of-mode "compilation")
           (dir default-directory)
@@ -568,7 +571,7 @@
         (compilation-insert-annotation
          (format "%s started at %s\n\n"
                  mode-name
-	         (substring (current-time-string) 0 19))
+                 (substring (current-time-string) 0 19))
          command "\n")
         (eat-mode)
         (eat-exec outbuf "*compile*" shell-file-name nil (list "-lc" command))
