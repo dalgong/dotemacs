@@ -516,18 +516,20 @@
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
   :autoload maybe-eat-compilation-start
-  :bind (:map eat-mode-map ("M-;" . eat-toggle-char-mode))
+  :bind (("C-`"  . eat)
+         :map eat-mode-map ("M-;" . eat-toggle-char-mode))
   :hook ((eshell-load . eat-eshell-mode)
          (eshell-load . eat-eshell-visual-command-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
-  :config
+  :init
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "M-o")  #'other-window)
     (define-key map (kbd "M-\"") #'consult-register-load)
     (define-key map (kbd "M-;")  #'eat-toggle-char-mode)
     map)
   (advice-add #'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
+  :config
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively (if eat--semi-char-mode
@@ -621,8 +623,7 @@
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
   :commands eshell
-  :bind (("C-`"  . eshell)
-         :map eshell-mode-map
+  :bind (:map eshell-mode-map
          ([remap eshell-previous-matching-input] . consult-history))
   :hook (eshell-pre-command . eshell-show-time)
   :custom
