@@ -536,12 +536,12 @@
                             'eat-emacs-mode
                           'eat-semi-char-mode)))
   (defun eat-insert-for-yank (o &rest args)
-    (if (null (ignore-errors eat--terminal))
+    (if (null (ignore-errors eat-terminal))
         (apply o args)
       (funcall eat--synchronize-scroll-function
                (eat--synchronize-scroll-windows 'force-selected))
       (eat-send-string-as-yank
-       eat--terminal
+       eat-terminal
        (let ((yank-hook (bound-and-true-p yank-transform-functions)))
          (with-temp-buffer
            (setq-local yank-transform-functions yank-hook)
