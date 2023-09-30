@@ -540,7 +540,7 @@
         (apply o args)
       (funcall eat--synchronize-scroll-function
                (eat--synchronize-scroll-windows 'force-selected))
-      (eat-send-string-as-yank
+      (eat-term-send-string-as-yank
        eat-terminal
        (let ((yank-hook (bound-and-true-p yank-transform-functions)))
          (with-temp-buffer
@@ -622,6 +622,7 @@
   :ensure
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package eshell
+  :disabled
   :commands eshell
   :bind (:map eshell-mode-map
          ([remap eshell-previous-matching-input] . consult-history))
@@ -669,7 +670,7 @@
     :load-path "~/work/hermes"
     :bind ("C-c v" . hermes)))
 (use-package hl-line
-  :hook (prog-mode conf-mode compilation-mode text-mode))
+  :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package ibuffer
   :bind ([remap list-buffers] . ibuffer))
 (use-package iedit
