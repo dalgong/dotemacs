@@ -789,24 +789,14 @@
   :magic ("%PDF" . pdf-view-mode)
   :config
   (pdf-tools-install :no-query))
-(use-package popper
-  :ensure t ; or :straight t
-  :bind (("M-`"     . popper-toggle)
-         ("C-c M-`" . popper-toggle-type))
-  :custom
-  (popper-reference-buffers '("\\*Messages\\*" "Output\\*$" "\\*Async Shell Command\\*"
-                              compilation-mode grep-mode help-mode occur-mode))
-  :config
-  (popper-mode +1)
-  (popper-echo-mode +1)
-  (advice-add 'other-window :around #'maybe-popper-cycle)
-  (defun maybe-popper-cycle (o &rest args)
-    (if popper-open-popup-alist
-        (call-interactively 'popper-cycle)
-     (apply o args))))
 (use-package smerge-mode
-  :defer t
+  :hook (find-file . sm-try-smerge)
   :config
+  (defun sm-try-smerge ()
+    (save-excursion
+      (goto-char (point-min))
+      (when (re-search-forward "^<<<<<<< " nil t)
+  	(smerge-mode 1))))
   (when (require 'transient nil t)
     (transient-define-prefix smerge-dispatch ()
       "Invoke an SMerge command from a list of available commands."
