@@ -393,6 +393,7 @@
 
          ([remap Info-search] . consult-info)
          :map help-map
+         ("C-i"   . consult-info)
          ("C-m"   . consult-man)
          ("SPC"   . consult-mark)
          ("C-SPC" . consult-global-mark)
