@@ -735,28 +735,6 @@
   (org-startup-indented t)
   (org-use-speed-commands t)
   :config
-  (defvar my-emacs-lisp-params nil)
-  (advice-add #'org-babel-execute:emacs-lisp :around
-    (defun save-my-emacs-lisp-params (o body params)
-      (funcall o body (setq my-emacs-lisp-params params))))
-  ;; #+NAME: embed
-  ;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
-  ;;   (require 'ob-compile nil t)
-  ;;   (save-excursion
-  ;;     (org-babel-goto-named-src-block block-name)
-  ;;     (setq datum (org-element-at-point))
-  ;;     t)
-  ;;   (setq info (org-babel-get-src-block-info nil datum))
-  ;;   (cl-callf org-babel-merge-params my-emacs-lisp-params)
-  ;;   (cl-callf org-babel-process-params (nth 2 info))
-  ;;   (setq lang (nth 0 info))
-  ;;   (setq body (org-babel-expand-src-block nil info))
-  ;;   (format "%s" body)
-  ;; #+END_SRC
-  ;;
-  ;; #+begin_src compile :noweb yes
-  ;; <<embed("name", arg1="...", arg2="...", ...)>>
-  ;; #+end_src
   (require 'org-tempo nil t)
   (use-package ob-async :ensure)
   (use-package ob-compile)

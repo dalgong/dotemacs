@@ -1,18 +1,3 @@
-;; A simple org babel for compile
-;; #+NAME: embed
-;; #+BEGIN_SRC elisp :var block-name="" :var datum="" :var info="" :var lang="" :var body="" :exports none
-;;   (save-excursion
-;;     (org-babel-goto-named-src-block block-name)
-;;     (setq datum (org-element-at-point))
-;;     t)
-;;   (setq info (org-babel-get-src-block-info nil datum))
-;;   (cl-callf org-babel-merge-params (nth 2 info) params)
-;;   (cl-callf org-babel-process-params (nth 2 info))
-;;   (setq lang (nth 0 info))
-;;   (setq body (org-babel-expand-src-block nil info))
-;;   (format "%s" body)
-;; #+END_SRC
-
 (require 'ob)
 
 (defvar org-babel-default-header-args:compile
@@ -22,22 +7,33 @@
 (defvar org-babel-execute:default-directory nil)
 (defvar org-babel-execute:compile-dir-expander nil)
 
-(defun org-babel-expand-body:compile (body params)
-  "Expand BODY according to PARAMS, return the expanded body."
-  (let ((vars (org-babel--get-vars params)))
-    (mapc
-     (lambda (pair)
-       (let ((name (symbol-name (car pair)))
-             (value (cdr pair)))
-         (setq body
-               (replace-regexp-in-string
-                (concat "$" (regexp-quote name))
-                (if (stringp value) value (format "%S" value))
-                body
-                t
-                t))))
-     vars)
-    body))
+(defvar org-babel--expand-body-inside-expansion nil)
+(advice-add 'org-babel--expand-body :around #'org-babel--expand-body-indicate-recursion)
+(defun org-babel--expand-body-indicate-recursion (o &rest args)
+  (let ((ov org-babel--expand-body-inside-expansion))
+    (setq org-babel--expand-body-inside-expansion t)
+    (unwind-protect
+        (apply o args)
+      (setq org-babel--expand-body-inside-expansion ov))))
+
+(defun org-babel-execute:compile (body params)
+  (let* ((command (org-babel-expand-body:compile body params))
+         (dir (or (cdr (assq :dir params))
+                  org-babel-execute:default-directory
+                  (read-string "directory to run: ")))
+         (default-directory (or (and org-babel-execute:compile-dir-expander
+                                     (funcall org-babel-execute:compile-dir-expander dir))
+                                (and (string-match "^/" dir)
+                                     dir)
+                                (cl-loop for d in (split-string (or (getenv "CDPATH") "") ":" t)
+                                         for path = (concat d "/" dir "/")
+                                         if (file-directory-p path)
+                                         return path)
+                                dir)))
+    (if org-babel--expand-body-inside-expansion
+        command
+      (compile command)
+      nil)))
 
 (defun org-babel-execute:compile (body params)
   (let* ((command (org-babel-expand-body:compile body params))
