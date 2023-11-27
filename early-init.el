@@ -1,10 +1,18 @@
 ;; -*- lexical-binding: t -*-
 (unless noninteractive
+  (setq native-comp-speed 2
+        comp-speed 2)
+  (setq native-comp-async-report-warnings-errors nil
+        comp-async-report-warnings-errors nil)
+  (setq native-comp-async-query-on-exit t
+        comp-async-query-on-exit t)
+  (setq gc-cons-threshold most-positive-fixnum)
   (setq site-run-file nil)
   (menu-bar-mode -1)
   (line-number-mode -1)
   (tooltip-mode -1)
   (setq widget-image-enable nil)
+  (setq frame-inhibit-implied-resize t)
   (setq load-prefer-newer t)
   (setq default-frame-alist '((menu-bar-lines . 0)
                               (tool-bar-lines . 0)

@@ -531,6 +531,14 @@
     map)
   (advice-add #'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
   :config
+  (advice-add 'eat--pre-cmd :after #'bash-show-time)
+  (defun bash-show-time (&rest _)
+    (let* ((s (format-time-string "%m-%d %T")))
+      (save-excursion
+        (goto-char (- (point) 1))
+        (insert (propertize " "
+                            'display `(space :align-to (- right-fringe ,(1+ (length s)))))
+                (propertize " " 'display s)))))
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively (if eat--semi-char-mode

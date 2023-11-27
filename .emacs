@@ -1,5 +1,3 @@
-(setq gc-cons-threshold #x80000000
-      garbage-collection-messages t)
 (setq elfeed-feeds
       '("https://xkcd.com/rss.xml"
         "https://nullprogram.com/feed/"
