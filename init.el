@@ -494,6 +494,10 @@
     (cl-rotatef consult--preview-function
                 (plist-get (symbol-plist 'consult--preview-function)
                            (current-buffer)))))
+(use-package coterm
+  :ensure
+  :hook after-init
+  :bind (:map comint-mode-map ("M-;" . coterm-char-mode-cycle)))
 (use-package diffview
   :ensure
   :after diff-mode
@@ -516,8 +520,7 @@
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
   :autoload maybe-eat-compilation-start
-  :bind (("C-`"  . eat)
-         :map eat-mode-map ("M-;" . eat-toggle-char-mode))
+  :bind ( :map eat-mode-map ("M-;" . eat-toggle-char-mode))
   :hook ((eshell-load . eat-eshell-mode)
          (eshell-load . eat-eshell-visual-command-mode))
   :custom
@@ -532,12 +535,16 @@
   :config
   (advice-add 'eat--pre-cmd :after #'bash-show-time)
   (defun bash-show-time (&rest _)
-    (let* ((s (format-time-string "%m-%d %T")))
+    (let* ((s (format-time-string "%m-%d %T"))
+           ov)
       (save-excursion
-        (goto-char (- (point) 1))
-        (insert (propertize " "
-                            'display `(space :align-to (- right-fringe ,(1+ (length s)))))
-                (propertize " " 'display s)))))
+        (setq ov (make-overlay (pos-eol 0) (pos-eol 0)))
+        (overlay-put ov 'after-string
+                     (concat
+                      (propertize " "
+                                  'display
+                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
+                      (propertize s 'face 'font-lock-doc-face))))))
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively (if eat--semi-char-mode
@@ -612,6 +619,7 @@
   :ensure
   :commands (embark-act embark-prefix-help-command)
   :bind (("M-SPC" . embark-act)
+         ("M-M"   . embark-act)
          ("M-."   . embark-dwim)
          ("<f12>" . embark-dwim)
          :map minibuffer-local-map
@@ -775,6 +783,30 @@
   :magic ("%PDF" . pdf-view-mode)
   :config
   (pdf-tools-install :no-query))
+(use-package shell
+  :bind (("C-`" . shell)
+         :map comint-mode-map
+         ([C-up]   . nil)
+         ([C-down] . nil)
+         :map shell-mode-map
+         ("SPC" . comint-magic-space)
+         ("C-z" . comint-stop-subjob)
+         ("M-." . comint-insert-previous-argument))
+  :custom
+  (comint-input-ignoredups t)
+  :config
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
+  (add-hook 'comint-input-filter-functions #'show-prompt-time)
+  (defun show-prompt-time (input)
+    (unless (string-match "^[ \t\n\r]+$" input)
+      (let ((s (format-time-string "%m-%d %T"))
+            (ov (make-overlay (pos-eol 0) (pos-eol 0))))
+        (overlay-put ov 'after-string
+                     (concat
+                      (propertize " "
+                                  'display
+                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
+                      (propertize s 'face 'font-lock-doc-face)))))))
 (use-package smerge-mode
   :hook (find-file . sm-try-smerge)
   :config
@@ -833,6 +865,13 @@
   (vertico-count-format nil)
   :config
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
+  (setq completion-in-region-function
+        (lambda (&rest args)
+          (apply (if vertico-mode
+                     #'consult-completion-in-region
+                   #'completion--in-region)
+                 args)))
   (defun vertico-restrict-to-matches ()
     (interactive)
     (let ((inhibit-read-only t))
