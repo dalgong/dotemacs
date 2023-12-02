@@ -283,8 +283,7 @@
                           (lambda () (outline-next-visible-heading 1))))))
 (use-package avy
   :ensure
-  :bind (("C-'"       . avy-goto-char-timer)
-         ("C-c C-SPC" . avy-goto-char-timer))
+  :bind (("M-F" . avy-goto-char-timer))
   :config
   (avy-setup-default)
   (advice-add 'avy-goto-char-timer :around
