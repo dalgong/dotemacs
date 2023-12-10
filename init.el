@@ -15,6 +15,12 @@
   (require 'bind-key nil t)
   (require 'use-package nil t))
 
+(eval-and-compile
+  (defmacro fix-missing-args (n)
+    `(lambda (o &rest args)
+       (when (> (length args) ,n)
+         (setf (nthcdr ,n args) nil))
+       (apply o args))))
 (use-package emacs
   :bind (([C-tab]              . other-window)
          ([C-up]               . windmove-up)
@@ -431,6 +437,7 @@
          ("M-L" . consult-line-multi))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
+  (register-use-preview nil)
   (register-preview-delay 0.5)
   (register-preview-function #'consult-register-format)
   (consult-preview-key 'any)
@@ -438,6 +445,13 @@
   (xref-show-xrefs-function #'consult-xref)
   (xref-show-definitions-function #'consult-xref)
   :config
+  ;; fix the disaster
+  (cl-defmethod register-command-info ((_command (eql consult-register-load)))
+    (make-register-preview-info
+     :types '(all)
+     :msg "View register `%s'"
+     :act 'view
+     :smatch t))
   (defvar string-width #'string-width nil)
   (advice-add 'kill-line :around #'consult-kill-line-dwim)
   (defun consult-kill-line-dwim (o &rest args)
@@ -480,6 +494,7 @@
         (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
             (concat r (match-string 1 s))
           r))))
+  (advice-add #'consult-register-window :around (fix-missing-args 2))
   (advice-add #'register-preview :override #'consult-register-window)
   (advice-add #'consult-imenu :around
               (defun consult-imenu-across-all-buffers (o &rest args)
@@ -536,15 +551,14 @@
   (advice-add 'eat--pre-cmd :after #'bash-show-time)
   (defun bash-show-time (&rest _)
     (let* ((s (format-time-string "%m-%d %T"))
-           ov)
-      (save-excursion
-        (setq ov (make-overlay (pos-eol 0) (pos-eol 0)))
-        (overlay-put ov 'after-string
-                     (concat
-                      (propertize " "
-                                  'display
-                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
-                      (propertize s 'face 'font-lock-doc-face))))))
+           (ov (make-overlay (1- (pos-eol 0)) (pos-eol 0))))
+      (overlay-put ov 'evaporate t)
+      (overlay-put ov 'after-string
+                   (concat
+                    (propertize " "
+                                'display
+                                `(space :align-to (- right-fringe ,(+ 1 (length s)))))
+                    (propertize s 'face 'font-lock-doc-face)))))
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively (if eat--semi-char-mode
@@ -761,11 +775,7 @@
         (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages)))
     (apply o args))
   (advice-add 'org-babel-execute-src-block :around #'lazy-load-org-babel-languages)
-  (defun fix-missing-args (o &rest args)
-    (when (> (length args) 4)
-      (setf (nthcdr 4 args) nil))
-    (apply o args))
-  (advice-add #'ob-async-org-babel-execute-src-block :around #'fix-missing-args))
+  (advice-add #'ob-async-org-babel-execute-src-block :around (fix-missing-args 4)))
 (use-package outline-magic
   :ensure
   :bind (("<backtab>" . outline-cycle)))
