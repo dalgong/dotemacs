@@ -34,11 +34,11 @@
          ("C-,"                . previous-error)
          ("M-o"                . other-window)
          ("RET"                . newline-and-indent)
-         ("M-H"                . ff-find-other-file)
-         ("M-K"                . kill-this-buffer)
+         ("M-J"                . next-buffer)
+         ("M-K"                . previous-buffer)
          ("M-n"                . forward-paragraph)
          ("M-p"                . backward-paragraph)
-         ("C-x O"              . ff-find-other-file)
+         ("C-x f"              . ff-find-other-file)
          ("C-c 0"              . recursive-edit)
          ("C-c SPC"            . cycle-spacing)
          ("C-c q"              . [C-tab 24 48])
@@ -437,7 +437,6 @@
          ("M-L" . consult-line-multi))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
-  (register-use-preview nil)
   (register-preview-delay 0.5)
   (register-preview-function #'consult-register-format)
   (consult-preview-key 'any)
@@ -445,13 +444,6 @@
   (xref-show-xrefs-function #'consult-xref)
   (xref-show-definitions-function #'consult-xref)
   :config
-  ;; fix the disaster
-  (cl-defmethod register-command-info ((_command (eql consult-register-load)))
-    (make-register-preview-info
-     :types '(all)
-     :msg "View register `%s'"
-     :act 'view
-     :smatch t))
   (defvar string-width #'string-width nil)
   (advice-add 'kill-line :around #'consult-kill-line-dwim)
   (defun consult-kill-line-dwim (o &rest args)
@@ -494,7 +486,6 @@
         (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
             (concat r (match-string 1 s))
           r))))
-  (advice-add #'consult-register-window :around (fix-missing-args 2))
   (advice-add #'register-preview :override #'consult-register-window)
   (advice-add #'consult-imenu :around
               (defun consult-imenu-across-all-buffers (o &rest args)
@@ -611,6 +602,7 @@
         (set (make-variable-buffer-local 'eat--synchronize-scroll-function)
              #'eat--eshell-synchronize-scroll)
         (funcall mode)
+        (setq-local compile-command command)
         (setq next-error-last-buffer outbuf)
         (display-buffer outbuf '(nil (allow-no-window . t)))))))
 (use-package ediff
