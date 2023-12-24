@@ -1117,7 +1117,18 @@
     (eshell-interactive-print
      (let ((s (format-time-string "%m-%d %T\n")))
        (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
-               s)))))
+               s))))
+  (defun eshell-expand-colon (b e)
+    (when (= (char-after b) ?:)
+      (let (s)
+        (goto-char b)
+        (while (re-search-forward "[^\\](\\\\|\')" e t)
+          (replace-match "\\\&" nil nil nil 1))
+        (setq s (substring (buffer-substring-no-properties b e) 2))
+        (delete-region b e)
+        (goto-char b)
+        (insert (format "bash -lc \'%s\'" s)))))
+  (add-to-list 'eshell-expand-input-functions #'eshell-expand-colon))
 (use-package shell
   :disabled
   :bind (("C-`" . shell)

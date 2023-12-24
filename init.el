@@ -3,10 +3,11 @@
 (advice-add #'custom-save-all :override #'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
-(nconc after-init-hook
+(setq after-init-hook
+      (nconc after-init-hook
        '(delete-selection-mode electric-pair-mode
          global-reveal-mode minibuffer-depth-indicate-mode repeat-mode
-         recentf-mode savehist-mode save-place-mode))
+         recentf-mode savehist-mode save-place-mode)))
 
 (setq use-package-expand-minimally t)
 (when (require 'package nil t)
@@ -383,7 +384,6 @@
          ("M-'"  . consult-register-store)
          ([remap yank-pop] . consult-yank-pop)
          ("M-T" . consult-imenu)
-         ("M-Y" . consult-imenu-multi)
          ("C-c h"   . consult-history)
          ("C-c g"   . grep)
          ("C-c k"   . consult-kmacro)
@@ -418,7 +418,6 @@
          ("SPC" . consult-mark)
          ("x"   . consult-global-mark)
          ("o"   . consult-outline)
-         ("I"   . consult-imenu-multi)
          :map search-map
          ("d"   . consult-find)
          ("e"   . consult-isearch-history)
@@ -434,7 +433,7 @@
          ("u"   . consult-focus-lines)
          :map isearch-mode-map
          ("M-s" . isearch-query-replace)
-         ("M-e" . consult-isearch-history)
+         ("M-h" . consult-isearch-history)
          ("M-l" . consult-line)
          ("M-L" . consult-line-multi))
   :hook (completion-list-mode . consult-preview-at-point-mode)
@@ -502,10 +501,7 @@
     (cl-rotatef consult--preview-function
                 (plist-get (symbol-plist 'consult--preview-function)
                            (current-buffer)))))
-(use-package coterm
-  :ensure
-  :hook after-init
-  :bind (:map comint-mode-map ("M-;" . coterm-char-mode-cycle)))
+(use-package coterm :ensure :hook after-init)
 (use-package diffview
   :ensure
   :after diff-mode
@@ -608,7 +604,7 @@
         (setq next-error-last-buffer outbuf)
         (display-buffer outbuf '(nil (allow-no-window . t)))))))
 (use-package ediff
-  :bind ("C-=" . ediff-current-file)
+  :bind (:map goto-map ("=" . ediff-current-file))
   :custom
   (diff-switches "-wu")
   (ediff-diff-options "-w")
@@ -626,10 +622,7 @@
 (use-package embark
   :ensure
   :commands (embark-act embark-prefix-help-command)
-  :bind (("M-SPC" . embark-act)
-         ("M-M"   . embark-act)
-         ("M-."   . embark-dwim)
-         ("<f12>" . embark-dwim)
+  :bind (("M-."   . embark-dwim)
          :map minibuffer-local-map
          ("M-E"   . embark-export)
          ("M-L"   . embark-live)
@@ -645,44 +638,10 @@
 (use-package embark-consult
   :ensure
   :hook (embark-collect-mode . consult-preview-at-point-mode))
-(use-package eshell
-  :disabled
-  :commands eshell
-  :bind (:map eshell-mode-map
-         ([remap eshell-previous-matching-input] . consult-history))
-  :hook (eshell-pre-command . eshell-show-time)
-  :custom
-  (eshell-hist-ignoredups t)
-  :config
-  (use-package capf-autosuggest :ensure :hook eshell-mode)
-  (defun eshell-show-time ()
-    (eshell-interactive-print
-     (let ((s (format-time-string "%m-%d %T\n")))
-       (concat (propertize " " 'display `(space :align-to (- right-fringe ,(length s))))
-               s))))
-  (advice-add 'eshell-list-history :override 'consult-history)
-  (defun eshell-expand-colon (b e)
-    (when (= (char-after b) ?:)
-      (let (s)
-        (goto-char b)
-        (while (re-search-forward "[^\\](\\\\|\')" e t)
-          (replace-match "\\\&" nil nil nil 1))
-        (setq s (substring (buffer-substring-no-properties b e) 2))
-        (delete-region b e)
-        (goto-char b)
-        (insert (format "bash -lc \'%s\'" s)))))
-  (add-to-list 'eshell-expand-input-functions #'eshell-expand-colon))
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :ensure
   :hook (after-init . exec-path-from-shell-initialize))
-(use-package fussy
-  :ensure
-  :config
-  (push 'fussy completion-styles)
-  (with-eval-after-load 'eglot
-    (add-to-list 'completion-category-overrides
-                 '(eglot (styles fussy basic)))))
 (use-package gcmh
   :ensure
   :hook after-init)
@@ -700,7 +659,7 @@
 (use-package iedit
   :ensure
   :bind (("C-c E" . iedit-mode)
-         ("M-s E" . iedit-mode-from-isearch)))
+         :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package isearch
   :hook (isearch-mode . search-for-region)
   :config
