@@ -21,11 +21,10 @@
                               (left-fringe      . 0)
                               (right-fringe     . 0)
                               (ns-transparent-titlebar . t)
-                              ;; (undecorated . t)
+                              (undecorated . t)
                               (internal-border-width . 8)
                               (wait-for-wm      . nil)))
-  (when (string-match "linux" system-configuration)
-    (push '(font . "Fira Code Light-11") default-frame-alist))
+  (push '(font . "Cascadia Code-12") default-frame-alist)
   ;; (custom-set-faces '(mode-line          ((t :inverse-video t :style nil))))
   (set-face-attribute 'mode-line nil :box nil :overline nil :underline nil)
   (when nil

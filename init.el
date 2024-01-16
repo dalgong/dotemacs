@@ -431,9 +431,9 @@
          ("k"   . consult-keep-lines)
          ("r"   . consult-ripgrep)
          ("M-r" . consult-ripgrep)
+         ("M-s" . isearch-query-replace)
          ("u"   . consult-focus-lines)
          :map isearch-mode-map
-         ("M-s" . isearch-query-replace)
          ("M-h" . consult-isearch-history)
          ("M-l" . consult-line)
          ("M-L" . consult-line-multi))
@@ -525,10 +525,12 @@
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
   :autoload maybe-eat-compilation-start
-  :bind ( :map eat-mode-map ("M-;" . eat-toggle-char-mode))
+  :bind (("C-`" . eat)
+         :map eat-mode-map ("M-;" . eat-toggle-char-mode))
   :hook ((eshell-load . eat-eshell-mode)
          (eshell-load . eat-eshell-visual-command-mode))
   :custom
+  (eat-enable-auto-line-mode t)
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
@@ -748,6 +750,7 @@
   :config
   (pdf-tools-install :no-query))
 (use-package shell
+  :disabled
   :bind (("C-`" . shell)
          :map comint-mode-map
          ([C-up]   . nil)
