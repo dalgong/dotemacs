@@ -24,7 +24,7 @@
                               (undecorated . t)
                               (internal-border-width . 8)
                               (wait-for-wm      . nil)))
-  (push '(font . "Cascadia Code-12") default-frame-alist)
+  (push `(font . ,(if (eq system-type 'gnu/linux) "Go Mono-11" "Go Mono-12")) default-frame-alist)
   ;; (custom-set-faces '(mode-line          ((t :inverse-video t :style nil))))
   (set-face-attribute 'mode-line nil :box nil :overline nil :underline nil)
   (when nil
