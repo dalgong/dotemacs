@@ -493,7 +493,7 @@
         (funcall mode)
         (setq-local compilation-directory dir)
         (setq-local compile-command command)
-        (setq-local compilation-arguments (list command mode name-function))
+        (setq-local compilation-arguments (list command (if (eq mode 'compilation-minor-mode) nil mode) name-function))
         (setq-local revert-buffer-function 'compilation-revert-buffer)
         (setq next-error-last-buffer outbuf)
         (display-buffer outbuf '(nil (allow-no-window . t)))))))
