@@ -18,6 +18,7 @@
        (when (> (length args) ,n)
          (setf (nthcdr ,n args) nil))
        (apply o args))))
+(use-package delight)
 (use-package emacs
   :bind (([C-tab]              . other-window)
          ([remap suspend-frame]. ignore)
@@ -28,6 +29,7 @@
          ("M-K"                . kill-this-buffer)
          ("M-n"                . forward-paragraph)
          ("M-p"                . backward-paragraph)
+         ("C-c C-0"            . recursive-edit)
          ("C-c 0"              . recursive-edit)
          ("C-c c"              . calendar)
          ("C-c SPC"            . cycle-spacing)
@@ -35,6 +37,9 @@
          ("C-h E"              . erase-buffer)
          ("C-h C-b"            . describe-personal-keybindings)
          ("C-h C-o"            . proced))
+  :delight
+  (auto-revert-mode)
+  (eldoc-mode)
   :custom
   (async-shell-command-buffer 'rename-buffer)
   (async-shell-command-display-buffer nil)
@@ -183,7 +188,9 @@
   (advice-add 'list-buffers :after #'call-other-window-if-interactive)
   (defun switch-to-last-buffer-if-one-window (o &rest args)
     (if (and (one-window-p 'nomini) (called-interactively-p 'interactive))
-        (switch-to-buffer nil)
+        (if (= 1 (length (frame-list)))
+            (switch-to-buffer nil)
+          (other-frame 1))
       (apply o args)))
   (advice-add 'other-window :around #'switch-to-last-buffer-if-one-window)
   (defun get-current-active-selection ()
@@ -271,6 +278,7 @@
   :config
   (push (cons 'c++-ts-mode (cdr (assq 'c++-mode beardbolt-languages))) beardbolt-languages))
 (use-package company
+  :delight
   :hook (prog-mode text-mode)
   :bind (("C-c /" . company-manual-begin)
          :map company-active-map
@@ -531,6 +539,7 @@
   :if (memq window-system '(mac ns))
   :hook (after-init . exec-path-from-shell-initialize))
 (use-package gcmh
+  :delight
   :hook after-init)
 (use-package go-mode
   :hook (go-mode . eglot-ensure))
@@ -615,7 +624,7 @@
 (use-package treesit-auto
   :if (and (fboundp 'treesit-available-p) (treesit-available-p))
   :hook ((after-init . global-treesit-auto-mode)
-         (c++-ts-mode . fix-forward-sexp-function))
+         (prog-mode . fix-forward-sexp-function))
   :custom
   (treesit-font-lock-level 4)
   :config
