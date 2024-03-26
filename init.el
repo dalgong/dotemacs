@@ -538,6 +538,14 @@
 (use-package exec-path-from-shell
   :if (memq window-system '(mac ns))
   :hook (after-init . exec-path-from-shell-initialize))
+(use-package expreg
+  :bind
+  (("C-c +" . expreg-expand)
+   ("C-c =" . expreg-expand)
+   :repeat-map expreg-repeat-map
+   ("+" . expreg-expand)
+   ("=" . expreg-expand)
+   ("-" . expreg-contract)))
 (use-package gcmh
   :delight
   :hook after-init)
