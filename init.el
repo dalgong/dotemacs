@@ -351,9 +351,10 @@
          ("M-r"   . consult-history)
 
          :map goto-map
+         ("d"   . consult-imenu)
          ("e"   . consult-compile-error)
          ("f"   . consult-flymake)
-         ("M-g" . consult-goto-line)
+         ("l"   . consult-line)
          ("o"   . consult-outline)
 
          :map search-map
@@ -392,6 +393,12 @@
         (call-interactively 'consult-imenu-multi)
       (apply o args)))
   (advice-add 'consult-imenu :around #'consult-imenu-across-all-buffers)
+  (defun goto-line-with-number ()
+    (interactive)
+    (setq unread-command-events (cons last-command-event unread-command-events))
+    (call-interactively 'goto-line))
+  (dotimes (i 10)
+    (define-key goto-map (format "%d" i) 'goto-line-with-number))
   (defun consult-toggle-preview ()
     "Command to enable/disable preview."
     (interactive)
