@@ -435,7 +435,7 @@
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
   :autoload maybe-eat-compilation-start
-  :bind (("C-`" . eat) :map eat-mode-map ("M-;" . eat-toggle-char-mode))
+  :bind (("C-`" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :hook ((eshell-load . eat-eshell-mode)
          (eshell-load . eat-eshell-visual-command-mode))
   :custom
@@ -445,21 +445,10 @@
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "M-o")  #'avy-goto-char-timer)
     (define-key map (kbd "M-\"") #'consult-register-load)
-    (define-key map (kbd "M-;")  #'eat-toggle-char-mode)
+    (define-key map (kbd "C-z")  #'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
   :config
-  (defun bash-show-time (&rest _)
-    (let* ((s (format-time-string "%m-%d %T"))
-           (ov (make-overlay (1- (pos-eol 0)) (pos-eol 0))))
-      (overlay-put ov 'evaporate t)
-      (overlay-put ov 'after-string
-                   (concat
-                    (propertize " "
-                                'display
-                                `(space :align-to (- right-fringe ,(+ 1 (length s)))))
-                    (propertize s 'face 'font-lock-doc-face)))))
-  (advice-add 'eat--pre-cmd :after #'bash-show-time)
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively (if eat--semi-char-mode

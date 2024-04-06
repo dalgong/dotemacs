@@ -1147,16 +1147,19 @@
               (defun dont-move (o &rest args) (save-excursion (apply o args))))
   (add-hook 'comint-output-filter-functions #'comint-osc-process-output)
   (add-hook 'comint-input-filter-functions #'show-prompt-time)
-  (defun show-prompt-time (input)
-    (unless (string-match "^[ \t\n\r]+$" input)
-      (let ((s (format-time-string "%m/%d %T"))
-            (ov (make-overlay (pos-eol 0) (pos-eol 0))))
-        (overlay-put ov 'after-string
-                     (concat
-                      (propertize " "
-                                  'display
-                                  `(space :align-to (- right-fringe ,(+ 1 (length s)))))
-                      (propertize s 'face 'font-lock-doc-face)))))))
+  (defun bash-show-time (&rest _)
+    (let* ((s (format-time-string "%m-%d %T"))
+           (ov (make-overlay (1- (pos-eol 0)) (pos-eol 0))))
+      (overlay-put ov 'evaporate t)
+      (overlay-put ov 'after-string
+                   (concat
+                    (propertize " "
+                                'display
+                                `(space :align-to (- right-fringe ,(+ 1 (length s)))))
+                    (propertize s 'face 'font-lock-doc-face)))))
+  ;; for eat
+  ;; (advice-add 'eat--pre-cmd :after #'bash-show-time)
+  )
 
 (use-package tempel
   :ensure
