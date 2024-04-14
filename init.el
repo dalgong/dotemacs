@@ -1,10 +1,11 @@
 ;; -*- lexical-binding: t -*-
 (setq custom-file "/dev/null")
-(advice-add 'custom-save-all :override #'ignore)
+(advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
 (dolist (x '( delete-selection-mode electric-pair-mode global-reveal-mode
-              minibuffer-depth-indicate-mode repeat-mode recentf-mode savehist-mode save-place-mode))
+              minibuffer-depth-indicate-mode repeat-mode
+              recentf-mode savehist-mode save-place-mode))
   (add-to-list 'after-init-hook x))
 
 (setq use-package-always-ensure t)
@@ -12,29 +13,18 @@
   (nconc package-archives '(("melpa"  . "http://melpa.org/packages/")
                             ("org"    . "http://orgmode.org/elpa/"))))
 
-(eval-and-compile
-  (defmacro fix-missing-args (n)
-    `(lambda (o &rest args)
-       (when (> (length args) ,n)
-         (setf (nthcdr ,n args) nil))
-       (apply o args))))
 (use-package delight)
 (use-package emacs
   :bind (([C-tab]              . other-window)
          ([remap suspend-frame]. ignore)
          ([remap kill-buffer]  . kill-this-buffer)
-         ("C-TAB"              . other-window)
+         ([remap list-buffers] . ibuffer)
+         ([remap delete-horizontal-space] . cycle-spacing)
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-this-buffer)
-         ("M-n"                . forward-paragraph)
-         ("M-p"                . backward-paragraph)
-         ("C-c C-0"            . recursive-edit)
-         ("C-c 0"              . recursive-edit)
+         ("C-z"                . recursive-edit)
          ("C-c c"              . calendar)
-         ("C-c SPC"            . cycle-spacing)
-         ("C-h D"              . toggle-debug-on-error)
-         ("C-h E"              . erase-buffer)
          ("C-h C-b"            . describe-personal-keybindings)
          ("C-h C-o"            . proced))
   :delight
@@ -115,6 +105,7 @@
   (remote-file-name-inhibit-locks t)
   (require-final-newline t)
   (revert-without-query '(""))
+  (ring-bell-function 'ignore)
   (save-interprogram-paste-before-kill t)
   (scroll-preserve-screen-position t)
   (scroll-margin 0)
@@ -144,12 +135,18 @@
   (x-selection-timeout 100)
   (words-include-escapes t)
   :config
+  (defun goto-line-with-number ()
+    (interactive)
+    (setq unread-command-events (cons last-command-event unread-command-events))
+    (call-interactively 'goto-line))
+  (dotimes (i 10)
+    (define-key goto-map (format "%d" i) 'goto-line-with-number))
   (defun search-for-region ()
     (when-let (s (get-current-active-selection))
       (isearch-yank-string s)
       (deactivate-mark)
       (isearch-repeat (if isearch-forward 'forward 'backward))))
-  (add-hook 'isearch-mode-hook #'search-for-region)
+  (add-hook 'isearch-mode-hook 'search-for-region)
   (windmove-default-keybindings 'control)
   (set-display-table-slot (or standard-display-table (setq standard-display-table (make-display-table)))
                           'vertical-border (make-glyph-code ?┃))
@@ -158,8 +155,8 @@
   (defvar set-mark-dwim-timeout-action 'company-indent-or-complete-common)
   (defvar-keymap set-mark-dwim-map
     :doc "An briefly active keymap after set-mark-command"
-    "SPC" #'embark-select
-    "."   #'embark-act-all)
+    "SPC" 'embark-select
+    "."   'embark-act-all)
   (defun set-mark-dwim (o &rest args)
     (cond ((or (not (called-interactively-p 'interactive))
                current-prefix-arg
@@ -179,68 +176,41 @@
                     (call-interactively cmd)))))
           (t
            (call-interactively set-mark-dwim-timeout-action))))
-  (advice-add 'set-mark-command :around #'set-mark-dwim)
+  (advice-add 'set-mark-command :around 'set-mark-dwim)
   (defun preseve-window-configuration-if-interactive (o)
     (let ((wc (and (called-interactively-p 'interactive)
                    (current-window-configuration))))
       (unwind-protect (funcall o)
         (and wc (set-window-configuration wc)))))
-  (advice-add 'recursive-edit :around #'preseve-window-configuration-if-interactive)
-  (defun call-other-window-if-interactive (&rest _)
-    (when (called-interactively-p 'any)
-      (other-window 1)))
-  (advice-add 'split-window-right :after #'call-other-window-if-interactive)
-  (advice-add 'split-window-below :after #'call-other-window-if-interactive)
-  (advice-add 'list-buffers :after #'call-other-window-if-interactive)
+  (advice-add 'recursive-edit :around 'preseve-window-configuration-if-interactive)
   (defun switch-to-last-buffer-if-one-window (o &rest args)
     (if (and (one-window-p 'nomini) (called-interactively-p 'interactive))
         (if (= 1 (length (frame-list)))
             (switch-to-buffer nil)
           (other-frame 1))
       (apply o args)))
-  (advice-add 'other-window :around #'switch-to-last-buffer-if-one-window)
+  (advice-add 'other-window :around 'switch-to-last-buffer-if-one-window)
   (defun get-current-active-selection ()
     (let ((p (if (use-region-p)
                  (cons (region-beginning) (region-end))
-               (and (fboundp 'easy-kill--bounds)
-                    (ignore-errors (funcall 'easy-kill--bounds))))))
+               (and (fboundp 'easy-kill--bounds) (funcall 'easy-kill--bounds)))))
       (and p (car p) (buffer-substring-no-properties (car p) (cdr p)))))
-  (defun use-region-if-active (o &rest args)
-    (let ((s (and (memq this-command '(compile shell-command async-shell-command))
-                  (get-current-active-selection))))
-      (if (null s)
-          (apply o args)
-        (let (r)
-          (dolist (l (split-string s "\n"))
-            (push (if (string-match (concat "^ *" comment-start "*[ \t]*") l)
-                      (replace-match "" nil t l 0)
-                    l)
-                  r))
-          (mapconcat #'identity (nreverse r) "\n")))))
-  (advice-add 'read-shell-command :around #'use-region-if-active)
   (advice-add 'electric-pair-open-newline-between-pairs-psif
               :after (lambda ()
                        (when (eq last-command-event ?\n)
                          (indent-according-to-mode))))
-  (defun kill-line-dwim (o &rest args)
-    (require 'embark nil t)
-    (if (not (eq 'buffer (plist-get (and (minibufferp) (car (embark--targets))) :type)))
-        (apply o args)
-      (setq unread-command-events (listify-key-sequence "k"))
-      (call-interactively 'embark-act)))
-  (advice-add 'kill-line :around #'kill-line-dwim)
   (defun keep-url (o arg)
     (if (string-match "^https?://" arg)
         arg
       (funcall o arg)))
-  (advice-add 'substitute-in-file-name :around #'keep-url)
+  (advice-add 'substitute-in-file-name :around 'keep-url)
   (defun may-browse-url (r)
     (if (string-match "^https?://" (car r))
         (progn
           (browse-url (car r))
           (exit-minibuffer))
       r))
-  (advice-add 'find-file-read-args :filter-return #'may-browse-url)
+  (advice-add 'find-file-read-args :filter-return 'may-browse-url)
   (defun find-file--line-number (o filename &optional wildcards)
     "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
     (let (line-number)
@@ -255,14 +225,17 @@
         (when line-number
           (goto-char (point-min))
           (forward-line (1- line-number))))))
-  (advice-add 'find-file :around #'find-file--line-number)
-  (defun ffap-file-at-point-add-line-number (r)
-    (let ((s (ffap-string-at-point)))
-      (save-match-data
-        (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
-            (concat r (match-string 1 s))
-          r))))
-  (advice-add 'ffap-file-at-point :filter-return #'ffap-file-at-point-add-line-number))
+  (advice-add 'find-file :around 'find-file--line-number)
+  (use-package ffap
+    :ensure nil
+    :config
+    (defun ffap-file-at-point-add-line-number (r)
+      (let ((s (ffap-string-at-point)))
+        (save-match-data
+          (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
+              (concat r (match-string 1 s))
+            r))))
+    (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
 (use-package avy
   :bind (("M-o" . avy-goto-char-timer) :map isearch-mode-map ("M-o" . avy-isearch))
   :config
@@ -271,12 +244,7 @@
     (if current-prefix-arg
         (call-interactively 'avy-pop-mark)
       (apply o args)))
-  (advice-add 'avy-goto-char-timer :around #'avy-pop-mark-if-prefix))
-(use-package bash-completion
-  :unless (memq window-system '(mac ns))
-  :hook (after-init . bash-completion-setup)
-  :custom
-  (bash-completion-use-separate-processes t))
+  (advice-add 'avy-goto-char-timer :around 'avy-pop-mark-if-prefix))
 (use-package beardbolt
   :vc ( :url "https://github.com/joaotavora/beardbolt.git"
         :rev :newest)
@@ -302,10 +270,10 @@
   (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
   (compilation-ask-about-save nil)
-  (compilation-buffer-name-function #'get-idle-compilation--buffer-name)
-  (compilation-save-buffers-predicate (lambda ()))
+  (compilation-buffer-name-function 'get-idle-compilation--buffer-name)
+  (compilation-save-buffers-predicate 'ignore)
   :config
-  (advice-add 'compilation-start :around #'maybe-eat-compilation-start)
+  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
   (defun do-kill-compilation (o &rest args)
     (when (and (called-interactively-p 'interactive)
                (memq major-mode '(comint-mode compilation-mode eat-mode))
@@ -314,22 +282,15 @@
       (while (get-buffer-process (current-buffer))
         (sit-for .5)))
     (apply o args))
-  (advice-add 'recompile :around #'do-kill-compilation)
+  (advice-add 'recompile :around 'do-kill-compilation)
   (defun get-idle-compilation--buffer-name (name-of-mode)
     (let ((name (compilation--default-buffer-name name-of-mode)))
-      (if (and (get-buffer name)
-               (get-buffer-process (get-buffer name))
-               (process-live-p (get-buffer-process (get-buffer name))))
-          (let ((mode (buffer-local-value 'major-mode (get-buffer name))))
-            (or (cl-loop for b in (buffer-list)
-                         with name-re = (concat "^" (regexp-quote name))
-                         when (and (string-match name-re (buffer-name b))
-                                   (eq mode (buffer-local-value 'major-mode b))
-                                   (not (and (get-buffer-process b)
-                                             (process-live-p (get-buffer-process b)))))
-                         return (buffer-name b))
-                (generate-new-buffer-name name)))
-        name))))
+      (or (cl-loop for b in (buffer-list)
+                   with name-re = (concat "^" (regexp-quote name))
+                   when (and (string-match name-re (buffer-name b))
+                             (not (process-live-p (get-buffer-process b))))
+                   return (buffer-name b))
+          (generate-new-buffer-name name)))))
 (use-package consult
   :after vertico
   :bind (("M-\"" . consult-register-load)
@@ -371,58 +332,35 @@
          ("M-h"  . consult-isearch-history)
          ("M-l"  . consult-line)
          ("M-L"  . consult-line-multi)
-         ("M-q"  . isearch-query-replace)
-
-         :map vertico-map
-         ("M-P"  . consult-toggle-preview)
-         ("M-s r". consult-ripgrep-here))
+         ("M-q"  . isearch-query-replace))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
   (register-preview-delay 0.5)
-  (register-preview-function #'consult-register-format)
-  (completion-in-region-function #'consult-completion-in-region)
+  (register-preview-function 'consult-register-format)
+  (completion-in-region-function 'consult-completion-in-region)
   (consult-preview-key 'any)
   (consult-narrow-key "<")
-  (xref-show-xrefs-function #'consult-xref)
-  (xref-show-definitions-function #'consult-xref)
+  (xref-show-xrefs-function 'consult-xref)
+  (xref-show-definitions-function 'consult-xref)
   :config
-  ;; (defvar string-width #'string-width nil)
-  (advice-add 'register-preview :override #'consult-register-window)
+  (advice-add 'register-preview :override 'consult-register-window)
   (defun consult-imenu-across-all-buffers (o &rest args)
     (if current-prefix-arg
         (call-interactively 'consult-imenu-multi)
       (apply o args)))
-  (advice-add 'consult-imenu :around #'consult-imenu-across-all-buffers)
-  (defun goto-line-with-number ()
-    (interactive)
-    (setq unread-command-events (cons last-command-event unread-command-events))
-    (call-interactively 'goto-line))
-  (dotimes (i 10)
-    (define-key goto-map (format "%d" i) 'goto-line-with-number))
-  (defun consult-toggle-preview ()
-    "Command to enable/disable preview."
-    (interactive)
-    (unless (plist-get (symbol-plist 'consult--preview-function) (current-buffer))
-      (plist-put (symbol-plist 'consult--preview-function) (current-buffer) #'ignore))
-    (cl-rotatef consult--preview-function
-                (plist-get (symbol-plist 'consult--preview-function)
-                           (current-buffer))))
-  (defun consult-ripgrep-here ()
-    (interactive)
-    (let* ((mc (substitute-in-file-name (minibuffer-contents-no-properties)))
-           (dir (file-name-directory mc))
-           (search (file-name-nondirectory mc)))
-    (run-at-time 0 nil (lambda () (consult-ripgrep dir search)))
-    (abort-recursive-edit)))
-  (advice-add 'consult-ripgrep-here :before #'vertico-insert))
+  (advice-add 'consult-imenu :around 'consult-imenu-across-all-buffers)
+  (defun use-current-active-selection (args)
+    (when-let (s (get-current-active-selection))
+      (deactivate-mark)
+      (setq args (or args (list nil)))
+      (setcar args s))
+    args)
+  (advice-add 'consult-line :filter-args 'use-current-active-selection))
 (use-package consult-dir
   :after vertico
   :bind (:map vertico-map ("M-/" . consult-dir-jump-file))
   :config
-  (advice-add 'consult-dir-jump-file :before #'vertico-insert))
-(use-package diffview
-  :after diff-mode
-  :bind (:map diff-mode-map ("|" . diffview-current)))
+  (advice-add 'consult-dir-jump-file :before 'vertico-insert))
 (use-package dired-subtree
   :after dired
   :bind (:map dired-mode-map ("TAB" . dired-subtree-toggle))
@@ -435,19 +373,20 @@
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
   :autoload maybe-eat-compilation-start
+  :commands (eat-emacs-mode eat-mode)
+  :functions (eat-exec eat-term-send-string-as-yank eat--synchronize-scroll-windows)
   :bind (("C-`" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :hook ((eshell-load . eat-eshell-mode)
          (eshell-load . eat-eshell-visual-command-mode))
   :custom
-  ;; (eat-enable-auto-line-mode t)
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
-    (define-key map (kbd "M-o")  #'avy-goto-char-timer)
-    (define-key map (kbd "M-\"") #'consult-register-load)
-    (define-key map (kbd "C-z")  #'eat-toggle-char-mode)
+    (define-key map (kbd "M-o")  'avy-goto-char-timer)
+    (define-key map (kbd "M-\"") 'consult-register-load)
+    (define-key map (kbd "C-z")  'eat-toggle-char-mode)
     map)
-  (advice-add 'eat-term-make-keymap :filter-return #'override-eat-term-keymap)
+  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   :config
   (defun eat-toggle-char-mode ()
     (interactive)
@@ -466,16 +405,16 @@
            (setq-local yank-transform-functions yank-hook)
            (apply o args)
            (buffer-string))))))
-  (advice-add 'insert-for-yank :around #'eat-insert-for-yank)
+  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
   (defun maybe-eat-compilation-start (o &rest args)
-    (apply (if (eq (cadr args) 'grep-mode) o #'eat-compilation-start) args))
-  (advice-add 'compilation-start :around #'maybe-eat-compilation-start)
+    (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
+  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
   (defun eat-compilation-start (command &optional mode name-function _ _)
     (let ((name-of-mode "compilation")
           (dir default-directory)
           outbuf)
       (if (or (not mode) (eq mode t))
-          (setq mode #'compilation-minor-mode)
+          (setq mode 'compilation-minor-mode)
         (setq name-of-mode (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
       (with-current-buffer
           (setq outbuf
@@ -499,7 +438,7 @@
         (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
         (eat-emacs-mode)
         (set (make-local-variable 'eat--synchronize-scroll-function)
-             #'eat--eshell-synchronize-scroll)
+             'eat--eshell-synchronize-scroll)
         (funcall mode)
         (setq-local compilation-directory dir)
         (setq-local compile-command command)
@@ -512,28 +451,40 @@
   :custom
   (ediff-custom-diff-options "-u")
   (ediff-keep-variants nil)
-  (ediff-window-setup-function #'ediff-setup-windows-plain)
+  (ediff-window-setup-function 'ediff-setup-windows-plain)
   :config
   (defun silently (o &rest args)
     (cl-letf (((symbol-function 'y-or-n-p) #'(lambda (_) t)))
       (apply o args)))
-  (advice-add 'ediff-janitor :around #'silently)
-  (advice-add 'ediff-quit :around #'silently))
+  (advice-add 'ediff-janitor :around 'silently)
+  (advice-add 'ediff-quit :around 'silently))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
+  :functions embark--targets
   :bind (("M-." . embark-dwim)
          :map minibuffer-local-map
          ("M-E" . embark-export)
          ("M-L" . embark-live)
-         ("M-S" . embark-collect))
+         ("M-S" . embark-collect)
+         :map embark-region-map
+         ("!" . shell-command)
+         ("x" . compile))
   :custom
   (embark-cycle-key "C-SPC")
-  (prefix-help-command #'embark-prefix-help-command)
+  (prefix-help-command 'embark-prefix-help-command)
   (embark-help-key "?")
   (embark-quit-after-action nil)
   :config
+  (setq embark-indicators (delq 'embark-mixed-indicator embark-indicators))
+  (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
-  (push #'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
+  (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks))
+  (defun kill-line-dwim (o &rest args)
+    (if (not (eq 'buffer (plist-get (and (minibufferp) (car (embark--targets))) :type)))
+        (apply o args)
+      (setq unread-command-events (listify-key-sequence "k"))
+      (call-interactively 'embark-act)))
+  (advice-add 'kill-line :around 'kill-line-dwim))
 (use-package embark-consult
   :after (embark consult)
   :hook (embark-collect-mode . consult-preview-at-point-mode))
@@ -553,16 +504,10 @@
   :hook after-init)
 (use-package go-mode
   :hook (go-mode . eglot-ensure))
-(when (file-directory-p "~/work/hermes")
-  (use-package hermes
-    :load-path "~/work/hermes"
-    :bind ("C-c v" . hermes)))
 (use-package hl-line
   :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit
   :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
-(use-package marginalia
-  :hook after-init)
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -592,7 +537,7 @@
   :config
   (require 'org-tempo nil t)
   (use-package ob-async)
-  (use-package ob-compile)
+  (use-package ob-compile :ensure nil)
   (defun lazy-load-org-babel-languages (o &rest args)
     (when-let (lang (org-element-property :language (org-element-at-point)))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
@@ -600,15 +545,7 @@
         (add-to-list 'org-babel-load-languages (cons (intern lang) t))
         (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages)))
     (apply o args))
-  (advice-add 'org-babel-execute-src-block :around #'lazy-load-org-babel-languages)
-  (advice-add 'ob-async-org-babel-execute-src-block :around (fix-missing-args 4)))
-(use-package outline-magic
-  :bind (("<backtab>" . outline-cycle)))
-(use-package rustic
-  :hook (rustic-mode . eglot-ensure)
-  :bind (:map rustic-mode-map ("C-c n" . flymake-goto-next-error) ("C-c p" . flymake-goto-prev-error))
-  :custom
-  (rustic-lsp-client 'eglot))
+  (advice-add 'org-babel-execute-src-block :around 'lazy-load-org-babel-languages))
 (use-package pdf-tools
   :if window-system
   :magic ("%PDF" . pdf-view-mode)
@@ -638,8 +575,7 @@
   :custom
   (treesit-font-lock-level 4)
   :config
-  (defun fix-forward-sexp-function ()
-    (setq forward-sexp-function nil)))
+  (defun fix-forward-sexp-function () (setq forward-sexp-function nil)))
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
@@ -650,7 +586,10 @@
           ("DEL"     . vertico-directory-delete-char)
           ("M-DEL"   . vertico-directory-delete-word)
           ("C-c SPC" . vertico-restrict-to-matches)
-          ("C-c C-r" . vertico-repeat))
+          ("C-c C-r" . vertico-repeat)
+          ("C-`"     . command-here)
+          ("M-s g"   . command-here)
+          ("M-s r"   . command-here))
   :custom
   (vertico-count-format nil)
   :config
@@ -660,5 +599,19 @@
       (goto-char (point-max))
       (insert " ")
       (add-text-properties (minibuffer-prompt-end) (point-max)
-                           '(invisible t read-only t cursor-intangible t rear-nonsticky t)))))
+                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
+  (defun command-here ()
+    (interactive)
+    (let* ((mc (substitute-in-file-name (minibuffer-contents-no-properties)))
+           (dir (file-name-directory mc))
+           (cmd (lookup-key global-map (this-command-keys))))
+    (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                    (call-interactively cmd))))
+    (abort-recursive-edit)))
+  (advice-add 'command-here :before 'vertico-insert)
+  (use-package vertico-multiform
+    :ensure nil
+    :config
+    (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
+    (vertico-multiform-mode 1)))
 (use-package wgrep)

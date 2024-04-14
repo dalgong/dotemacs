@@ -51,6 +51,11 @@
 
   ;; Manual preview key for `affe-grep'
   (consult-customize affe-grep :preview-key (kbd "M-.")))
+(use-package bash-completion
+  :unless (memq window-system '(mac ns))
+  :hook (after-init . bash-completion-setup)
+  :custom
+  (bash-completion-use-separate-processes t))
 (use-package cc-mode
   :custom
   (c-electric-flag nil)
@@ -59,6 +64,9 @@
   (defun set-outline-regexp ()
     (require 'outline)
     (setq outline-regexp "\\s-*\\S-")))
+(use-package diffview
+  :after diff-mode
+  :bind (:map diff-mode-map ("|" . diffview-current)))
 (use-package dired-sidebar
   :disabled
   :ensure
@@ -92,6 +100,8 @@
           (apply o args))
       (apply o args)))
   (advice-add #'xterm-paste :around #'handle-eat-paste))
+(use-package outline-magic
+  :bind (("<backtab>" . outline-cycle)))
 (use-package rtags
   :disabled
   :after company
@@ -104,6 +114,11 @@
     :ensure
     :config
     (cmake-ide-setup)))
+(use-package rustic
+  :hook (rustic-mode . eglot-ensure)
+  :bind (:map rustic-mode-map ("C-c n" . flymake-goto-next-error) ("C-c p" . flymake-goto-prev-error))
+  :custom
+  (rustic-lsp-client 'eglot))
 (use-package so-long
   :disabled
   :hook (after-init . global-so-long-mode))
