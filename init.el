@@ -67,6 +67,7 @@
   (help-window-select t)
   (history-delete-duplicates t)
   (history-length 1000)
+  (ibuffer-expert t)
   (indent-tabs-mode nil)
   (inhibit-startup-screen t)
   (initial-scratch-message nil)
@@ -551,6 +552,15 @@
   :magic ("%PDF" . pdf-view-mode)
   :config
   (pdf-tools-install :no-query))
+(use-package python
+  :ensure nil
+  :hook (python-ts-mode . maybe-set-python-shell-virtualenv-root)
+  :custom (python-shell-interpreter "ipython")
+  :config
+  (defun maybe-set-python-shell-virtualenv-root ()
+    (when-let (dir (and (null python-shell-virtualenv-root)
+                        (locate-dominating-file default-directory ".venv/")))
+      (setq-local python-shell-virtualenv-root (expand-file-name ".venv/" dir)))))
 (use-package smerge-mode
   :after embark
   :hook (find-file . smerge-start-session)
