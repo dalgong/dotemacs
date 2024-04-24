@@ -12,18 +12,5 @@
 (let ((file-name-handler-alist nil)
       (inhibit-message t))
   (load "~/.emacs.d/init" nil t)
-  (load-theme 'modus-operandi t)
-  (use-package bespoke-modeline
-    :disabled
-    :vc ( :url "https://github.com/mclear-tools/bespoke-modeline.git"
-          :rev :newest)
-    :hook after-init
-    :init
-    (setq bespoke-modeline-cleaner t)
-    (setq bespoke-modeline-position 'bottom)
-    (setq bespoke-modeline-space-top +0.1)
-    (setq bespoke-modeline-space-bottom -0.1)
-    (setq bespoke-modeline-visual-bell t)
-    (setq bespoke-modeline-vc-symbol " G:")
-    :config
+  (when (display-graphic-p)
     (load-theme 'modus-operandi t)))
