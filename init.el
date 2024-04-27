@@ -23,10 +23,12 @@
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-this-buffer)
-         ("C-z"                . recursive-edit)
+         ("M-Z"                . recursive-edit)
          ("C-c c"              . calendar)
          ("C-h C-b"            . describe-personal-keybindings)
-         ("C-h C-o"            . proced))
+         ("C-h C-o"            . proced)
+         ("S-<mouse-1>"        . ffap-at-mouse)
+         ("<mode-line> S-<mouse-1>" . previous-buffer))
   :delight
   (auto-revert-mode)
   (eldoc-mode)
@@ -463,6 +465,10 @@
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
   :bind (("M-." . embark-dwim)
+         ("M-<mouse-1>"  . embark-dwim-mouse)
+         ("M-<down-mouse-1>"  . nil)
+         ("M-S-<mouse-1>" . xref-go-back)
+         ("M-S-<down-mouse-1>" . nil)
          :map minibuffer-local-map
          ("M-E" . embark-export)
          ("M-L" . embark-live)
@@ -476,6 +482,10 @@
   (embark-help-key "?")
   (embark-quit-after-action nil)
   :config
+  (defun embark-dwim-mouse (e)
+    (interactive "e")
+    (mouse-set-point e)
+    (call-interactively 'embark-dwim))
   (setq embark-indicators (delq 'embark-mixed-indicator embark-indicators))
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
