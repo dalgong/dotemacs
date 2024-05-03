@@ -21,6 +21,8 @@
          ([remap list-buffers] . ibuffer)
          ([remap delete-horizontal-space] . cycle-spacing)
          ("RET"                . newline-and-indent)
+         ("M-C"                . compile)
+         ("M-R"                . recompile)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-this-buffer)
          ("M-Z"                . recursive-edit)
@@ -120,6 +122,7 @@
   (shell-command-default-error-buffer "*Shell Command Errors*")
   (split-height-threshold nil)
   (tab-always-indent 'complete)
+  (tab-bar-show nil)
   (tramp-auto-save-directory "~/.cache/emacs/backups")
   (tramp-persistency-file-name "~/.emacs.d/data/tramp")
   (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
@@ -514,7 +517,17 @@
   :delight
   :hook after-init)
 (use-package go-mode
+  :custom (gofmt-command "goimports")
   :hook (go-mode . eglot-ensure))
+(use-package go-ts-mode
+  :hook ((go-ts-mode . eglot-ensure)
+         (before-save . gofmt-before-save))
+  :config
+  (advice-add 'gofmt-before-save :around
+              (defun gofmt-on-go-ts-mode (o &rest args)
+                (if (eq major-mode 'go-ts-mode)
+                    (gofmt)
+                  (apply o args)))))
 (use-package hl-line
   :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit
@@ -588,6 +601,8 @@
       `(conflict "hunk" ,b . ,e)))
   (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point)
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
+(use-package tab-bar-echo-area
+  :hook after-init)
 (use-package treesit-auto
   :if (and (fboundp 'treesit-available-p) (treesit-available-p))
   :hook ((after-init . global-treesit-auto-mode)
