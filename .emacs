@@ -13,4 +13,7 @@
       (inhibit-message t))
   (load "~/.emacs.d/init" nil t)
   (when (display-graphic-p)
-    (load-theme 'modus-operandi t)))
+    (load-theme 'modus-operandi t)
+    (dolist (ml '(mode-line mode-line-inactive))
+      (set-face-attribute ml nil :box nil :overline nil :underline nil))))
+
