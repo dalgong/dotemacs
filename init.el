@@ -24,9 +24,7 @@
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-this-buffer)
          ("C-c c"              . calendar)
-         ("C-h C-b"            . describe-personal-keybindings)
-         ("C-h C-o"            . proced)
-         ("S-<mouse-1>"        . ffap-at-mouse))
+         ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
   (async-shell-command-display-buffer nil)
@@ -44,17 +42,13 @@
   (completion-auto-select 'second-tab)
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
+  (cycle-spacing-actions '(delete-all-space just-one-space restore))
   (dabbrev-case-fold-search t)
   (dabbrev-ignored-buffer-regexps '("\\.\\(?:pdf\\|jpe?g\\|png\\)\\'"))
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
-  (display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)
-                          ("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
-                           display-buffer-at-bottom
-                           (window-parameters (mode-line-format . none)))
-                          ("\\*hermes.*" display-buffer-same-window)))
   (enable-recursive-minibuffers t)
   (even-window-sizes nil)
   (evil-default-state 'emacs)
@@ -146,11 +140,13 @@
   (fset 'kill-this-buffer (lambda () (interactive) (kill-buffer (current-buffer))))
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
-  (defvar set-mark-dwim-timeout-action 'company-indent-or-complete-common)
+  (defvar set-mark-dwim-timeout-action 'completion-at-point)
   (defvar-keymap set-mark-dwim-map
     :doc "An briefly active keymap after set-mark-command"
     "SPC" 'embark-select
-    "."   'embark-act-all)
+    "."   'embark-act-all
+    "c"   'compile
+    "r"   'recompile)
   (defun set-mark-dwim (o &rest args)
     (cond ((or (not (called-interactively-p 'interactive))
                current-prefix-arg
@@ -239,7 +235,12 @@
   :bind ("C-c :" . beardbolt-starter)
   :config
   (push (cons 'c++-ts-mode (cdr (assq 'c++-mode beardbolt-languages))) beardbolt-languages))
-(use-package company :delight :hook (prog-mode text-mode))
+(use-package cape
+  :config
+  (add-hook 'completion-at-point-functions #'cape-history)
+  (add-hook 'completion-at-point-functions #'cape-file)
+  (add-hook 'completion-at-point-functions #'cape-keyword)
+  (add-hook 'completion-at-point-functions #'cape-dabbrev))
 (use-package compile
   :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
@@ -268,7 +269,6 @@
                    return (buffer-name b))
           (generate-new-buffer-name name)))))
 (use-package consult
-  :after vertico
   :bind (("M-\"" . consult-register-load)
          ("M-'"  . consult-register-store)
          ([remap yank-pop] . consult-yank-pop)
@@ -324,6 +324,17 @@
         (call-interactively 'consult-imenu-multi)
       (apply o args)))
   (advice-add 'consult-imenu :around 'consult-imenu-across-all-buffers))
+(use-package corfu
+  :hook (prog-mode text-mode)
+  :custom
+  (corfu-auto t)
+  (corfu-auto-delay 0.5)
+  (corfu-quit-no-match t)
+  :config
+  (use-package corfu-terminal
+    :config
+    (unless (display-graphic-p)
+      (corfu-terminal-mode +1))))
 (use-package display-line-numbers :hook (prog-mode text-mode))
 (use-package easy-kill :bind (([remap kill-ring-save] . easy-kill)))
 (use-package eat
@@ -421,7 +432,6 @@
   :bind (("C-." . embark-act)
          ("M-." . embark-dwim)
          :map minibuffer-local-map
-         ("M-o" . embark-act)
          ("M-E" . embark-export)
          ("M-S" . embark-collect)
          :map embark-region-map
@@ -548,11 +558,8 @@
          (rfn-eshadow-update-overlay . vertico-directory-tidy))
   :bind (("C-c C-r" . vertico-repeat)
          :map vertico-map
-         ("?"       . minibuffer-completion-help)
          ("C-j"     . vertico-exit-input)
          ("DEL"     . vertico-directory-delete-char)
-         ("M-DEL"   . vertico-directory-delete-word)
-         ("C-c SPC" . vertico-restrict-to-matches)
          ("M-/"     . consult-find-dwim)
          ("C-`"     . command-here)
          ("M-s g"   . command-here)
@@ -560,13 +567,6 @@
   :custom
   (vertico-count-format nil)
   :config
-  (defun vertico-restrict-to-matches ()
-    (interactive)
-    (let ((inhibit-read-only t))
-      (goto-char (point-max))
-      (insert " ")
-      (add-text-properties (minibuffer-prompt-end) (point-max)
-                           '(invisible t read-only t cursor-intangible t rear-nonsticky t))))
   (defun vertico-selected-directory ()
     (vertico-insert)
     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
@@ -586,4 +586,5 @@
     :config
     (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
     (vertico-multiform-mode 1)))
+(use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))

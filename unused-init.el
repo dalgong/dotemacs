@@ -301,68 +301,33 @@
             ("C-s"     . helm-next-line)))
   (use-package-when helm-xref (eq j:completion-ui 'helm)
     :ensure))
-(when t
-  (use-package icomplete
-    :hook (after-init . fido-mode))
-  (use-package icomplete-vertical
-    :disabled
-    :ensure
-    :hook (after-init . icomplete-vertical-mode)
-    :bind (:map icomplete-minibuffer-map
-                ("<down>" . icomplete-forward-completions)
-                ("C-n" . icomplete-forward-completions)
-                ("<up>" . icomplete-backward-completions)
-                ("C-p" . icomplete-backward-completions)
-                ("C-v" . icomplete-vertical-toggle))))
-(when t
-  (use-package ido
-    :custom
-    (ido-auto-merge-work-directories-length -1)
-    (ido-auto-merge-delay-time 999999)
-    (ido-create-new-buffer 'always)
-    (ido-enable-flex-matching t)
-    (ido-enable-tramp-completion nil)
-    ;; (ido-everywhere t)
-    (ido-mode t)
-    (ido-max-file-prompt-width 0.15)
-    (ido-work-directory-match-only t)
-    (ido-record-ftp-work-directories nil)
-    ;; (ido-use-faces t)
-    (ido-use-filename-at-point nil)
-    (ido-use-url-at-point nil)
-    (ido-use-virtual-buffers t)
-    :config
-    (ido-mode 1)
-    (advice-add 'ido-switch-buffer :around
-                (defun ido-switch-buffer-maybe-other-window (o &rest args)
-                  (if current-prefix-arg
-                      (call-interactively 'ido-switch-buffer-other-window)
-                    (apply o args))))
-    (advice-add 'ido-init-completion-maps :after
-                (defun override-next-prev-keys-with-C-n/p (&rest _)
-                  (bind-keys :map ido-common-completion-map
-                             ("C-n" . ido-next-match)
-                             ("C-p" . ido-prev-match))))
-    (defun ido-fallback-to-helm-file ()
-      (interactive)
-      (ido-fallback-command 'helm-find-files))
-    (defun ido-fallback-to-helm-buffer ()
-      (interactive)
-      (ido-fallback-command 'helm-buffers-list))
-    (defun ido-fallback-to-ffap ()
-      (interactive)
-      (ido-fallback-command 'ffap))
-    (bind-keys :map ido-common-completion-map
-               ("M-."   . ido-fallback-to-ffap)
-               :map ido-file-dir-completion-map
-               ("M-P"   . ido-fallback-to-helm-file)
-               :map ido-buffer-completion-map
-               ("M-P"   . ido-fallback-to-helm-buffer))
-    (use-package flx-ido
-      :ensure
-      :after ido
-      :config
-      (flx-ido-mode 1))))
+(use-package icomplete
+  :disabled
+  :hook (after-init . icomplete-vertical-mode)
+  :custom
+  (icomplete-in-buffer t)
+  (icomplete-tidy-shadowed-file-names t)
+  (max-mini-window-height 12)
+  :bind ( :map icomplete-minibuffer-map
+          ("RET"    . icomplete-force-complete-and-exit)
+          ("C-j"    . icomplete-ret)
+          ("TAB"    . icomplete-force-complete)
+          ("<down>" . icomplete-forward-completions)
+          ("C-n"    . icomplete-forward-completions)
+          ("<up>"   . icomplete-backward-completions)
+          ("C-p"    . icomplete-backward-completions)
+          ("C-`"    . command-here)
+          ("M-s g"  . command-here)
+          ("M-s r"  . command-here))
+  :config
+  (defun command-here ()
+    (interactive)
+    (icomplete-force-complete)
+    (let ((dir (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+          (cmd (lookup-key global-map (this-command-keys))))
+      (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                      (call-interactively cmd))))
+      (abort-recursive-edit))))
 (when t
   (use-package ivy
     :ensure
@@ -590,32 +555,6 @@
     (xref-show-xrefs-function 'ivy-xref-show-xrefs)
     (xref-show-definitions-function #'ivy-xref-show-defs)))
 (when t
-  (use-package selectrum
-    :ensure
-    :bind ( :map help-map ("M-q" . selectrum-cycle-display-style)
-            :map mode-specific-map ("C-r" . selectrum-repeat))
-    :hook (after-init . selectrum-mode)
-    :custom
-    (selectrum-complete-in-buffer nil)
-    (selectrum-count-style nil)
-    (selectrum-max-window-height .15)
-    (file-name-shadow-properties '(invisible t))
-    (orderless-skip-highlighting (lambda () selectrum-is-active))
-    (selectrum-highlight-candidates-function #'orderless-highlight-matches)
-    :config
-    (use-package prescient
-      :ensure
-      :hook (after-init . prescient-persist-mode))
-    (use-package selectrum-prescient
-      :ensure
-      :custom
-      (selectrum-prescient-enable-filtering nil)
-      :config
-      (selectrum-prescient-mode 1))
-    (use-package consult-dir
-      :ensure t
-      :bind ( :map minibuffer-local-map
-              ("M-/" . consult-dir-jump-file))))
   (use-package consult
     :ensure
     :bind (("M-\"" . consult-register-load)
@@ -765,6 +704,7 @@
     :after (embark consult)
     :config
     (add-hook 'embark-collect-mode-hook #'consult-preview-at-point-mode)))
+(use-package company :delight :hook (prog-mode text-mode))
 (use-package compile
   :diminish compilation-in-progress
   :hook ((compilation-mode . run-before-compile)
