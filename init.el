@@ -49,6 +49,11 @@
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
+  (display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)
+                          ("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+                           display-buffer-at-bottom
+                           (window-parameters (mode-line-format . none)))
+                          ("\\*hermes.*" display-buffer-same-window)))
   (enable-recursive-minibuffers t)
   (even-window-sizes nil)
   (evil-default-state 'emacs)
