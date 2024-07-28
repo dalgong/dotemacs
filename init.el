@@ -8,12 +8,10 @@
               recentf-mode savehist-mode save-place-mode))
   (add-to-list 'after-init-hook x))
 
-(setq use-package-always-ensure t)
 (when (cl-loop for p in '(package bind-key use-package) always (require p nil t))
   (nconc package-archives '(("melpa"  . "http://melpa.org/packages/")
                             ("org"    . "http://orgmode.org/elpa/"))))
 
-(use-package delight :config (delight '((auto-revert-mode "" autorevert) (eldoc-mode "" eldoc))))
 (use-package emacs
   :bind (([C-tab]              . other-window)
          ([remap suspend-frame]. ignore)
@@ -120,6 +118,7 @@
   (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
+  (use-package-always-ensure t)
   (use-short-answers t)
   (vc-follow-symlinks nil)
   (view-read-only t)
@@ -225,6 +224,7 @@
               (concat r (match-string 1 s))
             r))))
     (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
+(use-package delight :config (delight '((auto-revert-mode "" autorevert) (eldoc-mode "" eldoc))))
 (use-package avy
   :bind (("M-o" . avy-goto-char-timer) :map isearch-mode-map ("M-o" . avy-isearch))
   :config
@@ -456,9 +456,9 @@
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
 (use-package embark-consult :after consult)
-(use-package exec-path-from-shell
-  :if (memq window-system '(mac ns))
-  :hook (after-init . exec-path-from-shell-initialize))
+(static-if (memq window-system '(mac ns))
+    (use-package exec-path-from-shell
+  :hook (after-init . exec-path-from-shell-initialize)))
 (use-package go-mode
   :functions (gofmt)
   :custom (gofmt-command "goimports")
@@ -485,18 +485,10 @@
   :custom
   (org-confirm-babel-evaluate nil)
   (org-cycle-separator-lines 0)
-  (org-edit-src-content-indentation 0)
-  (org-edit-src-persistent-message nil)
-  (org-element-use-cache nil)
-  (org-fontify-quote-and-verse-blocks t)
   (org-hide-emphasis-markers t)
   (org-hide-leading-stars t)
-  (org-link-descriptive nil)
   (org-modules nil)
-  (org-odd-levels-only nil)
   (org-return-follows-link t)
-  (org-src-fontify-natively t)
-  (org-src-tab-acts-natively t)
   (org-src-window-setup 'current-window)
   (org-startup-indented t)
   (org-use-speed-commands t)
@@ -549,14 +541,14 @@
   (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point)
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
 (use-package tab-bar-echo-area :hook after-init)
-(use-package treesit-auto
-  :if (and (fboundp 'treesit-available-p) (treesit-available-p))
-  :hook ((after-init . global-treesit-auto-mode)
-         (prog-mode . fix-forward-sexp-function))
-  :custom
-  (treesit-font-lock-level 4)
-  :config
-  (defun fix-forward-sexp-function () (setq forward-sexp-function nil)))
+(static-if (and (fboundp 'treesit-available-p) (treesit-available-p))
+    (use-package treesit-auto
+      :hook ((after-init . global-treesit-auto-mode)
+             (prog-mode . fix-forward-sexp-function))
+      :custom
+      (treesit-font-lock-level 4)
+      :config
+      (defun fix-forward-sexp-function () (setq forward-sexp-function nil))))
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
