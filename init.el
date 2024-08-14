@@ -341,7 +341,17 @@
     (unless (display-graphic-p)
       (corfu-terminal-mode +1))))
 (use-package display-line-numbers :hook (prog-mode text-mode))
-(use-package easy-kill :bind (([remap kill-ring-save] . easy-kill)))
+(use-package easy-kill
+  :after embark
+  :bind (([remap kill-ring-save] . easy-kill))
+  :config
+  (defun embark-target-easy-kill-region ()
+    "Target the region if active. easy-kill region."
+    (when-let (r (easy-kill-get bounds))
+      (let ((start (car r))
+            (end (cdr r)))
+        `(region ,(buffer-substring start end) . ,r))))
+  (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
