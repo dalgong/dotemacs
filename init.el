@@ -347,7 +347,7 @@
   :config
   (defun embark-target-easy-kill-region ()
     "Target the region if active. easy-kill region."
-    (when-let (r (easy-kill-get bounds))
+    (when-let (r (ignore-errors (easy-kill-get bounds)))
       (let ((start (car r))
             (end (cdr r)))
         `(region ,(buffer-substring start end) . ,r))))
