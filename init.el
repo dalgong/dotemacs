@@ -347,10 +347,11 @@
   :config
   (defun embark-target-easy-kill-region ()
     "Target the region if active. easy-kill region."
-    (when-let (r (ignore-errors (easy-kill-get bounds)))
-      (let ((start (car r))
+    (let ((r (ignore-errors (easy-kill-get bounds))))
+      (when (and r (car r))
+        (let ((start (car r))
             (end (cdr r)))
-        `(region ,(buffer-substring start end) . ,r))))
+        `(region ,(buffer-substring start end) . ,r)))))
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
