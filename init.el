@@ -372,6 +372,14 @@
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   :config
+  (defun eat-dwim (o &rest args)
+    (if (or (car args)
+            (cadr args)
+            (not (called-interactively-p 'any))
+            (not (eq major-mode 'eat-mode)))
+        (apply o args)
+      (bury-buffer)))
+  (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively (if eat--semi-char-mode
