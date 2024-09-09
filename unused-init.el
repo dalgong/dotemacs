@@ -85,7 +85,8 @@
     (cl-pushnew c easy-repeat-command-list)))
 (use-package eat
   :ensure
-  :hook (after-init . eat-eshell-mode)
+  :hook ((eshell-load . eat-eshell-mode)
+         (eshell-load . eat-eshell-visual-command-mode))
   :bind ("M-`" . eat)
   :custom
   (eshell-visual-commands nil)
@@ -100,6 +101,9 @@
           (apply o args))
       (apply o args)))
   (advice-add #'xterm-paste :around #'handle-eat-paste))
+(static-if (memq window-system '(mac ns))
+    (use-package exec-path-from-shell
+  :hook (after-init . exec-path-from-shell-initialize)))
 (use-package outline-magic
   :bind (("<backtab>" . outline-cycle)))
 (use-package rtags
@@ -133,19 +137,30 @@
   (tab-bar-show nil))
 (use-package vterm
   :disabled
-  :config
-  (csetq shell-pop-shell-type '("vterm" "*vterm*" (lambda () (vterm))))
-  (advice-add #'vterm-yank-pop :override
-              (defun use-consult-yank-pop (&optional arg)
-                (interactive "p")
-                (vterm-goto-char (point))
-                (let ((inhibit-read-only t)
-                      (yank-undo-function #'(lambda (_start _end) (vterm-undo))))
-                  (cl-letf (((symbol-function 'insert-for-yank) #'vterm-insert))
-                    (consult-yank-pop arg))))))
+  :bind (("C-c x" . vterm)
+         :map vterm-mode-map
+         ("C-z"  . vterm-copy-mode)
+         ("M-\"" . consult-register-load))
+  :init
+  (defun vterm-dwim (o &rest args)
+    (if (or (car args)
+            (not (called-interactively-p 'any))
+            (not (derived-mode-p 'vterm-mode))
+            (not (process-live-p (get-buffer-process (current-buffer)))))
+        (apply o args)
+      (bury-buffer)))
+  (advice-add 'vterm :around 'vterm-dwim)
+  (advice-add 'insert-for-yank :around 'vterm-insert-for-yank)
+  (defun vterm-insert-for-yank (o &rest args)
+    (if (equal major-mode 'vterm-mode)
+        (let ((inhibit-read-only t)
+              (yank-undo-function (lambda (_start _end) (vterm-undo))))
+          (vterm-send-string (car args) t))
+      (apply o args))))
 (use-package icomplete
   :hook (after-init . icomplete-vertical-mode)
   :bind ( :map icomplete-minibuffer-map
+          ("TAB" . icomplete-force-complete)
           ("SPC" . self-insert-command)
           ("C-j" . icomplete-fido-exit)
           ("RET" . icomplete-force-complete-and-exit)

@@ -13,7 +13,16 @@
       (inhibit-message t))
   (load "~/.emacs.d/init" nil t)
   (when (display-graphic-p)
-    (load-theme 'modus-operandi t)
-    (dolist (ml '(mode-line mode-line-inactive))
-      (set-face-attribute ml nil :box nil :overline nil :underline nil))))
+    ;; use setq if you want
+    (setopt
+     modus-themes-italic-constructs        t
+     modus-themes-bold-constructs          t
+     modus-themes-mixed-fonts              t
+     modus-themes-common-palette-overrides '((border-mode-line-active bg-mode-line-active)
+                                             (border-mode-line-inactive bg-mode-line-inactive)
+                                             (comment yellow)
+                                             (string green-warmer))
+     modus-vivendi-palette-overrides       '((bg-main "#1d2021")
+                                             (fg-main "#c2c2c2")))
+    (load-theme 'modus-operandi t)))
 

@@ -8,9 +8,8 @@
               recentf-mode savehist-mode save-place-mode))
   (add-to-list 'after-init-hook x))
 
-(when (cl-loop for p in '(package bind-key use-package) always (require p nil t))
-  (nconc package-archives '(("melpa"  . "http://melpa.org/packages/")
-                            ("org"    . "http://orgmode.org/elpa/"))))
+(dolist (p '(package bind-key use-package)) (require p nil t))
+(push (cons "melpa" "http://melpa.org/packages/") package-archives)
 
 (use-package emacs
   :bind (([C-tab]              . other-window)
@@ -21,6 +20,8 @@
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-this-buffer)
+         ("C-,"                . next-error)
+         ("C-<"                . previous-error)
          ("C-c c"              . calendar)
          ("C-h C-o"            . proced))
   :custom
@@ -28,21 +29,13 @@
   (async-shell-command-display-buffer nil)
   (auto-save-default nil)
   (auto-save-interval 0)
-  (backup-by-copying t)
-  (backup-by-copying-when-linked t)
-  (bidi-display-reordering 'left-to-right)
   (bidi-inhibit-bpa t)
-  (bidi-paragraph-direction 'left-to-right)
-  (column-number-indicator-zero-based nil)
-  (completion-auto-help 'visible)
+  (bidi-paragraph-direction t)
   (completion-category-defaults nil)
   (completion-category-overrides '((file (styles partial-completion))))
-  (completion-auto-select 'second-tab)
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
   (cycle-spacing-actions '(delete-all-space just-one-space restore))
-  (dabbrev-case-fold-search t)
-  (dabbrev-ignored-buffer-regexps '("\\.\\(?:pdf\\|jpe?g\\|png\\)\\'"))
   (dired-kill-when-opening-new-dired-buffer t)
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
@@ -53,16 +46,8 @@
                            (window-parameters (mode-line-format . none)))
                           ("\\*hermes.*" display-buffer-same-window)))
   (enable-recursive-minibuffers t)
-  (even-window-sizes nil)
-  (evil-default-state 'emacs)
-  (frame-inhibit-implied-resize t)
-  (frame-resize-pixelwise t)
-  (help-char ?^)
-  (help-window-select t)
-  (history-delete-duplicates t)
   (history-length 1000)
   (ibuffer-expert t)
-  (indent-tabs-mode nil)
   (inhibit-startup-screen t)
   (initial-scratch-message nil)
   (inhibit-startup-echo-area-message (user-login-name))
@@ -87,9 +72,6 @@
   (mode-line-end-spaces nil)
   (ns-alternate-modifier 'super)
   (ns-command-modifier 'meta)
-  (ns-tool-bar-display-mode 'both)
-  (ns-tool-bar-size-mode 'regular)
-  (ns-use-thin-smoothing t)
   (proced-enable-color-flag t)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
@@ -128,8 +110,6 @@
                                     xref-find-definitions-other-frame
                                     xref-find-references))
   (xref-search-program 'ripgrep)
-  (x-underline-at-descent-line t)
-  (x-selection-timeout 100)
   (words-include-escapes t)
   :config
   (defun goto-line-with-number ()
@@ -147,10 +127,7 @@
   (defvar set-mark-dwim-timeout-action 'completion-at-point)
   (defvar-keymap set-mark-dwim-map
     :doc "An briefly active keymap after set-mark-command"
-    "SPC" 'embark-select
-    "."   'embark-act-all
-    "c"   'compile
-    "r"   'recompile)
+    "SPC" 'embark-select)
   (defun set-mark-dwim (o &rest args)
     (cond ((or (not (called-interactively-p 'interactive))
                current-prefix-arg
@@ -224,9 +201,13 @@
               (concat r (match-string 1 s))
             r))))
     (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
-(use-package delight :config (delight '((auto-revert-mode "" autorevert) (eldoc-mode "" eldoc))))
+(use-package delight
+  :config
+  (delight '((auto-revert-mode "" autorevert)
+             (eldoc-mode "" eldoc)
+             (outline-minor-mode "" outline))))
 (use-package avy
-  :bind (("M-o" . avy-goto-char-timer) :map isearch-mode-map ("M-o" . avy-isearch))
+  :bind (("C-'" . avy-goto-char-timer) :map isearch-mode-map ("C-'" . avy-isearch))
   :config
   (avy-setup-default)
   (defun avy-pop-mark-if-prefix (o &rest args)
@@ -242,12 +223,11 @@
   (push (cons 'c++-ts-mode (cdr (assq 'c++-mode beardbolt-languages))) beardbolt-languages))
 (use-package cape
   :config
-  (add-hook 'completion-at-point-functions #'cape-history)
-  (add-hook 'completion-at-point-functions #'cape-file)
-  (add-hook 'completion-at-point-functions #'cape-keyword)
-  (add-hook 'completion-at-point-functions #'cape-dabbrev))
+  (setq completion-at-point-functions
+	(nconc completion-at-point-functions
+	       '(cape-history cape-file cape-keyword cape-dabbrev))))
 (use-package compile
-  :bind (("M-C" . compile) ("M-R" . recompile))
+  :bind (("C-:" . compile) ("C-;" . recompile))
   :custom
   (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
@@ -256,15 +236,6 @@
   (compilation-save-buffers-predicate 'ignore)
   :config
   (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
-  (defun do-kill-compilation (o &rest args)
-    (when (and (called-interactively-p 'interactive)
-               (memq major-mode '(comint-mode compilation-mode eat-mode))
-               (get-buffer-process (current-buffer)))
-      (kill-compilation)
-      (while (get-buffer-process (current-buffer))
-        (sit-for .5)))
-    (apply o args))
-  (advice-add 'recompile :around 'do-kill-compilation)
   (defun get-idle-compilation--buffer-name (name-of-mode)
     (let ((name (compilation--default-buffer-name name-of-mode)))
       (or (cl-loop for b in (buffer-list)
@@ -282,10 +253,6 @@
          ("C-x M-:" . consult-complex-command)
          ("C-x b"   . consult-buffer)
          ("C-x C-r" . consult-recent-file)
-         ("C-x m"   . consult-mode-command)
-         ("C-x r b" . consult-bookmark)
-         ("C-h C-i"   . consult-info)
-         ("C-h C-m"   . consult-man)
          ("C-h SPC"   . consult-mark)
          ("C-h C-SPC" . consult-global-mark)
 
@@ -293,26 +260,22 @@
          ("M-r"   . consult-history)
 
          :map goto-map
-         ("d"   . consult-imenu)
-         ("e"   . consult-compile-error)
          ("f"   . consult-flymake)
 
          :map search-map
          ("e"    . consult-isearch-history)
-         ("f"    . consult-find)
+         ("f"    . consult-line)
+         ("F"    . consult-line-multi)
          ("g"    . grep)
          ("G"    . consult-git-grep)
-         ("m"    . consult-line-multi)
-         ("l"    . consult-line)
-         ("o"    . consult-outline)
          ("k"    . consult-keep-lines)
          ("r"    . consult-ripgrep)
          ("u"    . consult-focus-lines)
 
          :map isearch-mode-map
          ("M-h"  . consult-isearch-history)
-         ("M-l"  . consult-line)
-         ("M-L"  . consult-line-multi)
+         ("M-o"  . consult-line)
+         ("M-O"  . consult-line-multi)
          ("M-q"  . isearch-query-replace))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
@@ -360,8 +323,6 @@
   :commands (eat-emacs-mode eat-mode)
   :functions (eat-exec eat-term-send-string-as-yank eat--synchronize-scroll-windows)
   :bind (("C-`" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
-  :hook ((eshell-load . eat-eshell-mode)
-         (eshell-load . eat-eshell-visual-command-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
@@ -371,20 +332,16 @@
     (define-key map (kbd "C-z")  'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
-  :config
   (defun eat-dwim (o &rest args)
-    (if (or (car args)
-            (cadr args)
-            (not (called-interactively-p 'any))
-            (not (eq major-mode 'eat-mode)))
+    (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
+            (not (derived-mode-p 'eat-mode))
+            (not (process-live-p (get-buffer-process (current-buffer)))))
         (apply o args)
-      (bury-buffer)))
+      (bury-buffer)))  
   (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
-    (call-interactively (if eat--semi-char-mode
-                            'eat-emacs-mode
-                          'eat-semi-char-mode)))
+    (call-interactively (if eat--semi-char-mode 'eat-emacs-mode 'eat-semi-char-mode)))
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat-terminal))
         (apply o args)
@@ -438,46 +395,33 @@
         (setq-local revert-buffer-function 'compilation-revert-buffer)
         (setq next-error-last-buffer outbuf)
         (display-buffer outbuf '(nil (allow-no-window . t)))))))
-(use-package ediff
-  :bind (:map goto-map ("=" . ediff-current-file))
+(use-package ediff :bind (:map goto-map ("=" . ediff-current-file)))
+(use-package eglot
+  :ensure nil
+  :defer t
   :custom
-  (ediff-custom-diff-options "-u")
-  (ediff-keep-variants nil)
-  (ediff-window-setup-function 'ediff-setup-windows-plain)
+  (eglot-report-progress nil)
   :config
-  (defun silently (o &rest args)
-    (cl-letf (((symbol-function 'y-or-n-p) #'(lambda (_) t)))
-      (apply o args)))
-  (advice-add 'ediff-janitor :around 'silently)
-  (advice-add 'ediff-quit :around 'silently))
+  (setq jsonrpc-event-hook nil))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
   :bind (("C-." . embark-act)
          ("M-." . embark-dwim)
-         :map minibuffer-local-map
-         ("M-E" . embark-export)
-         ("M-S" . embark-collect)
          :map embark-region-map
          ("!" . shell-command)
          ("x" . compile)
          :map help-map
          ("b" . embark-bindings))
   :custom
-  (embark-confirm-act-all nil)
   (embark-cycle-key "C-SPC")
   (prefix-help-command 'embark-prefix-help-command)
-  (embark-help-key "?")
-  (embark-quit-after-action nil)
   :config
   (setq embark-indicators (delq 'embark-mixed-indicator embark-indicators))
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
 (use-package embark-consult :after consult)
-(static-if (memq window-system '(mac ns))
-    (use-package exec-path-from-shell
-  :hook (after-init . exec-path-from-shell-initialize)))
 (use-package go-mode
   :functions (gofmt)
   :custom (gofmt-command "goimports")
@@ -493,6 +437,17 @@
                   (apply o args)))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
+(use-package indent-bars
+  :custom
+  (indent-bars-prefer-character t)
+  (indent-bars-treesit-support t)
+  (indent-bars-treesit-ignore-blank-lines-types '("module"))
+  (indent-bars-treesit-scope
+   '((python function_definition class_definition for_statement if_statement with_statement while_statement)
+     (c argument_list parameter_list init_declarator)))
+  :hook (prog-mode . indent-bars-mode)
+  :config
+  (require 'indent-bars-ts))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -528,8 +483,11 @@
       (setf (nthcdr 4 args) nil))
     (apply o args))
   (advice-add #'ob-async-org-babel-execute-src-block :around 'fix-missing-args))
+(use-package outline-indent
+  :delight outline-indent-minor-mode
+  :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
+  :hook (prog-mode . outline-indent-minor-mode))
 (use-package pdf-tools
-  :if window-system
   :magic ("%PDF" . pdf-view-mode)
   :config
   (pdf-tools-install :no-query))
@@ -549,17 +507,10 @@
   (defvar embark-vc-conflict-map (make-composed-keymap smerge-basic-map embark-general-map))
   (defun embark-vc-target-conflict-at-point ()
     "Target a Merge Conflict at point."
-    (when-let* ((smerge-mode smerge-mode)
-                (b (save-excursion
-                     (end-of-line)
-                     (and (re-search-backward smerge-begin-re nil t) (pos-bol))))
-                (e (save-excursion
-                     (and (re-search-forward smerge-end-re nil t) (pos-eol 0))))
-                (in-range (<= b (point) e)))
-      `(conflict "hunk" ,b . ,e)))
+    (when-let (d (save-match-data (and smerge-mode (smerge-match-conflict) (match-data 0))))
+      `(conflict "hunk" ,(car d) . ,(cadr d))))
   (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point)
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
-(use-package tab-bar-echo-area :hook after-init)
 (static-if (and (fboundp 'treesit-available-p) (treesit-available-p))
     (use-package treesit-auto
       :hook ((after-init . global-treesit-auto-mode)
