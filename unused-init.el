@@ -101,6 +101,18 @@
           (apply o args))
       (apply o args)))
   (advice-add #'xterm-paste :around #'handle-eat-paste))
+(use-package indent-bars
+  :disabled
+  :custom
+  (indent-bars-prefer-character t)
+  (indent-bars-treesit-support t)
+  (indent-bars-treesit-ignore-blank-lines-types '("module"))
+  (indent-bars-treesit-scope
+   '((python function_definition class_definition for_statement if_statement with_statement while_statement)
+     (c argument_list parameter_list init_declarator)))
+  :hook (prog-mode . indent-bars-mode)
+  :config
+  (require 'indent-bars-ts))
 (static-if (memq window-system '(mac ns))
     (use-package exec-path-from-shell
   :hook (after-init . exec-path-from-shell-initialize)))

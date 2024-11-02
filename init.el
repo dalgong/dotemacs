@@ -437,17 +437,6 @@
                   (apply o args)))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
-(use-package indent-bars
-  :custom
-  (indent-bars-prefer-character t)
-  (indent-bars-treesit-support t)
-  (indent-bars-treesit-ignore-blank-lines-types '("module"))
-  (indent-bars-treesit-scope
-   '((python function_definition class_definition for_statement if_statement with_statement while_statement)
-     (c argument_list parameter_list init_declarator)))
-  :hook (prog-mode . indent-bars-mode)
-  :config
-  (require 'indent-bars-ts))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))

@@ -21,7 +21,7 @@
                               (left-fringe      . 0)
                               (right-fringe     . 0)
                               (ns-transparent-titlebar . t)
-                              (undecorated . t)
+                              ;; (undecorated . t)
                               (internal-border-width . 8)
                               (wait-for-wm      . nil)
                               (font . ,(format "GoMono Nerd Font-%d" (if (eq system-type 'gnu/linux) 11 12))))))
