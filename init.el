@@ -14,12 +14,12 @@
 (use-package emacs
   :bind (([C-tab]              . other-window)
          ([remap suspend-frame]. ignore)
-         ([remap kill-buffer]  . kill-this-buffer)
+         ([remap kill-buffer]  . kill-current-buffer)
          ([remap list-buffers] . ibuffer)
          ([remap delete-horizontal-space] . cycle-spacing)
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
-         ("M-K"                . kill-this-buffer)
+         ("M-K"                . kill-current-buffer)
          ("C-,"                . next-error)
          ("C-<"                . previous-error)
          ("C-c c"              . calendar)
@@ -121,7 +121,6 @@
   (windmove-default-keybindings 'control)
   (set-display-table-slot (or standard-display-table (setq standard-display-table (make-display-table)))
                           'vertical-border (make-glyph-code ?┃))
-  (fset 'kill-this-buffer (lambda () (interactive) (kill-buffer (current-buffer))))
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
   (defvar set-mark-dwim-timeout-action 'completion-at-point)
@@ -227,7 +226,9 @@
 	(nconc completion-at-point-functions
 	       '(cape-history cape-file cape-keyword cape-dabbrev))))
 (use-package compile
-  :bind (("C-:" . compile) ("C-;" . recompile))
+  :bind ( :map mode-specific-map
+	  ("C"   . compile)
+	  ("C-c" . recompile))
   :custom
   (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
@@ -408,7 +409,9 @@
   :functions embark--targets
   :bind (("C-." . embark-act)
          ("M-." . embark-dwim)
-         :map embark-region-map
+         :map minibuffer-local-map
+	 ("M-E" . embark-export)
+	 :map embark-region-map
          ("!" . shell-command)
          ("x" . compile)
          :map help-map
@@ -419,7 +422,7 @@
   :config
   (setq embark-indicators (delq 'embark-mixed-indicator embark-indicators))
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
-  (add-to-list 'embark-post-action-hooks '(kill-this-buffer embark--restart))
+  (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
 (use-package embark-consult :after consult)
 (use-package go-mode

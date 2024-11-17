@@ -347,6 +347,7 @@
           ("M-s g"  . command-here)
           ("M-s r"  . command-here))
   :config
+  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
   (defun command-here ()
     (interactive)
     (icomplete-force-complete)
