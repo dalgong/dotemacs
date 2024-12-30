@@ -517,12 +517,13 @@
          (rfn-eshadow-update-overlay . vertico-directory-tidy))
   :bind (("C-c C-r" . vertico-repeat)
          :map vertico-map
-         ("C-j"     . vertico-exit-input)
-         ("DEL"     . vertico-directory-delete-char)
-         ("M-/"     . consult-find-dwim)
-         ("C-`"     . command-here)
-         ("M-s g"   . command-here)
-         ("M-s r"   . command-here))
+         ("M-E"   . embark-export)
+	 ("C-j"   . vertico-exit-input)
+         ("DEL"   . vertico-directory-delete-char)
+         ("M-/"   . consult-find-dwim)
+         ("C-`"   . command-here)
+         ("M-s g" . command-here)
+         ("M-s r" . command-here))
   :custom
   (vertico-count-format nil)
   :config
