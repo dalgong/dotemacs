@@ -440,6 +440,13 @@
                   (apply o args)))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
+(use-package marginalia
+  :ensure
+  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
+  :custom
+  (marginalia-annotators
+   '(marginalia-annotators-light marginalia-annotators-heavy))
+  :hook (after-init . marginalia-mode))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -463,7 +470,7 @@
   (use-package ob-async)
   (use-package ob-compile :ensure nil)
   (defun lazy-load-org-babel-languages (o &rest args)
-    (when-let (lang (org-element-property :language (org-element-at-point)))
+    (when-let* ((lang (org-element-property :language (org-element-at-point))))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
       (unless (cdr (assoc (intern lang) org-babel-load-languages))
         (add-to-list 'org-babel-load-languages (cons (intern lang) t))
@@ -474,7 +481,21 @@
     (when (> (length args) 4)
       (setf (nthcdr 4 args) nil))
     (apply o args))
-  (advice-add #'ob-async-org-babel-execute-src-block :around 'fix-missing-args))
+  (advice-add #'ob-async-org-babel-execute-src-block :around 'fix-missing-args)
+  (use-package org-roam
+    :ensure t
+    :custom
+    (org-roam-directory "~/notes")
+    (org-roam-complete-everywhere t)
+    :bind (("C-c n l" . org-roam-buffer-toggle)
+           ("C-c n f" . org-roam-node-find)
+           ("C-c n i" . org-roam-node-insert)
+	   :map org-mode-map
+	   ("C-M-i" . completion-at-point))
+    :config
+    (unless (file-directory-p "~/notes")
+      (make-directory "~/notes/daily" 'parents))
+    (org-roam-db-autosync-enable)))
 (use-package outline-indent
   :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
@@ -489,8 +510,8 @@
   :custom (python-shell-interpreter "ipython")
   :config
   (defun maybe-set-python-shell-virtualenv-root ()
-    (when-let (dir (and (null python-shell-virtualenv-root)
-                        (locate-dominating-file default-directory ".venv/")))
+    (when-let* ((dir (and (null python-shell-virtualenv-root)
+                          (locate-dominating-file default-directory ".venv/"))))
       (setq-local python-shell-virtualenv-root (expand-file-name ".venv/" dir)))))
 (use-package smerge-mode
   :after embark
@@ -499,7 +520,7 @@
   (defvar embark-vc-conflict-map (make-composed-keymap smerge-basic-map embark-general-map))
   (defun embark-vc-target-conflict-at-point ()
     "Target a Merge Conflict at point."
-    (when-let (d (save-match-data (and smerge-mode (smerge-match-conflict) (match-data 0))))
+    (when-let* ((d (save-match-data (and smerge-mode (smerge-match-conflict) (match-data 0)))))
       `(conflict "hunk" ,(car d) . ,(cadr d))))
   (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point)
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
