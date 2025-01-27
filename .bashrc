@@ -49,8 +49,15 @@ if [[ -z $EMACS_BASH_COMPLETE ]]; then
   PS1='\h:\w \$ ' PS0='`tput cuu1``tput cuf $(($(tput cols) - 15))`\t `date +%m/%d`\n'
 fi
 
-[[ -n "$EAT_SHELL_INTEGRATION_DIR" ]] && source "$EAT_SHELL_INTEGRATION_DIR/bash"
+show_date_before_cmd() {
+    [[ "$BASH_COMMAND" = "$PROMPT_COMMAND" ]] || printf "%*s\e[3m\e[4m%s\e[0m\n" $((COLUMNS-32)) "" "$(date)"
+}
 
-[[ -n "$INSIDE_EMACS" ]] &&
-    [[ -n "$EAT_SHELL_INTEGRATION_DIR" ]] &&
-    source ~/.emacs.d/init_bash.sh
+if [[ -n "$INSIDE_EMACS" ]]; then
+    if expr $INSIDE_EMACS : .*comint.* >/dev/null 2>&1; then
+	export EDITOR='emacsclient' PAGER=cat TERM=xterm-256color PS0=
+	PROMPT_COMMAND="trap 'show_date_before_cmd; trap - DEBUG' DEBUG${PROMPT_COMMAND:+;}${PROMPT_COMMAND}"
+    else
+	[[ -n "$EAT_SHELL_INTEGRATION_DIR" ]] && source "$EAT_SHELL_INTEGRATION_DIR/bash"
+    fi
+fi
