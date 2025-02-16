@@ -404,6 +404,19 @@
   (eglot-report-progress nil)
   :config
   (setq jsonrpc-event-hook nil))
+(use-package elfeed
+  :disabled
+  :ensure nil
+  :custom
+  (elfeed-feeds '("https://xkcd.com/rss.xml"
+		  "https://nullprogram.com/feed/"
+		  "http://pragmaticemacs.com/feed/"
+		  "https://blog.codinghorror.com/rss/"
+		  "https://daringfireball.net/feeds/main"
+		  "https://feeds.feedburner.com/explainextended"
+		  "http://morss.aryadevchavali.com/news.ycombinator.com/rss"
+		  "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/rss.xml"
+		  "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/technology/rss.xml")))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
