@@ -13,7 +13,6 @@
 
 (use-package emacs
   :bind (([C-tab]              . other-window)
-         ([remap suspend-frame]. ignore)
          ([remap kill-buffer]  . kill-current-buffer)
          ([remap list-buffers] . ibuffer)
          ([remap delete-horizontal-space] . cycle-spacing)
@@ -323,7 +322,7 @@
   :autoload maybe-eat-compilation-start
   :commands (eat-emacs-mode eat-mode)
   :functions (eat-exec eat-term-send-string-as-yank eat--synchronize-scroll-windows)
-  :bind (("C-`" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
+  :bind (("C-z" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
@@ -342,7 +341,14 @@
   (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
-    (call-interactively (if eat--semi-char-mode 'eat-emacs-mode 'eat-semi-char-mode)))
+    (call-interactively
+     (cond ((or (null eat-terminal)
+		current-prefix-arg)
+	    'eat)
+	   (eat--semi-char-mode
+	    'eat-emacs-mode)
+	   (t
+	    'eat-semi-char-mode))))
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat-terminal))
         (apply o args)
@@ -555,7 +561,7 @@
 	 ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . consult-find-dwim)
-         ("C-`"   . command-here)
+         ("C-z"   . command-here)
          ("M-s g" . command-here)
          ("M-s r" . command-here))
   :custom
