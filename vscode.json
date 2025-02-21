@@ -12,6 +12,9 @@
 
 // key bindings
   { "key": "ctrl+.", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c." } },
+  { "key": "ctrl+,", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c," } },
+  { "key": "ctrl+'", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c'" } },
+  { "key": "ctrl+;", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c;" } },
   { "key": "cmd+space", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001b " }},
   { "key": "cmd+'", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001b'" }},
   { "key": "cmd+,", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001b," }},
