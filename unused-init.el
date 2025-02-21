@@ -1220,3 +1220,16 @@
           (insert completion)
           t))))
   (setq completion-in-region-function #'completion-in-region-on-minibuffer))
+(use-package corfu
+  :disabled
+  :hook (prog-mode text-mode)
+  :custom
+  (corfu-auto t)
+  (corfu-auto-delay 0.5)
+  (corfu-quit-no-match t)
+  :config
+  (use-package corfu-terminal
+    :config
+    (unless (display-graphic-p)
+      (corfu-terminal-mode +1))))
+

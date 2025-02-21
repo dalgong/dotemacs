@@ -13,7 +13,6 @@
 
 (use-package emacs
   :bind (([C-tab]              . other-window)
-         ([remap suspend-frame]. ignore)
          ([remap kill-buffer]  . kill-current-buffer)
          ([remap list-buffers] . ibuffer)
          ([remap delete-horizontal-space] . cycle-spacing)
@@ -293,17 +292,10 @@
         (call-interactively 'consult-imenu-multi)
       (apply o args)))
   (advice-add 'consult-imenu :around 'consult-imenu-across-all-buffers))
-(use-package corfu
-  :hook (prog-mode text-mode)
-  :custom
-  (corfu-auto t)
-  (corfu-auto-delay 0.5)
-  (corfu-quit-no-match t)
-  :config
-  (use-package corfu-terminal
-    :config
-    (unless (display-graphic-p)
-      (corfu-terminal-mode +1))))
+(use-package completion-preview
+  :delight
+  :ensure nil
+  :hook (prog-mode text-mode))
 (use-package display-line-numbers :hook (prog-mode text-mode))
 (use-package easy-kill
   :after embark
@@ -323,7 +315,7 @@
   :autoload maybe-eat-compilation-start
   :commands (eat-emacs-mode eat-mode)
   :functions (eat-exec eat-term-send-string-as-yank eat--synchronize-scroll-windows)
-  :bind (("C-`" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
+  :bind (("C-z" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
@@ -342,7 +334,14 @@
   (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
-    (call-interactively (if eat--semi-char-mode 'eat-emacs-mode 'eat-semi-char-mode)))
+    (call-interactively
+     (cond ((or (null eat-terminal)
+		current-prefix-arg)
+	    'eat)
+	   (eat--semi-char-mode
+	    'eat-emacs-mode)
+	   (t
+	    'eat-semi-char-mode))))
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat-terminal))
         (apply o args)
@@ -513,10 +512,11 @@
   :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
   :hook (prog-mode . outline-indent-minor-mode))
-(use-package pdf-tools
-  :magic ("%PDF" . pdf-view-mode)
-  :config
-  (pdf-tools-install :no-query))
+(static-if window-system
+    (use-package pdf-tools
+      :magic ("%PDF" . pdf-view-mode)
+      :config
+      (pdf-tools-install :no-query)))
 (use-package python
   :ensure nil
   :hook (python-ts-mode . maybe-set-python-shell-virtualenv-root)
@@ -539,12 +539,9 @@
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
 (static-if (and (fboundp 'treesit-available-p) (treesit-available-p))
     (use-package treesit-auto
-      :hook ((after-init . global-treesit-auto-mode)
-             (prog-mode . fix-forward-sexp-function))
+      :hook ((after-init . global-treesit-auto-mode))
       :custom
-      (treesit-font-lock-level 4)
-      :config
-      (defun fix-forward-sexp-function () (setq forward-sexp-function nil))))
+      (treesit-font-lock-level 4)))
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
@@ -555,7 +552,7 @@
 	 ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . consult-find-dwim)
-         ("C-`"   . command-here)
+         ("C-z"   . command-here)
          ("M-s g" . command-here)
          ("M-s r" . command-here))
   :custom
