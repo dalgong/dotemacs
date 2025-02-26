@@ -11,6 +11,28 @@
     "terminal.integrated.sendKeybindingsToShell": true,
 
 // key bindings
+[
+  {
+      "key": "alt+.",
+      "command": "workbench.action.terminal.sendSequence",
+      "args": {
+          "text": "emacsclient -a '' -e '(embark-file-line \"${file}\" ${lineNumber})'\nx\n"
+      }
+  },
+  {
+      "key": "shift+cmd+l",
+      "command": "fuzzySearch.activeTextEditorWithCurrentSelection"
+  },
+  {
+      "key": "shift+cmd+b",
+      "command": "buck.lsp.build_owning_target"
+  },
+  {
+      "key": "ctrl+cmd+enter",
+      "command": "workbench.action.toggleMaximizedPanel",
+      "when": "panelAlignment == 'center' || panelPosition != 'bottom' && panelPosition != 'top'"
+  },
+
   { "key": "ctrl+.", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c." } },
   { "key": "ctrl+,", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c," } },
   { "key": "ctrl+'", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c'" } },
@@ -88,7 +110,8 @@
 
   { "key": "cmd+shift+a", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bA" }},
   { "key": "cmd+shift+b", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bB" }},
-  { "key": "cmd+shift+c", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bC" }},
+  // { "key": "cmd+shift+c", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bC" }},
+  { "key": "cmd+shift+c", "command": "workbench.action.terminal.copySelection", "when": "terminalFocus" },
   { "key": "cmd+shift+d", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bD" }},
   { "key": "cmd+shift+e", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bE" }},
   { "key": "cmd+shift+f", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bF" }},
@@ -107,7 +130,8 @@
   { "key": "cmd+shift+s", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bS" }},
   { "key": "cmd+shift+t", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bT" }},
   { "key": "cmd+shift+u", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bU" }},
-  { "key": "cmd+shift+v", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bV" }},
+  // { "key": "cmd+shift+v", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bV" }},
+  { "key": "cmd+shift+v", "command": "workbench.action.terminal.paste", "when": "terminalFocus" },
   { "key": "cmd+shift+w", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bW" }},
   { "key": "cmd+shift+x", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bX" }},
   { "key": "cmd+shift+y", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001bY" }},
@@ -140,3 +164,4 @@
   { "key": "cmd+ctrl+x", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@m\u0018" }},
   { "key": "cmd+ctrl+y", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@m\u0019" }},
   { "key": "cmd+ctrl+z", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@m\u001a" }},
+]
