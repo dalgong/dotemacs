@@ -292,17 +292,9 @@
         (call-interactively 'consult-imenu-multi)
       (apply o args)))
   (advice-add 'consult-imenu :around 'consult-imenu-across-all-buffers))
-(use-package corfu
-  :hook (prog-mode text-mode)
-  :custom
-  (corfu-auto t)
-  (corfu-auto-delay 0.5)
-  (corfu-quit-no-match t)
-  :config
-  (use-package corfu-terminal
-    :config
-    (unless (display-graphic-p)
-      (corfu-terminal-mode +1))))
+(use-package completion-preview
+  :ensure nil
+  :hook (prog-mode text-mode))
 (use-package display-line-numbers :hook (prog-mode text-mode))
 (use-package easy-kill
   :after embark
@@ -519,10 +511,11 @@
   :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
   :hook (prog-mode . outline-indent-minor-mode))
-(use-package pdf-tools
-  :magic ("%PDF" . pdf-view-mode)
-  :config
-  (pdf-tools-install :no-query))
+(static-if window-system
+    (use-package pdf-tools
+      :magic ("%PDF" . pdf-view-mode)
+      :config
+      (pdf-tools-install :no-query)))
 (use-package python
   :ensure nil
   :hook (python-ts-mode . maybe-set-python-shell-virtualenv-root)
@@ -545,12 +538,9 @@
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
 (static-if (and (fboundp 'treesit-available-p) (treesit-available-p))
     (use-package treesit-auto
-      :hook ((after-init . global-treesit-auto-mode)
-             (prog-mode . fix-forward-sexp-function))
+      :hook ((after-init . global-treesit-auto-mode))
       :custom
-      (treesit-font-lock-level 4)
-      :config
-      (defun fix-forward-sexp-function () (setq forward-sexp-function nil))))
+      (treesit-font-lock-level 4)))
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
