@@ -450,6 +450,14 @@
                 (if (eq major-mode 'go-ts-mode)
                     (gofmt)
                   (apply o args)))))
+(use-package gptel
+  :ensure
+  :config
+  (setq gptel-model 'mistral:latest)
+  (setq gptel-backend (gptel-make-ollama "Ollama"
+			:host "localhost:11434"
+			:stream t
+			:models '(deepseek-r1:7b))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
@@ -459,6 +467,10 @@
   (marginalia-annotators
    '(marginalia-annotators-light marginalia-annotators-heavy))
   :hook (after-init . marginalia-mode))
+(use-package ollama-buddy
+  :ensure
+  :bind ("C-c o" . ollama-buddy-menu)
+  :custom ollama-buddy-default-model "deepseek-r1:7b")
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
