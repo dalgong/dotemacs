@@ -1,5 +1,5 @@
 ;; -*- lexical-binding: t -*-
-(setq custom-file "/dev/null")
+(setq custom-file null-device)
 (advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
@@ -223,7 +223,7 @@
   :config
   (setq completion-at-point-functions
 	(nconc completion-at-point-functions
-	       '(cape-history cape-file cape-keyword cape-dabbrev))))
+	       '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package compile
   :bind ( :map mode-specific-map
 	  ("C"   . compile)
@@ -253,7 +253,8 @@
          ("C-x M-:" . consult-complex-command)
          ("C-x b"   . consult-buffer)
          ("C-x C-r" . consult-recent-file)
-         ("C-h SPC"   . consult-mark)
+         ("C-h C-i"   . consult-info)
+	 ("C-h SPC"   . consult-mark)
          ("C-h C-SPC" . consult-global-mark)
 
          :map minibuffer-local-map
@@ -436,7 +437,8 @@
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
-(use-package embark-consult :after consult)
+(use-package embark-consult
+  :hook (embark-collect-mode . consult-preview-at-point-mode))
 (use-package go-mode
   :functions (gofmt)
   :custom (gofmt-command "goimports")
@@ -478,7 +480,6 @@
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism)))
 (use-package org
   :bind (:map org-mode-map ("C-TAB" . nil) ("C-c ;" . nil))
-  :hook (org-babel-after-execute . org-redisplay-inline-images)
   :custom
   (org-confirm-babel-evaluate nil)
   (org-cycle-separator-lines 0)
@@ -591,3 +592,12 @@
     (vertico-multiform-mode 1)))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
+(use-package which-key
+  :delight
+  :ensure nil
+  :hook (after-init . which-key-mode)
+  :custom
+  (which-key-idle-delay 1.5)
+  (which-key-idle-secondary-delay 0.25)
+  (which-key-add-column-padding 1)
+  (which-key-max-description-length 40))
