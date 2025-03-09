@@ -332,27 +332,34 @@
   :disabled
   :hook (after-init . icomplete-vertical-mode)
   :custom
+  (icomplete-hide-common-prefix nil)
   (icomplete-in-buffer t)
+  (icomplete-matches-format nil)
+  (icomplete-prospects-height 10)
+  (icomplete-show-matches-on-no-input t)
   (icomplete-tidy-shadowed-file-names t)
-  (max-mini-window-height 12)
   :bind ( :map icomplete-minibuffer-map
-          ("RET"    . icomplete-force-complete-and-exit)
+          ("C-."    . embark-act)
+	  ("DEL"    . icomplete-fido-backward-updir)
+	  ("RET"    . icomplete-force-complete-and-exit)
           ("C-j"    . icomplete-ret)
           ("TAB"    . icomplete-force-complete)
           ("<down>" . icomplete-forward-completions)
           ("C-n"    . icomplete-forward-completions)
           ("<up>"   . icomplete-backward-completions)
           ("C-p"    . icomplete-backward-completions)
-          ("C-`"    . command-here)
+	  ("M-/"   .  (lambda () (interactive) (command-here 'consult-find)))
+          ("C-z"    . command-here)
           ("M-s g"  . command-here)
           ("M-s r"  . command-here))
   :config
+  (setq icomplete-scroll t)  
   (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
-  (defun command-here ()
+  (defun command-here (&optional cmd)
     (interactive)
     (icomplete-force-complete)
     (let ((dir (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-          (cmd (lookup-key global-map (this-command-keys))))
+          (cmd (or cmd (lookup-key global-map (this-command-keys)))))
       (run-at-time 0 nil (lambda () (let ((default-directory dir))
                                       (call-interactively cmd))))
       (abort-recursive-edit))))
@@ -1232,4 +1239,66 @@
     :config
     (unless (display-graphic-p)
       (corfu-terminal-mode +1))))
+(use-package vertico
+  :disabled
+  :hook ((after-init . vertico-mode)
+         (minibuffer-setup . vertico-repeat-save)
+         (rfn-eshadow-update-overlay . vertico-directory-tidy))
+  :bind (("C-c C-r" . vertico-repeat)
+         :map vertico-map
+         ("M-E"   . embark-export)
+	 ("C-j"   . vertico-exit-input)
+         ("DEL"   . vertico-directory-delete-char)
+         ("M-/"   . consult-find-dwim)
+         ("C-z"   . command-here)
+         ("M-s g" . command-here)
+         ("M-s r" . command-here))
+  :custom
+  (vertico-count-format nil)
+  :config
+  (defun vertico-selected-directory ()
+    (vertico-insert)
+    (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+  (defun command-here ()
+    (interactive)
+    (let ((dir (vertico-selected-directory))
+          (cmd (lookup-key global-map (this-command-keys))))
+      (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                      (call-interactively cmd))))
+      (abort-recursive-edit)))
+  (defun consult-find-dwim ()
+    (interactive)
+    (run-at-time 0 nil #'consult-find (vertico-selected-directory))
+    (abort-recursive-edit))
+  (use-package vertico-multiform
+    :ensure nil
+    :config
+    (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
+    (vertico-multiform-mode 1)))
+(when nil
+  (defun find-file--line-number (o filename &optional wildcards)
+    "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
+    (let (line-number)
+      (unless (file-exists-p filename)
+        (save-match-data
+          (when (and (string-match "^\\(.*\\):\\([0-9]+\\):?$" filename)
+                     (match-string 2 filename))
+            (setq line-number (string-to-number (match-string 2 filename)))
+            (setq filename (match-string 1 filename)))))
+      (prog1
+          (apply o (list filename wildcards))
+        (when line-number
+          (goto-char (point-min))
+          (forward-line (1- line-number))))))
+  (advice-add 'find-file :around 'find-file--line-number)
+  (use-package ffap
+    :ensure nil
+    :config
+    (defun ffap-file-at-point-add-line-number (r)
+      (let ((s (ffap-string-at-point)))
+        (save-match-data
+          (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
+              (concat r (match-string 1 s))
+            r))))
+    (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
 
