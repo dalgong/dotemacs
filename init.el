@@ -3,13 +3,8 @@
 (advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
-(dolist (x '( auto-revert-mode delete-selection-mode electric-pair-mode
-              global-reveal-mode minibuffer-depth-indicate-mode repeat-mode
-              recentf-mode savehist-mode save-place-mode))
-  (add-to-list 'after-init-hook x))
-
-(dolist (p '(package bind-key use-package)) (require p nil t))
-(push (cons "melpa" "http://melpa.org/packages/") package-archives)
+(mapc #'require '(package bind-key use-package))
+(push '("melpa" . "http://melpa.org/packages/") package-archives)
 
 (use-package emacs
   :bind (([C-tab]              . other-window)
@@ -19,13 +14,12 @@
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-current-buffer)
-         ("C-,"                . next-error)
-         ("C-<"                . previous-error)
+         ("M-o"		       . find-file)
+         ("M-p"		       . find-file)
          ("C-c c"              . calendar)
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
-  (async-shell-command-display-buffer nil)
   (auto-save-default nil)
   (auto-save-interval 0)
   (bidi-inhibit-bpa t)
@@ -35,7 +29,6 @@
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
   (cycle-spacing-actions '(delete-all-space just-one-space restore))
-  (dired-kill-when-opening-new-dired-buffer t)
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
@@ -61,14 +54,11 @@
   (mac-right-option-modifier nil)
   (make-backup-files nil)
   (mark-even-if-inactive t)
-  (mode-line-client nil)
-  (mode-line-modified '("%* "))
-  (mode-line-remote nil)
-  (mode-line-frame-identification nil)
-  (mode-line-front-space '("  "))
-  (mode-line-position)
-  (mode-line-mule-info nil)
   (mode-line-end-spaces nil)
+  (mode-line-frame-identification nil)
+  (mode-line-modified '("%* "))
+  (mode-line-mule-info nil)
+  (mode-line-remote nil)
   (ns-alternate-modifier 'super)
   (ns-command-modifier 'meta)
   (proced-enable-color-flag t)
@@ -77,26 +67,17 @@
   (read-process-output-max (* 1024 1024))
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 1000)
-  (redisplay-skip-fontification-on-input t)
   (remote-file-name-inhibit-locks t)
   (require-final-newline t)
   (revert-without-query '(""))
   (ring-bell-function 'ignore)
-  (save-interprogram-paste-before-kill t)
-  (scroll-preserve-screen-position t)
-  (scroll-margin 0)
-  (scroll-step 1)
+  (scroll-conservatively 5)
   (select-active-regions nil)
   (sentence-end-double-space nil)
   (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
-  (shell-command-default-error-buffer "*Shell Command Errors*")
   (split-height-threshold nil)
   (tab-always-indent 'complete)
-  (tab-bar-show nil)
-  (tramp-auto-save-directory "~/.cache/emacs/backups")
-  (tramp-persistency-file-name "~/.emacs.d/data/tramp")
-  (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
   (use-package-always-ensure t)
@@ -111,21 +92,37 @@
   (xref-search-program 'ripgrep)
   (words-include-escapes t)
   :config
-  (defun goto-line-with-number ()
-    (interactive)
-    (setq unread-command-events (cons last-command-event unread-command-events))
-    (call-interactively 'goto-line))
-  (dotimes (i 10)
-    (define-key goto-map (format "%d" i) 'goto-line-with-number))
+  (setq after-init-hook
+	(nconc after-init-hook
+	       '( auto-revert-mode delete-selection-mode electric-pair-mode
+		  global-reveal-mode line-number-mode minibuffer-depth-indicate-mode
+		  repeat-mode recentf-mode savehist-mode save-place-mode)))
+  (defvar first-key-overload-command-list '(find-file execute-extended-command))
+  (defvar-keymap first-key-overload-map
+    :doc "Mimic vscode behavior"
+    ">"   'execute-extended-command
+    "@"   'consult-imenu
+    ":"   'consult-goto-line
+    ";"   'consult-outline)
+  (defun self-insert-dwim (n &optional c)
+    (interactive (list (prefix-numeric-value current-prefix-arg) last-command-event))
+    (if-let* ((cmd (and (memq last-command first-key-overload-command-list)
+			(lookup-key first-key-overload-map (vector last-command-event)))))
+	(progn (run-at-time 0 nil #'call-interactively cmd)
+	       (abort-recursive-edit)))
+    (self-insert-command n c))
+  (map-keymap (lambda (k _) (define-key minibuffer-local-map (char-to-string k) 'self-insert-dwim)) first-key-overload-map)
   (windmove-default-keybindings 'control)
-  (set-display-table-slot (or standard-display-table (setq standard-display-table (make-display-table)))
-                          'vertical-border (make-glyph-code ?┃))
+  (or standard-display-table (setq standard-display-table (make-display-table)))
+  (set-display-table-slot standard-display-table 'vertical-border ?\u2502)
+  (set-display-table-slot standard-display-table 'truncation ?\u2192)
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
   (defvar set-mark-dwim-timeout-action 'completion-at-point)
   (defvar-keymap set-mark-dwim-map
     :doc "An briefly active keymap after set-mark-command"
-    "SPC" 'embark-select)
+    :repeat t
+    "SPC" #'hippie-expand)
   (defun set-mark-dwim (o &rest args)
     (cond ((or (not (called-interactively-p 'interactive))
                current-prefix-arg
@@ -136,7 +133,7 @@
                  cmd)
              (cond ((and (setq cmd (lookup-key set-mark-dwim-map keyseq))
                          (commandp cmd))
-                    (call-interactively cmd))
+                    (call-interactively (setq this-command cmd)))
                    ((and (setq cmd (lookup-key (current-active-maps) keyseq))
                          (memq cmd '(set-mark-command cua-set-mark)))
                     (call-interactively set-mark-dwim-repeat-action))
@@ -158,18 +155,6 @@
       (run-at-time 0 nil (lambda () (apply o args)))
       (call-interactively 'recursive-edit)))
   (advice-add 'delete-other-windows :around 'delete-other-windows-dwim)
-  (defun call-other-window-if-interactive (&rest _)
-    (when (called-interactively-p 'any)
-      (other-window 1)))
-  (advice-add 'split-window-right :after 'call-other-window-if-interactive)
-  (advice-add 'split-window-below :after 'call-other-window-if-interactive)
-  (defun switch-to-last-buffer-if-one-window (o &rest args)
-    (if (and (one-window-p 'nomini) (called-interactively-p 'interactive))
-        (if (= 1 (length (frame-list)))
-            (switch-to-buffer nil)
-          (other-frame 1))
-      (apply o args)))
-  (advice-add 'other-window :around 'switch-to-last-buffer-if-one-window)
   (advice-add 'electric-pair-open-newline-between-pairs-psif
               :after (lambda ()
                        (when (eq last-command-event ?\n)
@@ -213,21 +198,13 @@
         (call-interactively 'avy-pop-mark)
       (apply o args)))
   (advice-add 'avy-goto-char-timer :around 'avy-pop-mark-if-prefix))
-(use-package beardbolt
-  :vc ( :url "https://github.com/joaotavora/beardbolt.git"
-        :rev :newest)
-  :bind ("C-c :" . beardbolt-starter)
-  :config
-  (push (cons 'c++-ts-mode (cdr (assq 'c++-mode beardbolt-languages))) beardbolt-languages))
 (use-package cape
   :config
   (setq completion-at-point-functions
 	(nconc completion-at-point-functions
 	       '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package compile
-  :bind ( :map mode-specific-map
-	  ("C"   . compile)
-	  ("C-c" . recompile))
+  :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
   (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
@@ -235,7 +212,7 @@
   (compilation-buffer-name-function 'get-idle-compilation--buffer-name)
   (compilation-save-buffers-predicate 'ignore)
   :config
-  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
+  (require 'eat nil t)
   (defun get-idle-compilation--buffer-name (name-of-mode)
     (let ((name (compilation--default-buffer-name name-of-mode)))
       (or (cl-loop for b in (buffer-list)
@@ -248,7 +225,6 @@
   :bind (("M-\"" . consult-register-load)
          ("M-'"  . consult-register-store)
          ([remap yank-pop] . consult-yank-pop)
-         ("M-T" . consult-imenu)
          ("C-c k"   . consult-kmacro)
          ("C-x M-:" . consult-complex-command)
          ("C-x b"   . consult-buffer)
@@ -265,19 +241,15 @@
 
          :map search-map
          ("e"    . consult-isearch-history)
-         ("f"    . consult-line)
-         ("F"    . consult-line-multi)
          ("g"    . grep)
          ("G"    . consult-git-grep)
-         ("k"    . consult-keep-lines)
          ("r"    . consult-ripgrep)
-         ("u"    . consult-focus-lines)
 
          :map isearch-mode-map
          ("M-h"  . consult-isearch-history)
-         ("M-o"  . consult-line)
-         ("M-O"  . consult-line-multi)
-         ("M-q"  . isearch-query-replace))
+         ("M-l"  . consult-line)
+         ("M-L"  . consult-line-multi)
+	 ("M-q"  . isearch-query-replace))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
   (register-preview-delay 0.5)
@@ -297,7 +269,6 @@
   :delight
   :ensure nil
   :hook (prog-mode text-mode))
-(use-package display-line-numbers :hook (prog-mode text-mode))
 (use-package easy-kill
   :after embark
   :bind (([remap kill-ring-save] . easy-kill))
@@ -313,15 +284,11 @@
 (use-package eat
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
-  :autoload maybe-eat-compilation-start
-  :commands (eat-emacs-mode eat-mode)
-  :functions (eat-exec eat-term-send-string-as-yank eat--synchronize-scroll-windows)
   :bind (("C-z" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
-    (define-key map (kbd "M-o")  'avy-goto-char-timer)
     (define-key map (kbd "M-\"") 'consult-register-load)
     (define-key map (kbd "C-z")  'eat-toggle-char-mode)
     map)
@@ -396,27 +363,10 @@
         (setq-local revert-buffer-function 'compilation-revert-buffer)
         (setq next-error-last-buffer outbuf)
         (display-buffer outbuf '(nil (allow-no-window . t)))))))
-(use-package ediff :bind (:map goto-map ("=" . ediff-current-file)))
-(use-package eglot
-  :ensure nil
-  :defer t
+(use-package ediff
   :custom
-  (eglot-report-progress nil)
-  :config
-  (setq jsonrpc-event-hook nil))
-(use-package elfeed
-  :disabled
-  :ensure nil
-  :custom
-  (elfeed-feeds '("https://xkcd.com/rss.xml"
-		  "https://nullprogram.com/feed/"
-		  "http://pragmaticemacs.com/feed/"
-		  "https://blog.codinghorror.com/rss/"
-		  "https://daringfireball.net/feeds/main"
-		  "https://feeds.feedburner.com/explainextended"
-		  "http://morss.aryadevchavali.com/news.ycombinator.com/rss"
-		  "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/rss.xml"
-		  "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/technology/rss.xml")))
+  (ediff-window-setup-function 'ediff-setup-windows-plain)
+  :bind (:map goto-map ("=" . ediff-current-file)))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
@@ -437,42 +387,33 @@
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
-(use-package embark-consult
-  :hook (embark-collect-mode . consult-preview-at-point-mode))
-(use-package go-mode
-  :functions (gofmt)
-  :custom (gofmt-command "goimports")
-  :hook (go-mode . eglot-ensure))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
   :config
-  (advice-add 'gofmt-before-save :around
-              (defun gofmt-on-go-ts-mode (o &rest args)
-                (if (eq major-mode 'go-ts-mode)
-                    (gofmt)
-                  (apply o args)))))
+  (use-package go-mode :functions (gofmt) :custom (gofmt-command "goimports"))
+  (defun gofmt-before-save () (when (derived-mode-p 'go-mode) (gofmt))))
 (use-package gptel
   :ensure
+  :bind (("M-P"     . gptel)
+	 ("C-c RET" . gptel-send))
   :config
-  (setq gptel-model 'mistral:latest)
+  (setq gptel-model 'gemma3)
   (setq gptel-backend (gptel-make-ollama "Ollama"
 			:host "localhost:11434"
 			:stream t
-			:models '(deepseek-r1:7b))))
+			:models '(gemma3 mistral:latest deepseek-r1:7b))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
   :ensure
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
-  :custom
-  (marginalia-annotators
-   '(marginalia-annotators-light marginalia-annotators-heavy))
   :hook (after-init . marginalia-mode))
 (use-package ollama-buddy
   :ensure
   :bind ("C-c o" . ollama-buddy-menu)
-  :custom ollama-buddy-default-model "deepseek-r1:7b")
+  :custom
+  (ollama-buddy-default-model "gemma3:latest"))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -556,48 +497,34 @@
       :custom
       (treesit-font-lock-level 4)))
 (use-package vertico
-  :hook ((after-init . vertico-mode)
-         (minibuffer-setup . vertico-repeat-save)
-         (rfn-eshadow-update-overlay . vertico-directory-tidy))
-  :bind (("C-c C-r" . vertico-repeat)
-         :map vertico-map
-         ("M-E"   . embark-export)
-	 ("C-j"   . vertico-exit-input)
-         ("DEL"   . vertico-directory-delete-char)
-         ("M-/"   . consult-find-dwim)
-         ("C-z"   . command-here)
-         ("M-s g" . command-here)
-         ("M-s r" . command-here))
-  :custom
-  (vertico-count-format nil)
-  :config
-  (defun vertico-selected-directory ()
-    (vertico-insert)
-    (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-  (defun command-here ()
-    (interactive)
-    (let ((dir (vertico-selected-directory))
-          (cmd (lookup-key global-map (this-command-keys))))
-      (run-at-time 0 nil (lambda () (let ((default-directory dir))
-                                      (call-interactively cmd))))
-      (abort-recursive-edit)))
-  (defun consult-find-dwim ()
-    (interactive)
-    (run-at-time 0 nil #'consult-find (vertico-selected-directory))
-    (abort-recursive-edit))
-  (use-package vertico-multiform
-    :ensure nil
-    :config
-    (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
-    (vertico-multiform-mode 1)))
+   :hook ((after-init . vertico-mode)
+          (minibuffer-setup . vertico-repeat-save)
+          (rfn-eshadow-update-overlay . vertico-directory-tidy))
+   :bind (("C-c C-r" . vertico-repeat)
+          :map vertico-map
+          ("M-E"   . embark-export)
+ 	 ("C-j"   . vertico-exit-input)
+          ("DEL"   . vertico-directory-delete-char)
+          ("M-/"   . consult-find-dwim)
+          ("C-z"   . command-here)
+          ("M-s g" . command-here)
+          ("M-s r" . command-here))
+   :custom
+   (vertico-count-format nil)
+   :config
+   (defun vertico-selected-directory ()
+     (vertico-insert)
+     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+   (defun command-here ()
+     (interactive)
+     (let ((dir (vertico-selected-directory))
+           (cmd (lookup-key global-map (this-command-keys))))
+       (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                       (call-interactively cmd))))
+       (abort-recursive-edit)))
+   (defun consult-find-dwim ()
+     (interactive)
+     (run-at-time 0 nil #'consult-find (vertico-selected-directory))
+     (abort-recursive-edit)))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
-(use-package which-key
-  :delight
-  :ensure nil
-  :hook (after-init . which-key-mode)
-  :custom
-  (which-key-idle-delay 1.5)
-  (which-key-idle-secondary-delay 0.25)
-  (which-key-add-column-padding 1)
-  (which-key-max-description-length 40))
