@@ -3,13 +3,8 @@
 (advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
-(dolist (x '( auto-revert-mode delete-selection-mode electric-pair-mode
-              global-reveal-mode minibuffer-depth-indicate-mode repeat-mode
-              recentf-mode savehist-mode save-place-mode))
-  (add-to-list 'after-init-hook x))
-
-(dolist (p '(package bind-key use-package)) (require p nil t))
-(push (cons "melpa" "http://melpa.org/packages/") package-archives)
+(mapc #'require '(package bind-key use-package))
+(push '("melpa" . "http://melpa.org/packages/") package-archives)
 
 (use-package emacs
   :bind (([C-tab]              . other-window)
@@ -19,13 +14,12 @@
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-current-buffer)
-         ("C-,"                . next-error)
-         ("C-<"                . previous-error)
+         ("M-o"		       . find-file)
+         ("M-p"		       . find-file)
          ("C-c c"              . calendar)
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
-  (async-shell-command-display-buffer nil)
   (auto-save-default nil)
   (auto-save-interval 0)
   (bidi-inhibit-bpa t)
@@ -35,7 +29,6 @@
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
   (cycle-spacing-actions '(delete-all-space just-one-space restore))
-  (dired-kill-when-opening-new-dired-buffer t)
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
@@ -61,12 +54,10 @@
   (mac-right-option-modifier nil)
   (make-backup-files nil)
   (mark-even-if-inactive t)
-  (mode-line-client nil)
   (mode-line-modified '("%* "))
   (mode-line-remote nil)
   (mode-line-frame-identification nil)
-  (mode-line-front-space '("  "))
-  (mode-line-position)
+  (mode-line-position nil)
   (mode-line-mule-info nil)
   (mode-line-end-spaces nil)
   (ns-alternate-modifier 'super)
@@ -77,26 +68,16 @@
   (read-process-output-max (* 1024 1024))
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 1000)
-  (redisplay-skip-fontification-on-input t)
   (remote-file-name-inhibit-locks t)
   (require-final-newline t)
   (revert-without-query '(""))
   (ring-bell-function 'ignore)
-  (save-interprogram-paste-before-kill t)
-  (scroll-preserve-screen-position t)
-  (scroll-margin 0)
-  (scroll-step 1)
   (select-active-regions nil)
   (sentence-end-double-space nil)
   (set-mark-command-repeat-pop t)
   (shell-command-switch "-lc")
-  (shell-command-default-error-buffer "*Shell Command Errors*")
   (split-height-threshold nil)
   (tab-always-indent 'complete)
-  (tab-bar-show nil)
-  (tramp-auto-save-directory "~/.cache/emacs/backups")
-  (tramp-persistency-file-name "~/.emacs.d/data/tramp")
-  (tramp-default-user-alist '(("\\`su\\(do\\)?\\'" nil "root")))
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
   (use-package-always-ensure t)
@@ -111,12 +92,30 @@
   (xref-search-program 'ripgrep)
   (words-include-escapes t)
   :config
-  (defun goto-line-with-number ()
-    (interactive)
-    (setq unread-command-events (cons last-command-event unread-command-events))
-    (call-interactively 'goto-line))
-  (dotimes (i 10)
-    (define-key goto-map (format "%d" i) 'goto-line-with-number))
+  (setq after-init-hook
+	(nconc after-init-hook
+	       '( auto-revert-mode delete-selection-mode electric-pair-mode
+		  global-reveal-mode minibuffer-depth-indicate-mode repeat-mode
+		  recentf-mode savehist-mode save-place-mode)))
+  (defvar-keymap read-extended-command-dwim-map
+    :doc "An briefly active keymap during M-x"
+    "<backspace>" 'find-file
+    ">"   'execute-extended-command
+    "@"   'consult-imenu
+    ":"   'consult-goto-line
+    ";"   'consult-outline)
+  (defun read-extended-command-dwim (o &optional prompt &rest args)
+    (let* ((ev (read-event (or prompt "M-x ") nil .7))
+	   (keyseq (and ev (vector ev)))
+	   (cmd (and ev (lookup-key read-extended-command-dwim-map keyseq))))
+      (if (and cmd (commandp cmd))
+	  (progn (run-at-time 0 nil (lambda () (call-interactively cmd)))
+		 (abort-recursive-edit))
+	(when ev
+	  (setq unread-command-events (nconc (listify-key-sequence keyseq) unread-command-events)))
+	(apply o prompt args))))
+  (advice-add 'read-extended-command :around 'read-extended-command-dwim)
+  (advice-add 'find-file-read-args :around 'read-extended-command-dwim)
   (windmove-default-keybindings 'control)
   (set-display-table-slot (or standard-display-table (setq standard-display-table (make-display-table)))
                           'vertical-border (make-glyph-code ?┃))
@@ -213,21 +212,13 @@
         (call-interactively 'avy-pop-mark)
       (apply o args)))
   (advice-add 'avy-goto-char-timer :around 'avy-pop-mark-if-prefix))
-(use-package beardbolt
-  :vc ( :url "https://github.com/joaotavora/beardbolt.git"
-        :rev :newest)
-  :bind ("C-c :" . beardbolt-starter)
-  :config
-  (push (cons 'c++-ts-mode (cdr (assq 'c++-mode beardbolt-languages))) beardbolt-languages))
 (use-package cape
   :config
   (setq completion-at-point-functions
 	(nconc completion-at-point-functions
 	       '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package compile
-  :bind ( :map mode-specific-map
-	  ("C"   . compile)
-	  ("C-c" . recompile))
+  :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
   (compilation-environment '("TERM=xterm-256color"))
   (compilation-always-kill t)
@@ -248,7 +239,6 @@
   :bind (("M-\"" . consult-register-load)
          ("M-'"  . consult-register-store)
          ([remap yank-pop] . consult-yank-pop)
-         ("M-T" . consult-imenu)
          ("C-c k"   . consult-kmacro)
          ("C-x M-:" . consult-complex-command)
          ("C-x b"   . consult-buffer)
@@ -265,19 +255,15 @@
 
          :map search-map
          ("e"    . consult-isearch-history)
-         ("f"    . consult-line)
-         ("F"    . consult-line-multi)
          ("g"    . grep)
          ("G"    . consult-git-grep)
-         ("k"    . consult-keep-lines)
          ("r"    . consult-ripgrep)
-         ("u"    . consult-focus-lines)
 
          :map isearch-mode-map
          ("M-h"  . consult-isearch-history)
-         ("M-o"  . consult-line)
-         ("M-O"  . consult-line-multi)
-         ("M-q"  . isearch-query-replace))
+         ("M-l"  . consult-line)
+         ("M-L"  . consult-line-multi)
+	 ("M-q"  . isearch-query-replace))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
   (register-preview-delay 0.5)
