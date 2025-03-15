@@ -1232,4 +1232,40 @@
     :config
     (unless (display-graphic-p)
       (corfu-terminal-mode +1))))
+(use-package vertico
+  :disabled
+  :hook ((after-init . vertico-mode)
+         (minibuffer-setup . vertico-repeat-save)
+         (rfn-eshadow-update-overlay . vertico-directory-tidy))
+  :bind (("C-c C-r" . vertico-repeat)
+         :map vertico-map
+         ("M-E"   . embark-export)
+	 ("C-j"   . vertico-exit-input)
+         ("DEL"   . vertico-directory-delete-char)
+         ("M-/"   . consult-find-dwim)
+         ("C-z"   . command-here)
+         ("M-s g" . command-here)
+         ("M-s r" . command-here))
+  :custom
+  (vertico-count-format nil)
+  :config
+  (defun vertico-selected-directory ()
+    (vertico-insert)
+    (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+  (defun command-here ()
+    (interactive)
+    (let ((dir (vertico-selected-directory))
+          (cmd (lookup-key global-map (this-command-keys))))
+      (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                      (call-interactively cmd))))
+      (abort-recursive-edit)))
+  (defun consult-find-dwim ()
+    (interactive)
+    (run-at-time 0 nil #'consult-find (vertico-selected-directory))
+    (abort-recursive-edit))
+  (use-package vertico-multiform
+    :ensure nil
+    :config
+    (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
+    (vertico-multiform-mode 1)))
 

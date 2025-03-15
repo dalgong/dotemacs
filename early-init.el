@@ -32,7 +32,8 @@
     (add-to-list
      'after-init-hook
      (lambda ()
-       (setq file-name-handler-alist original-file-name-handler-alist)
+       (setq file-name-handler-alist original-file-name-handler-alist
+	     inhibit-message nil)
        (setopt
 	modus-themes-italic-constructs        t
 	modus-themes-bold-constructs          t

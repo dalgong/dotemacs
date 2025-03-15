@@ -54,12 +54,12 @@
   (mac-right-option-modifier nil)
   (make-backup-files nil)
   (mark-even-if-inactive t)
-  (mode-line-modified '("%* "))
-  (mode-line-remote nil)
-  (mode-line-frame-identification nil)
-  (mode-line-position nil)
-  (mode-line-mule-info nil)
   (mode-line-end-spaces nil)
+  (mode-line-frame-identification nil)
+  (mode-line-modified '("%* "))
+  (mode-line-mule-info nil)
+  (mode-line-position nil)
+  (mode-line-remote nil)
   (ns-alternate-modifier 'super)
   (ns-command-modifier 'meta)
   (proced-enable-color-flag t)
@@ -92,6 +92,7 @@
   (xref-search-program 'ripgrep)
   (words-include-escapes t)
   :config
+  (setq-default mode-line-format (append mode-line-format '(mode-line-format-right-align "%l ")))
   (setq after-init-hook
 	(nconc after-init-hook
 	       '( auto-revert-mode delete-selection-mode electric-pair-mode
@@ -157,18 +158,6 @@
       (run-at-time 0 nil (lambda () (apply o args)))
       (call-interactively 'recursive-edit)))
   (advice-add 'delete-other-windows :around 'delete-other-windows-dwim)
-  (defun call-other-window-if-interactive (&rest _)
-    (when (called-interactively-p 'any)
-      (other-window 1)))
-  (advice-add 'split-window-right :after 'call-other-window-if-interactive)
-  (advice-add 'split-window-below :after 'call-other-window-if-interactive)
-  (defun switch-to-last-buffer-if-one-window (o &rest args)
-    (if (and (one-window-p 'nomini) (called-interactively-p 'interactive))
-        (if (= 1 (length (frame-list)))
-            (switch-to-buffer nil)
-          (other-frame 1))
-      (apply o args)))
-  (advice-add 'other-window :around 'switch-to-last-buffer-if-one-window)
   (advice-add 'electric-pair-open-newline-between-pairs-psif
               :after (lambda ()
                        (when (eq last-command-event ?\n)
@@ -226,7 +215,7 @@
   (compilation-buffer-name-function 'get-idle-compilation--buffer-name)
   (compilation-save-buffers-predicate 'ignore)
   :config
-  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
+  (require 'eat nil t)
   (defun get-idle-compilation--buffer-name (name-of-mode)
     (let ((name (compilation--default-buffer-name name-of-mode)))
       (or (cl-loop for b in (buffer-list)
@@ -283,7 +272,6 @@
   :delight
   :ensure nil
   :hook (prog-mode text-mode))
-(use-package display-line-numbers :hook (prog-mode text-mode))
 (use-package easy-kill
   :after embark
   :bind (([remap kill-ring-save] . easy-kill))
@@ -299,15 +287,11 @@
 (use-package eat
   :vc ( :url "https://codeberg.org/akib/emacs-eat"
         :rev :newest)
-  :autoload maybe-eat-compilation-start
-  :commands (eat-emacs-mode eat-mode)
-  :functions (eat-exec eat-term-send-string-as-yank eat--synchronize-scroll-windows)
   :bind (("C-z" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
-    (define-key map (kbd "M-o")  'avy-goto-char-timer)
     (define-key map (kbd "M-\"") 'consult-register-load)
     (define-key map (kbd "C-z")  'eat-toggle-char-mode)
     map)
@@ -382,27 +366,10 @@
         (setq-local revert-buffer-function 'compilation-revert-buffer)
         (setq next-error-last-buffer outbuf)
         (display-buffer outbuf '(nil (allow-no-window . t)))))))
-(use-package ediff :bind (:map goto-map ("=" . ediff-current-file)))
-(use-package eglot
-  :ensure nil
-  :defer t
+(use-package ediff
   :custom
-  (eglot-report-progress nil)
-  :config
-  (setq jsonrpc-event-hook nil))
-(use-package elfeed
-  :disabled
-  :ensure nil
-  :custom
-  (elfeed-feeds '("https://xkcd.com/rss.xml"
-		  "https://nullprogram.com/feed/"
-		  "http://pragmaticemacs.com/feed/"
-		  "https://blog.codinghorror.com/rss/"
-		  "https://daringfireball.net/feeds/main"
-		  "https://feeds.feedburner.com/explainextended"
-		  "http://morss.aryadevchavali.com/news.ycombinator.com/rss"
-		  "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/rss.xml"
-		  "http://morss.aryadevchavali.com/feeds.bbci.co.uk/news/technology/rss.xml")))
+  (ediff-window-setup-function 'ediff-setup-windows-plain)
+  :bind (:map goto-map ("=" . ediff-current-file)))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
@@ -423,42 +390,68 @@
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
-(use-package embark-consult
-  :hook (embark-collect-mode . consult-preview-at-point-mode))
-(use-package go-mode
-  :functions (gofmt)
-  :custom (gofmt-command "goimports")
-  :hook (go-mode . eglot-ensure))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
   :config
-  (advice-add 'gofmt-before-save :around
-              (defun gofmt-on-go-ts-mode (o &rest args)
-                (if (eq major-mode 'go-ts-mode)
-                    (gofmt)
-                  (apply o args)))))
+  (use-package go-mode :functions (gofmt) :custom (gofmt-command "goimports"))
+  (defun gofmt-before-save () (when (derived-mode-p 'go-mode) (gofmt))))
 (use-package gptel
   :ensure
+  :bind (("M-P"     . gptel)
+	 ("C-c RET" . gptel-send))
   :config
-  (setq gptel-model 'mistral:latest)
+  (setq gptel-model 'gemma3)
   (setq gptel-backend (gptel-make-ollama "Ollama"
 			:host "localhost:11434"
 			:stream t
-			:models '(deepseek-r1:7b))))
+			:models '(gemma3 mistral:latest deepseek-r1:7b))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
+(use-package icomplete
+  :hook (after-init . icomplete-vertical-mode)
+  :custom
+  (icomplete-show-matches-on-no-input t)
+  (icomplete-prospects-height 10)
+  (icomplete-scroll t)  
+  (icomplete-in-buffer t)
+  (icomplete-tidy-shadowed-file-names t)
+  :bind ( :map icomplete-minibuffer-map
+          ("C-."    . embark-act)
+	  ("RET"    . icomplete-force-complete-and-exit)
+          ("C-j"    . icomplete-ret)
+          ("TAB"    . icomplete-force-complete)
+          ("<down>" . icomplete-forward-completions)
+          ("C-n"    . icomplete-forward-completions)
+          ("<up>"   . icomplete-backward-completions)
+          ("C-p"    . icomplete-backward-completions)
+	  ("M-/"   .  consult-find-dwim)
+          ("C-z"    . command-here)
+          ("M-s g"  . command-here)
+          ("M-s r"  . command-here))
+  :config
+  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
+  (defun command-here (&optional cmd)
+    (interactive)
+    (icomplete-force-complete)
+    (let ((dir (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+          (cmd (or cmd (lookup-key global-map (this-command-keys)))))
+      (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                      (call-interactively cmd))))
+      (abort-recursive-edit)))
+  (defun consult-find-dwim ()
+    (interactive)
+    (command-here 'consult-find)
+    (abort-recursive-edit)))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
   :ensure
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
-  :custom
-  (marginalia-annotators
-   '(marginalia-annotators-light marginalia-annotators-heavy))
   :hook (after-init . marginalia-mode))
 (use-package ollama-buddy
   :ensure
   :bind ("C-c o" . ollama-buddy-menu)
-  :custom ollama-buddy-default-model "deepseek-r1:7b")
+  :custom
+  (ollama-buddy-default-model "gemma3:latest"))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -541,49 +534,5 @@
       :hook ((after-init . global-treesit-auto-mode))
       :custom
       (treesit-font-lock-level 4)))
-(use-package vertico
-  :hook ((after-init . vertico-mode)
-         (minibuffer-setup . vertico-repeat-save)
-         (rfn-eshadow-update-overlay . vertico-directory-tidy))
-  :bind (("C-c C-r" . vertico-repeat)
-         :map vertico-map
-         ("M-E"   . embark-export)
-	 ("C-j"   . vertico-exit-input)
-         ("DEL"   . vertico-directory-delete-char)
-         ("M-/"   . consult-find-dwim)
-         ("C-z"   . command-here)
-         ("M-s g" . command-here)
-         ("M-s r" . command-here))
-  :custom
-  (vertico-count-format nil)
-  :config
-  (defun vertico-selected-directory ()
-    (vertico-insert)
-    (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-  (defun command-here ()
-    (interactive)
-    (let ((dir (vertico-selected-directory))
-          (cmd (lookup-key global-map (this-command-keys))))
-      (run-at-time 0 nil (lambda () (let ((default-directory dir))
-                                      (call-interactively cmd))))
-      (abort-recursive-edit)))
-  (defun consult-find-dwim ()
-    (interactive)
-    (run-at-time 0 nil #'consult-find (vertico-selected-directory))
-    (abort-recursive-edit))
-  (use-package vertico-multiform
-    :ensure nil
-    :config
-    (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
-    (vertico-multiform-mode 1)))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
-(use-package which-key
-  :delight
-  :ensure nil
-  :hook (after-init . which-key-mode)
-  :custom
-  (which-key-idle-delay 1.5)
-  (which-key-idle-secondary-delay 0.25)
-  (which-key-add-column-padding 1)
-  (which-key-max-description-length 40))
