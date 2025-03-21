@@ -407,41 +407,6 @@
 			:stream t
 			:models '(gemma3 mistral:latest deepseek-r1:7b))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
-(use-package icomplete
-  :hook (after-init . icomplete-vertical-mode)
-  :custom
-  (icomplete-show-matches-on-no-input t)
-  (icomplete-prospects-height 10)
-  (icomplete-scroll t)  
-  (icomplete-in-buffer t)
-  (icomplete-tidy-shadowed-file-names t)
-  :bind ( :map icomplete-minibuffer-map
-          ("C-."    . embark-act)
-	  ("RET"    . icomplete-force-complete-and-exit)
-          ("C-j"    . icomplete-ret)
-          ("TAB"    . icomplete-force-complete)
-          ("<down>" . icomplete-forward-completions)
-          ("C-n"    . icomplete-forward-completions)
-          ("<up>"   . icomplete-backward-completions)
-          ("C-p"    . icomplete-backward-completions)
-	  ("M-/"   .  consult-find-dwim)
-          ("C-z"    . command-here)
-          ("M-s g"  . command-here)
-          ("M-s r"  . command-here))
-  :config
-  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
-  (defun command-here (&optional cmd)
-    (interactive)
-    (icomplete-force-complete)
-    (let ((dir (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-          (cmd (or cmd (lookup-key global-map (this-command-keys)))))
-      (run-at-time 0 nil (lambda () (let ((default-directory dir))
-                                      (call-interactively cmd))))
-      (abort-recursive-edit)))
-  (defun consult-find-dwim ()
-    (interactive)
-    (command-here 'consult-find)
-    (abort-recursive-edit)))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
   :ensure
@@ -534,5 +499,40 @@
       :hook ((after-init . global-treesit-auto-mode))
       :custom
       (treesit-font-lock-level 4)))
+(use-package vertico
+   :hook ((after-init . vertico-mode)
+          (minibuffer-setup . vertico-repeat-save)
+          (rfn-eshadow-update-overlay . vertico-directory-tidy))
+   :bind (("C-c C-r" . vertico-repeat)
+          :map vertico-map
+          ("M-E"   . embark-export)
+ 	 ("C-j"   . vertico-exit-input)
+          ("DEL"   . vertico-directory-delete-char)
+          ("M-/"   . consult-find-dwim)
+          ("C-z"   . command-here)
+          ("M-s g" . command-here)
+          ("M-s r" . command-here))
+   :custom
+   (vertico-count-format nil)
+   :config
+   (defun vertico-selected-directory ()
+     (vertico-insert)
+     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+   (defun command-here ()
+     (interactive)
+     (let ((dir (vertico-selected-directory))
+           (cmd (lookup-key global-map (this-command-keys))))
+       (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                       (call-interactively cmd))))
+       (abort-recursive-edit)))
+   (defun consult-find-dwim ()
+     (interactive)
+     (run-at-time 0 nil #'consult-find (vertico-selected-directory))
+     (abort-recursive-edit))
+   (use-package vertico-multiform
+     :ensure nil
+     :config
+     (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
+     (vertico-multiform-mode 1)))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
