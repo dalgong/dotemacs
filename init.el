@@ -14,8 +14,7 @@
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-current-buffer)
-         ("M-o"		       . find-file)
-         ("M-p"		       . find-file)
+         ("M-o"		       . other-window)
          ("C-c c"              . calendar)
          ("C-h C-o"            . proced))
   :custom
@@ -29,6 +28,7 @@
   (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
   (cycle-spacing-actions '(delete-all-space just-one-space restore))
+  (delete-selection-mode t)
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
@@ -37,7 +37,10 @@
                            display-buffer-at-bottom
                            (window-parameters (mode-line-format . none)))
                           ("\\*hermes.*" display-buffer-same-window)))
+  (electric-pair-mode t)
   (enable-recursive-minibuffers t)
+  (global-auto-revert-mode t)
+  (global-reveal-mode t)
   (history-length 1000)
   (ibuffer-expert t)
   (inhibit-startup-screen t)
@@ -54,8 +57,10 @@
   (mac-right-option-modifier nil)
   (make-backup-files nil)
   (mark-even-if-inactive t)
+  (minibuffer-depth-indicate-mode t)
   (mode-line-end-spaces nil)
   (mode-line-frame-identification nil)
+  (mode-line-position '((-3 "%p") " %l:%c"))
   (mode-line-modified '("%* "))
   (mode-line-mule-info nil)
   (mode-line-remote nil)
@@ -65,9 +70,11 @@
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 1024 1024))
+  (recentf-mode t)
   (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 1000)
   (remote-file-name-inhibit-locks t)
+  (repeat-mode t)
   (require-final-newline t)
   (revert-without-query '(""))
   (ring-bell-function 'ignore)
@@ -92,11 +99,7 @@
   (xref-search-program 'ripgrep)
   (words-include-escapes t)
   :config
-  (setq after-init-hook
-	(nconc after-init-hook
-	       '( auto-revert-mode delete-selection-mode electric-pair-mode
-		  global-reveal-mode line-number-mode minibuffer-depth-indicate-mode
-		  repeat-mode recentf-mode savehist-mode save-place-mode)))
+  (setq after-init-hook (nconc after-init-hook '(savehist-mode save-place-mode)))
   (defvar first-key-overload-command-list '(find-file execute-extended-command))
   (defvar-keymap first-key-overload-map
     :doc "Mimic vscode behavior"
@@ -268,7 +271,10 @@
 (use-package completion-preview
   :delight
   :ensure nil
-  :hook (prog-mode text-mode))
+  :hook (prog-mode text-mode)
+  :bind ( :map completion-preview-active-mode-map
+	  ("M-n" . completion-preview-next-candidate)
+	  ("M-p" . completion-preview-prev-candidate)))
 (use-package easy-kill
   :after embark
   :bind (([remap kill-ring-save] . easy-kill))
@@ -282,8 +288,7 @@
         `(region ,(buffer-substring start end) . ,r)))))
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
-  :vc ( :url "https://codeberg.org/akib/emacs-eat"
-        :rev :newest)
+  :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
   :bind (("C-z" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
@@ -403,7 +408,46 @@
 			:host "localhost:11434"
 			:stream t
 			:models '(gemma3 mistral:latest deepseek-r1:7b))))
+(use-package gptel-quick
+  :ensure
+  :after gptel
+  :vc (:url "https://github.com/karthink/gptel-quick.git" :rev :newest)
+  :bind (:map embark-general-map ("?" . gptel-quick)))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
+(use-package icomplete
+  :hook (after-init . icomplete-vertical-mode)
+  :custom
+  (icomplete-hide-common-prefix nil)
+  (icomplete-in-buffer t)
+  (icomplete-matches-format nil)
+  (icomplete-prospects-height 10)
+  (icomplete-show-matches-on-no-input t)
+  (icomplete-tidy-shadowed-file-names t)
+  :bind ( :map icomplete-minibuffer-map
+          ("C-."    . embark-act)
+	  ("DEL"    . icomplete-fido-backward-updir)
+	  ("RET"    . icomplete-force-complete-and-exit)
+          ("C-j"    . icomplete-ret)
+          ("TAB"    . icomplete-force-complete)
+          ("<down>" . icomplete-forward-completions)
+          ("C-n"    . icomplete-forward-completions)
+          ("<up>"   . icomplete-backward-completions)
+          ("C-p"    . icomplete-backward-completions)
+	  ("M-/"   .  (lambda () (interactive) (command-here 'consult-find)))
+          ("C-z"    . command-here)
+          ("M-s g"  . command-here)
+          ("M-s r"  . command-here))
+  :config
+  (setq icomplete-scroll t)  
+  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
+  (defun command-here (&optional cmd)
+    (interactive)
+    (icomplete-force-complete)
+    (let ((dir (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+          (cmd (or cmd (lookup-key global-map (this-command-keys)))))
+      (run-at-time 0 nil (lambda () (let ((default-directory dir))
+                                      (call-interactively cmd))))
+      (abort-recursive-edit))))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
   :ensure
@@ -496,35 +540,5 @@
       :hook ((after-init . global-treesit-auto-mode))
       :custom
       (treesit-font-lock-level 4)))
-(use-package vertico
-   :hook ((after-init . vertico-mode)
-          (minibuffer-setup . vertico-repeat-save)
-          (rfn-eshadow-update-overlay . vertico-directory-tidy))
-   :bind (("C-c C-r" . vertico-repeat)
-          :map vertico-map
-          ("M-E"   . embark-export)
- 	 ("C-j"   . vertico-exit-input)
-          ("DEL"   . vertico-directory-delete-char)
-          ("M-/"   . consult-find-dwim)
-          ("C-z"   . command-here)
-          ("M-s g" . command-here)
-          ("M-s r" . command-here))
-   :custom
-   (vertico-count-format nil)
-   :config
-   (defun vertico-selected-directory ()
-     (vertico-insert)
-     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-   (defun command-here ()
-     (interactive)
-     (let ((dir (vertico-selected-directory))
-           (cmd (lookup-key global-map (this-command-keys))))
-       (run-at-time 0 nil (lambda () (let ((default-directory dir))
-                                       (call-interactively cmd))))
-       (abort-recursive-edit)))
-   (defun consult-find-dwim ()
-     (interactive)
-     (run-at-time 0 nil #'consult-find (vertico-selected-directory))
-     (abort-recursive-edit)))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
