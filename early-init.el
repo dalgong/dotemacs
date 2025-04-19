@@ -12,7 +12,7 @@
           (internal-border-width . 8)
           (wait-for-wm      . nil)
           (font . ,(format "Menlo-%d" (if (eq system-type 'gnu/linux) 11 12)))))
-  (setq initial-frame-alist '((visibility . nil)))
+  ;; (setq initial-frame-alist '((visibility . nil)))
   (add-hook 'window-setup-hook
 	    (let ((original-file-name-handler-alist file-name-handler-alist))
 	      (setq file-name-handler-alist nil
@@ -28,4 +28,5 @@
 		  '((border-mode-line-active bg-mode-line-active)
 		    (border-mode-line-inactive bg-mode-line-inactive)))
 		 (load-theme 'modus-operandi t)
-		 (make-frame-visible)))))
+		 ;; (make-frame-visible)
+		 ))))
