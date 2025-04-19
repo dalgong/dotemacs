@@ -1276,4 +1276,30 @@
     :config
     (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
     (vertico-multiform-mode 1)))
+(when nil
+  (defun find-file--line-number (o filename &optional wildcards)
+    "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
+    (let (line-number)
+      (unless (file-exists-p filename)
+        (save-match-data
+          (when (and (string-match "^\\(.*\\):\\([0-9]+\\):?$" filename)
+                     (match-string 2 filename))
+            (setq line-number (string-to-number (match-string 2 filename)))
+            (setq filename (match-string 1 filename)))))
+      (prog1
+          (apply o (list filename wildcards))
+        (when line-number
+          (goto-char (point-min))
+          (forward-line (1- line-number))))))
+  (advice-add 'find-file :around 'find-file--line-number)
+  (use-package ffap
+    :ensure nil
+    :config
+    (defun ffap-file-at-point-add-line-number (r)
+      (let ((s (ffap-string-at-point)))
+        (save-match-data
+          (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
+              (concat r (match-string 1 s))
+            r))))
+    (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
 

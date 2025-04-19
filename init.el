@@ -158,35 +158,22 @@
       (run-at-time 0 nil (lambda () (apply o args)))
       (call-interactively 'recursive-edit)))
   (advice-add 'delete-other-windows :around 'delete-other-windows-dwim)
+  (defun call-other-window-if-interactive (&rest _)
+    (when (called-interactively-p 'any)
+      (other-window 1)))
+  (advice-add 'split-window-right :after 'call-other-window-if-interactive)
+  (advice-add 'split-window-below :after 'call-other-window-if-interactive)
+  (defun switch-to-last-buffer-if-one-window (o &rest args)
+    (if (and (one-window-p 'nomini) (called-interactively-p 'interactive))
+        (if (or (not window-system) (= 1 (length (frame-list))))
+            (switch-to-buffer nil)
+          (other-frame 1))
+      (apply o args)))
+  (advice-add 'other-window :around 'switch-to-last-buffer-if-one-window)
   (advice-add 'electric-pair-open-newline-between-pairs-psif
               :after (lambda ()
                        (when (eq last-command-event ?\n)
-                         (indent-according-to-mode))))
-  (defun find-file--line-number (o filename &optional wildcards)
-    "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
-    (let (line-number)
-      (unless (file-exists-p filename)
-        (save-match-data
-          (when (and (string-match "^\\(.*\\):\\([0-9]+\\):?$" filename)
-                     (match-string 2 filename))
-            (setq line-number (string-to-number (match-string 2 filename)))
-            (setq filename (match-string 1 filename)))))
-      (prog1
-          (apply o (list filename wildcards))
-        (when line-number
-          (goto-char (point-min))
-          (forward-line (1- line-number))))))
-  (advice-add 'find-file :around 'find-file--line-number)
-  (use-package ffap
-    :ensure nil
-    :config
-    (defun ffap-file-at-point-add-line-number (r)
-      (let ((s (ffap-string-at-point)))
-        (save-match-data
-          (if (string-match "\\(:[0-9]+\\)\\(:[0-9]+\\)?$" s)
-              (concat r (match-string 1 s))
-            r))))
-    (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
+                         (indent-according-to-mode)))))
 (use-package delight
   :config
   (delight '((auto-revert-mode "" autorevert)
@@ -380,8 +367,8 @@
          :map minibuffer-local-map
 	 ("M-E" . embark-export)
 	 :map embark-region-map
-         ("!" . shell-command)
-         ("x" . compile)
+         ("x" . shell-command)
+         ("C" . compile)
          :map help-map
          ("b" . embark-bindings))
   :custom
@@ -477,7 +464,6 @@
   (org-use-speed-commands t)
   :config
   (require 'org-tempo nil t)
-  (use-package ob-async)
   (use-package ob-compile :ensure nil)
   (defun lazy-load-org-babel-languages (o &rest args)
     (when-let* ((lang (org-element-property :language (org-element-at-point))))
@@ -486,26 +472,7 @@
         (add-to-list 'org-babel-load-languages (cons (intern lang) t))
         (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages)))
     (apply o args))
-  (advice-add 'org-babel-execute-src-block :around 'lazy-load-org-babel-languages)
-  (defun fix-missing-args (o &rest args)
-    (when (> (length args) 4)
-      (setf (nthcdr 4 args) nil))
-    (apply o args))
-  (advice-add #'ob-async-org-babel-execute-src-block :around 'fix-missing-args)
-  (use-package org-roam
-    :ensure t
-    :custom
-    (org-roam-directory "~/notes")
-    (org-roam-complete-everywhere t)
-    :bind (("C-c n l" . org-roam-buffer-toggle)
-           ("C-c n f" . org-roam-node-find)
-           ("C-c n i" . org-roam-node-insert)
-	   :map org-mode-map
-	   ("C-M-i" . completion-at-point))
-    :config
-    (unless (file-directory-p "~/notes")
-      (make-directory "~/notes/daily" 'parents))
-    (org-roam-db-autosync-enable)))
+  (advice-add 'org-babel-execute-src-block :around 'lazy-load-org-babel-languages))
 (use-package outline-indent
   :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
