@@ -7,10 +7,10 @@
 (push '("melpa" . "http://melpa.org/packages/") package-archives)
 
 (use-package emacs
-  :bind (([C-tab]              . other-window)
-         ([remap kill-buffer]  . kill-current-buffer)
+  :bind ((([remap kill-buffer]  . kill-current-buffer)
          ([remap list-buffers] . ibuffer)
          ([remap delete-horizontal-space] . cycle-spacing)
+	 ("S-<mouse-1>"        . ffap-at-mouse)
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-current-buffer)
@@ -289,7 +289,7 @@
             (not (derived-mode-p 'eat-mode))
             (not (process-live-p (get-buffer-process (current-buffer)))))
         (apply o args)
-      (bury-buffer)))  
+      (bury-buffer)))
   (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
@@ -388,11 +388,11 @@
   :bind (("M-P"     . gptel)
 	 ("C-c RET" . gptel-send))
   :config
-  (setq gptel-model 'gemma3)
+  (setq gptel-model 'gemma3n)
   (setq gptel-backend (gptel-make-ollama "Ollama"
 			:host "localhost:11434"
 			:stream t
-			:models '(gemma3 mistral:latest deepseek-r1:7b))))
+			:models '(gemma3n))))
 (use-package gptel-quick
   :ensure
   :after gptel
@@ -408,7 +408,7 @@
   :ensure
   :bind ("C-c o" . ollama-buddy-menu)
   :custom
-  (ollama-buddy-default-model "gemma3:latest"))
+  (ollama-buddy-default-model "gemma3n:latest"))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
