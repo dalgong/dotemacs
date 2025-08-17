@@ -7,14 +7,14 @@
 (push '("melpa" . "http://melpa.org/packages/") package-archives)
 
 (use-package emacs
-  :bind ((([remap kill-buffer]  . kill-current-buffer)
+  :bind (([remap kill-buffer]  . kill-current-buffer)
          ([remap list-buffers] . ibuffer)
          ([remap delete-horizontal-space] . cycle-spacing)
-	 ("S-<mouse-1>"        . ffap-at-mouse)
+         ("S-<mouse-1>"        . ffap-at-mouse)
          ("RET"                . newline-and-indent)
          ("M-I"                . ff-find-other-file)
          ("M-K"                . kill-current-buffer)
-         ("M-o"		       . other-window)
+         ("M-o"                . other-window)
          ("C-c c"              . calendar)
          ("C-h C-o"            . proced))
   :custom
@@ -110,9 +110,9 @@
   (defun self-insert-dwim (n &optional c)
     (interactive (list (prefix-numeric-value current-prefix-arg) last-command-event))
     (if-let* ((cmd (and (memq last-command first-key-overload-command-list)
-			(lookup-key first-key-overload-map (vector last-command-event)))))
-	(progn (run-at-time 0 nil #'call-interactively cmd)
-	       (abort-recursive-edit)))
+                        (lookup-key first-key-overload-map (vector last-command-event)))))
+        (progn (run-at-time 0 nil #'call-interactively cmd)
+               (abort-recursive-edit)))
     (self-insert-command n c))
   (map-keymap (lambda (k _) (define-key minibuffer-local-map (char-to-string k) 'self-insert-dwim)) first-key-overload-map)
   (windmove-default-keybindings 'control)
@@ -190,8 +190,8 @@
 (use-package cape
   :config
   (setq completion-at-point-functions
-	(nconc completion-at-point-functions
-	       '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
+        (nconc completion-at-point-functions
+               '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package compile
   :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
@@ -219,7 +219,7 @@
          ("C-x b"   . consult-buffer)
          ("C-x C-r" . consult-recent-file)
          ("C-h C-i"   . consult-info)
-	 ("C-h SPC"   . consult-mark)
+         ("C-h SPC"   . consult-mark)
          ("C-h C-SPC" . consult-global-mark)
 
          :map minibuffer-local-map
@@ -238,7 +238,7 @@
          ("M-h"  . consult-isearch-history)
          ("M-l"  . consult-line)
          ("M-L"  . consult-line-multi)
-	 ("M-q"  . isearch-query-replace))
+         ("M-q"  . isearch-query-replace))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
   (register-preview-delay 0.5)
@@ -259,8 +259,8 @@
   :ensure nil
   :hook (prog-mode text-mode)
   :bind ( :map completion-preview-active-mode-map
-	  ("M-n" . completion-preview-next-candidate)
-	  ("M-p" . completion-preview-prev-candidate)))
+          ("M-n" . completion-preview-next-candidate)
+          ("M-p" . completion-preview-prev-candidate)))
 (use-package easy-kill
   :after embark
   :bind (([remap kill-ring-save] . easy-kill))
@@ -295,12 +295,12 @@
     (interactive)
     (call-interactively
      (cond ((or (null eat-terminal)
-		current-prefix-arg)
-	    'eat)
-	   (eat--semi-char-mode
-	    'eat-emacs-mode)
-	   (t
-	    'eat-semi-char-mode))))
+                current-prefix-arg)
+            'eat)
+           (eat--semi-char-mode
+            'eat-emacs-mode)
+           (t
+            'eat-semi-char-mode))))
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat-terminal))
         (apply o args)
@@ -363,14 +363,14 @@
   :bind (("C-." . embark-act)
          ("M-." . embark-dwim)
          :map minibuffer-local-map
-	     ("M-E" . embark-export)
-	     :map embark-region-map
+             ("M-E" . embark-export)
+             :map embark-region-map
          ("x" . shell-command)
          ("C" . compile)
          :map help-map
          ("b" . embark-bindings)
-		 :map embark-file-map
-		 ("." . open-file-in-vscode))
+                 :map embark-file-map
+                 ("." . open-file-in-vscode))
   :custom
   (embark-cycle-key "C-SPC")
   (prefix-help-command 'embark-prefix-help-command)
@@ -387,7 +387,7 @@
   (advice-add 'browse-url-default-browser :around 'delegate-to-vscode-if-possible)
   (defun delegate-to-vscode-if-possible (o &rest args)
     (if-let ((cmd (getenv "BROWSER")))
-	(call-process cmd nil nil nil (car args))
+        (call-process cmd nil nil nil (car args))
       (apply o args))))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
@@ -398,13 +398,13 @@
 (use-package gptel
   :ensure
   :bind (("M-P"     . gptel)
-	 ("C-c RET" . gptel-send))
+         ("C-c RET" . gptel-send))
   :config
   (setq gptel-model 'gemma3n)
   (setq gptel-backend (gptel-make-ollama "Ollama"
-			:host "localhost:11434"
-			:stream t
-			:models '(gemma3n))))
+                        :host "localhost:11434"
+                        :stream t
+                        :models '(gemma3n))))
 (use-package gptel-quick
   :ensure
   :after gptel
@@ -490,7 +490,7 @@
   :bind (("C-c C-r" . vertico-repeat)
          :map vertico-map
          ("M-E"   . embark-export)
-	 ("C-j"   . vertico-exit-input)
+         ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . consult-find-dwim)
          ("C-z"   . command-here)
@@ -505,9 +505,9 @@
   (defun command-here ()
     (interactive)
     (run-at-time 0 nil
-		 (lambda (d c) (let ((default-directory d)) (call-interactively c)))
-		 (vertico-selected-directory)
-		 (lookup-key global-map (this-command-keys)))
+                 (lambda (d c) (let ((default-directory d)) (call-interactively c)))
+                 (vertico-selected-directory)
+                 (lookup-key global-map (this-command-keys)))
     (abort-recursive-edit))
   (defun consult-find-dwim ()
     (interactive)
