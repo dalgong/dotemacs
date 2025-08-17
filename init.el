@@ -363,12 +363,14 @@
   :bind (("C-." . embark-act)
          ("M-." . embark-dwim)
          :map minibuffer-local-map
-	 ("M-E" . embark-export)
-	 :map embark-region-map
+	     ("M-E" . embark-export)
+	     :map embark-region-map
          ("x" . shell-command)
          ("C" . compile)
          :map help-map
-         ("b" . embark-bindings))
+         ("b" . embark-bindings)
+		 :map embark-file-map
+		 ("." . open-file-in-vscode))
   :custom
   (embark-cycle-key "C-SPC")
   (prefix-help-command 'embark-prefix-help-command)
@@ -376,7 +378,17 @@
   (setq embark-indicators (delq 'embark-mixed-indicator embark-indicators))
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
-  (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
+  (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks))
+  (defun open-file-in-vscode (filename &optional _)
+    (interactive
+     (find-file-read-args "Find file: "
+                          (confirm-nonexistent-file-or-buffer)))
+    (call-process "code" nil nil nil (expand-file-name filename)))
+  (advice-add 'browse-url-default-browser :around 'delegate-to-vscode-if-possible)
+  (defun delegate-to-vscode-if-possible (o &rest args)
+    (if-let ((cmd (getenv "BROWSER")))
+	(call-process cmd nil nil nil (car args))
+      (apply o args))))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
