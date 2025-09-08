@@ -384,11 +384,15 @@
      (find-file-read-args "Find file: "
                           (confirm-nonexistent-file-or-buffer)))
     (call-process "code" nil nil nil (expand-file-name filename)))
-  (advice-add 'browse-url-default-browser :around 'delegate-to-vscode-if-possible)
-  (defun delegate-to-vscode-if-possible (o &rest args)
-    (if-let ((cmd (getenv "BROWSER")))
-        (call-process cmd nil nil nil (car args))
-      (apply o args))))
+  (advice-add 'browse-url-default-browser :around 'browse-url-dwim)
+  (defun browse-url-dwim (o &rest args)
+    (let ((url (car args)))
+      (cond ((getenv "BROWSER")
+	     (call-process (getenv "BROWSER") nil nil nil url))
+	    ((and (require 'clipetty nil t) (getenv "SSH_TTY"))
+	     (clipetty--emit (concat "\e]1337;OpenURL=:" (base64-encode-string url) "\007")))
+	    (t
+	     (apply o args))))))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
