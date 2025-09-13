@@ -33,6 +33,7 @@
       "when": "panelAlignment == 'center' || panelPosition != 'bottom' && panelPosition != 'top'"
   },
 
+  { "key": "cmd+\\", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u001b\\" } },    
   { "key": "ctrl+.", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c." } },
   { "key": "ctrl+,", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c," } },
   { "key": "ctrl+'", "command": "workbench.action.terminal.sendSequence", "when": "terminalFocus", "args": { "text": "\u0018@c'" } },
