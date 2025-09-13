@@ -314,6 +314,16 @@
            (apply o args)
            (buffer-string))))))
   (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
+  (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
+  (defun eat-insert-invocation-time ()
+    (let* ((pos (point-at-eol 0))
+	   (text (format-time-string "%m/%d %H:%M:%S"))
+	   (ov (make-overlay (1- pos) pos)))
+      (overlay-put ov 'evaporate t)
+      (overlay-put ov 'after-string
+		   (concat
+                    (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
+                    (propertize text 'face '(italic font-lock-comment-face))))))
   (defun maybe-eat-compilation-start (o &rest args)
     (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
   (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
