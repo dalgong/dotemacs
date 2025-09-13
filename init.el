@@ -464,8 +464,12 @@
       (pdf-tools-install :no-query)))
 (use-package python
   :ensure nil
-  :hook (python-ts-mode . maybe-set-python-shell-virtualenv-root)
-  :custom (python-shell-interpreter "ipython")
+  :hook
+  (python-ts-mode . maybe-set-python-shell-virtualenv-root)
+  :custom
+  (python-shell-interpreter "uv")
+  (python-shell-interpreter-args "run ipython -i")
+  (python-shell-prompt-detect-failure-warning nil)
   :config
   (defun maybe-set-python-shell-virtualenv-root ()
     (when-let* ((dir (and (null python-shell-virtualenv-root)
