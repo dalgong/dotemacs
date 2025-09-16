@@ -11,7 +11,7 @@
           ;; (undecorated . t)
           (internal-border-width . 8)
           (wait-for-wm      . nil)
-          (font . ,(format "Roboto Mono-%d" (if (eq system-type 'gnu/linux) 11 12)))))
+          (font . ,(format "Jetbrains Mono-%d" (if (eq system-type 'gnu/linux) 11 12)))))
   ;; (setq initial-frame-alist '((visibility . nil)))
   (add-hook 'window-setup-hook
 	    (let ((original-file-name-handler-alist file-name-handler-alist))
