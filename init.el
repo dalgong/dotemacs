@@ -14,7 +14,8 @@
          ("RET"                . newline-and-indent)
          ("M-K"                . kill-current-buffer)
          ("M-o"                . other-window)
-         ("C-c c"              . calendar)
+	 ("C-c c"              . calendar)
+         ("C-c r               . query-replace")
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
