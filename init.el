@@ -14,8 +14,8 @@
          ("RET"                . newline-and-indent)
          ("M-K"                . kill-current-buffer)
          ("M-o"                . other-window)
-	 ("C-c c"              . calendar)
-         ("C-c r               . query-replace")
+	     ("C-c c"              . calendar)
+         ("C-c r"              . query-replace)
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
@@ -408,7 +408,7 @@
     (let ((url (car args)))
       (cond ((getenv "BROWSER")
 	     (call-process (getenv "BROWSER") nil nil nil url))
-	    ((and (require 'clipetty nil t) (getenv "SSH_TTY"))
+	    ((and (require 'clipetty nil t) (getenv "SSH_CLIENT"))
 	     (clipetty--emit (concat "\e]1337;OpenURL=:" (base64-encode-string url) "\007")))
 	    (t
 	     (apply o args))))))
@@ -418,21 +418,6 @@
   :config
   (use-package go-mode :functions (gofmt) :custom (gofmt-command "goimports"))
   (defun gofmt-before-save () (when (derived-mode-p 'go-mode) (gofmt))))
-(use-package gptel
-  :ensure
-  :bind (("M-P"     . gptel)
-         ("C-c RET" . gptel-send))
-  :config
-  (setq gptel-model 'gemma3n)
-  (setq gptel-backend (gptel-make-ollama "Ollama"
-                        :host "localhost:11434"
-                        :stream t
-                        :models '(gemma3n))))
-(use-package gptel-quick
-  :ensure
-  :after gptel
-  :vc (:url "https://github.com/karthink/gptel-quick.git" :rev :newest)
-  :bind (:map embark-general-map ("?" . gptel-quick)))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
