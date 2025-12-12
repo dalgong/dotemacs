@@ -1,5 +1,6 @@
 ;; -*- lexical-binding: t -*-
 (setq custom-file null-device)
+(setq native-comp-speed nil)
 (advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
@@ -16,6 +17,7 @@
          ("M-o"                . other-window)
          ("C-c c"              . calendar)
          ("C-c r"              . query-replace)
+         ("C-c q"              . quit-window)
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
@@ -32,7 +34,7 @@
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
-  (display-buffer-alist '(("\\*shell\\*" display-buffer-same-window)
+  (display-buffer-alist '(("\\*\\(shell\\|eat\\)\\*" display-buffer-same-window)
                           ("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                            display-buffer-at-bottom
                            (window-parameters (mode-line-format . none)))
@@ -102,12 +104,7 @@
   :config
   (setq after-init-hook (nconc after-init-hook '(savehist-mode save-place-mode)))
   (defvar first-key-overload-command-list '(find-file execute-extended-command))
-  (defvar-keymap first-key-overload-map
-    :doc "Mimic vscode behavior"
-    ">"   'execute-extended-command
-    "@"   'consult-imenu
-    ":"   'consult-goto-line
-    ";"   'consult-outline)
+  (defvar-keymap first-key-overload-map :doc "Mimic vscode behavior")
   (defun self-insert-dwim (n &optional c)
     (interactive (list (prefix-numeric-value current-prefix-arg) last-command-event))
     (if-let* ((cmd (and (memq last-command first-key-overload-command-list)
@@ -115,7 +112,20 @@
         (progn (run-at-time 0 nil #'call-interactively cmd)
                (abort-recursive-edit)))
     (self-insert-command n c))
-  (map-keymap (lambda (k _) (define-key minibuffer-local-map (char-to-string k) 'self-insert-dwim)) first-key-overload-map)
+  (eval-and-compile
+    (defmacro minibuffer-local-first-keys (&rest bindings)
+      `(progn
+         ,@(mapcar (lambda (b)
+                     `(keymap-set first-key-overload-map ,(car b) ',(cdr b)))
+                   bindings)
+         ,@(mapcar (lambda (b)
+                     `(keymap-set minibuffer-local-map ,(car b) 'self-insert-dwim))
+                   bindings))))
+  (minibuffer-local-first-keys
+   (">" . execute-extended-command)
+   ("@" . consult-imenu)
+   (":" . consult-goto-line)
+   (";" . consult-outline))  
   (windmove-default-keybindings 'control)
   (or standard-display-table (setq standard-display-table (make-display-table)))
   (set-display-table-slot standard-display-table 'vertical-border ?\u2502)
@@ -196,11 +206,30 @@
         (call-interactively 'avy-pop-mark)
       (apply o args)))
   (advice-add 'avy-goto-char-timer :around 'avy-pop-mark-if-prefix))
+(use-package browse-url
+  :defer t
+  :config
+  (advice-add 'browse-url-default-browser :around 'browse-url-maybe-use-browser)
+  (defun browse-url-maybe-use-browser (o &rest args)
+    (let ((url (car args)))
+      (if (getenv "BROWSER")
+          (call-process (getenv "BROWSER") nil nil nil url)
+        (apply o args)))))
 (use-package cape
   :config
   (setq completion-at-point-functions
         (nconc completion-at-point-functions
                '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
+(use-package clipetty
+  :ensure
+  :functions clipetty--emit
+  :preface
+  (advice-add 'browse-url-default-browser :around 'browse-url-maybe-use-clipetty)
+  (defun browse-url-maybe-use-clipetty (o &rest args)
+    (let ((url (car args)))
+      (if (getenv "SSH_CLIENT")
+          (clipetty--emit (concat "\e]1337;OpenURL=:" (base64-encode-string url) "\007"))
+        (apply o args)))))
 (use-package compile
   :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
@@ -244,9 +273,9 @@
          ("r"    . consult-ripgrep)
 
          :map isearch-mode-map
+         ("M-o"  . consult-line)
+         ("M-l"  . consult-line-multi)
          ("M-h"  . consult-isearch-history)
-         ("M-l"  . consult-line)
-         ("M-L"  . consult-line-multi)
          ("M-q"  . isearch-query-replace))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
@@ -270,6 +299,8 @@
   :bind ( :map completion-preview-active-mode-map
           ("M-n" . completion-preview-next-candidate)
           ("M-p" . completion-preview-prev-candidate)))
+(use-package display-line-numbers
+  :hook (prog-mode . display-line-numbers--turn-on))
 (use-package easy-kill
   :after embark
   :bind (([remap kill-ring-save] . easy-kill))
@@ -325,7 +356,7 @@
   (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
   (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
   (defun eat-insert-invocation-time ()
-    (let* ((pos (point-at-eol 0))
+    (let* ((pos (pos-eol 0))
            (text (format-time-string "%m/%d %H:%M:%S"))
            (ov (make-overlay (1- pos) pos)))
       (overlay-put ov 'evaporate t)
@@ -391,7 +422,6 @@
                  :map embark-file-map
                  ("." . open-file-in-vscode))
   :custom
-  (embark-cycle-key "C-SPC")
   (prefix-help-command 'embark-prefix-help-command)
   :config
   (setq embark-indicators (delq 'embark-mixed-indicator embark-indicators))
@@ -402,16 +432,10 @@
     (interactive
      (find-file-read-args "Find file: "
                           (confirm-nonexistent-file-or-buffer)))
-    (call-process "code" nil nil nil (expand-file-name filename)))
-  (advice-add 'browse-url-default-browser :around 'browse-url-dwim)
-  (defun browse-url-dwim (o &rest args)
-    (let ((url (car args)))
-      (cond ((getenv "BROWSER")
-             (call-process (getenv "BROWSER") nil nil nil url))
-            ((and (require 'clipetty nil t) (getenv "SSH_CLIENT"))
-             (clipetty--emit (concat "\e]1337;OpenURL=:" (base64-encode-string url) "\007")))
-            (t
-             (apply o args))))))
+    (call-process "code" nil nil nil (expand-file-name filename))))
+(static-if window-system
+    (use-package exec-path-from-shell
+      :hook (after-init . exec-path-from-shell-initialize)))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
@@ -510,26 +534,30 @@
          ("M-E"   . embark-export)
          ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
-         ("M-/"   . consult-find-dwim)
-         ("C-z"   . command-here)
-         ("M-s g" . command-here)
-         ("M-s r" . command-here))
+         ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
+         ("C-z"   . vertico-exit-and-run)
+         ("M-s g" . vertico-exit-and-run)
+         ("M-s r" . vertico-exit-and-run))
   :custom
   (vertico-count-format nil)
   :config
-  (defun vertico-selected-directory ()
+  (defun vertico-exit-and-run (&optional cmd)
+    (interactive)
+    (or cmd (setq cmd (lookup-key global-map (this-command-keys))))
     (vertico-insert)
-    (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-  (defun command-here ()
-    (interactive)
     (run-at-time 0 nil
-                 (lambda (d c) (let ((default-directory d)) (call-interactively c)))
-                 (vertico-selected-directory)
-                 (lookup-key global-map (this-command-keys)))
-    (abort-recursive-edit))
-  (defun consult-find-dwim ()
-    (interactive)
-    (run-at-time 0 nil #'consult-find (vertico-selected-directory))
+                 (lambda (d) (let ((default-directory d))
+                               (call-interactively (setq this-command cmd))))
+                 (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
     (abort-recursive-edit)))
+(use-package vterm
+  :bind (("C-`" . vterm)
+         :map vterm-mode-map
+         ("C-q"  . vterm-send-next-key)
+         ("C-z"  . nil)
+         ("M-:"  . nil)
+         ("M-\"" . nil))
+  :custom
+  (vterm-kill-buffer-on-exit nil))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
