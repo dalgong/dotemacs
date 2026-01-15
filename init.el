@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t -*-
 (setq custom-file null-device)
-(setq native-comp-speed nil)
+(setq native-comp-speed -1)
 (advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
@@ -277,7 +277,6 @@
          ("M-l"  . consult-line-multi)
          ("M-h"  . consult-isearch-history)
          ("M-q"  . isearch-query-replace))
-  :hook (completion-list-mode . consult-preview-at-point-mode)
   :custom
   (register-preview-delay 0.5)
   (register-preview-function 'consult-register-format)
@@ -303,7 +302,7 @@
   :hook (prog-mode . display-line-numbers--turn-on))
 (use-package easy-kill
   :after embark
-  :bind (([remap kill-ring-save] . easy-kill))
+  :bind ([remap kill-ring-save] . easy-kill)
   :config
   (defun embark-target-easy-kill-region ()
     "Target the region if active. easy-kill region."
@@ -448,11 +447,6 @@
   :ensure
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :hook (after-init . marginalia-mode))
-(use-package ollama-buddy
-  :ensure
-  :bind ("C-c o" . ollama-buddy-menu)
-  :custom
-  (ollama-buddy-default-model "gemma3n:latest"))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
