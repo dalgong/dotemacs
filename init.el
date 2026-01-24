@@ -547,10 +547,11 @@
 (use-package vterm
   :bind (("C-`" . vterm)
          :map vterm-mode-map
-         ("C-q"  . vterm-send-next-key)
-         ("C-z"  . nil)
-         ("M-:"  . nil)
-         ("M-\"" . nil))
+         ("C-q"     . vterm-send-next-key)
+         ("ESC ESC" . vterm-send-escape)
+         ("C-z"     . vterm-copy-mode)
+         ("M-:"     . nil)
+         ("M-\""    . nil))
   :custom
   (vterm-kill-buffer-on-exit nil))
 (use-package vundo :bind ("C-x u" . vundo))
