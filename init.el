@@ -551,7 +551,9 @@
          ("ESC ESC" . vterm-send-escape)
          ("C-z"     . vterm-copy-mode)
          ("M-:"     . nil)
-         ("M-\""    . nil))
+         ("M-\""    . nil)
+         :map vterm-copy-mode-map
+         ("C-z"     . vterm-copy-mode))
   :custom
   (vterm-kill-buffer-on-exit nil))
 (use-package vundo :bind ("C-x u" . vundo))
