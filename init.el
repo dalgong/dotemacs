@@ -544,17 +544,5 @@
                                (call-interactively (setq this-command cmd))))
                  (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
     (abort-recursive-edit)))
-(use-package vterm
-  :bind (("C-`" . vterm)
-         :map vterm-mode-map
-         ("C-q"     . vterm-send-next-key)
-         ("ESC ESC" . vterm-send-escape)
-         ("C-z"     . vterm-copy-mode)
-         ("M-:"     . nil)
-         ("M-\""    . nil)
-         :map vterm-copy-mode-map
-         ("C-z"     . vterm-copy-mode))
-  :custom
-  (vterm-kill-buffer-on-exit nil))
 (use-package vundo :bind ("C-x u" . vundo))
 (use-package wgrep :custom (wgrep-auto-save-buffer t))
