@@ -26,7 +26,8 @@
 		  modus-themes-mixed-fonts              t
 		  modus-themes-common-palette-overrides
 		  '((bg-mode-line-inactive bg-dim)
-                    (border-mode-line-active bg-mode-line-active)
+			(bg-mode-line-active bg-blue-subtle)
+            (border-mode-line-active bg-mode-line-active)
 		    (border-mode-line-inactive bg-mode-line-inactive)))
 		 (load-theme 'modus-operandi t)
 		 ;; (make-frame-visible)
