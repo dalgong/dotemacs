@@ -249,8 +249,8 @@
                    return (buffer-name b))
           (generate-new-buffer-name name)))))
 (use-package consult
-  :bind (("M-\"" . consult-register-load)
-         ("M-'"  . consult-register-store)
+  :bind (("C-;" . consult-register-load)
+         ("C-=" . consult-register-store)
          ([remap yank-pop] . consult-yank-pop)
          ("C-c k"   . consult-kmacro)
          ("C-x M-:" . consult-complex-command)
@@ -319,8 +319,8 @@
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
-    (define-key map (kbd "M-\"") 'consult-register-load)
-    (define-key map (kbd "C-z")  'eat-toggle-char-mode)
+    (define-key map (kbd "C-;") 'consult-register-load)
+    (define-key map (kbd "C-z") 'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   (defun eat-dwim (o &rest args)
