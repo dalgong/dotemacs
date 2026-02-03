@@ -1,6 +1,5 @@
 ;; -*- lexical-binding: t -*-
 (setq custom-file null-device)
-(setq native-comp-speed -1)
 (advice-add 'custom-save-all :override 'ignore)
 (add-to-list 'load-path "~/.emacs.d/lisp")
 
