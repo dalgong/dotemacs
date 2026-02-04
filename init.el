@@ -313,13 +313,13 @@
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-z" . eat) :map eat-mode-map ("C-z" . eat-toggle-char-mode))
+  :bind (("C-`" . eat) :map eat-mode-map ("C-`" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "C-;") 'consult-register-load)
-    (define-key map (kbd "C-z") 'eat-toggle-char-mode)
+    (define-key map (kbd "C-`") 'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   (defun eat-dwim (o &rest args)
@@ -434,6 +434,17 @@
 (static-if window-system
     (use-package exec-path-from-shell
       :hook (after-init . exec-path-from-shell-initialize)))
+(use-package eyebrowse
+  :ensure
+  :init
+  (setq eyebrowse-keymap-prefix (kbd "C-z"))
+  :hook (after-init . eyebrowse-mode)
+  :bind (:map eyebrowse-mode-prefix-map
+              ("n"   . eyebrowse-next-window-config)
+              ("p"   . eyebrowse-prev-window-config)
+              ("C-n" . eyebrowse-next-window-config)
+              ("C-p" . eyebrowse-prev-window-config)
+              ("C-z" . eyebrowse-last-window-config)))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
@@ -528,7 +539,7 @@
          ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
-         ("C-z"   . vertico-exit-and-run)
+         ("C-`"   . vertico-exit-and-run)
          ("M-s g" . vertico-exit-and-run)
          ("M-s r" . vertico-exit-and-run))
   :custom
