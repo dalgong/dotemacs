@@ -7,10 +7,7 @@
 (push '("melpa" . "http://melpa.org/packages/") package-archives)
 
 (use-package emacs
-  :bind (([remap kill-buffer]  . kill-current-buffer)
-         ([remap list-buffers] . ibuffer)
-         ([remap delete-horizontal-space] . cycle-spacing)
-         ("S-<mouse-1>"        . ffap-at-mouse)
+  :bind (([remap list-buffers] . ibuffer)
          ("RET"                . newline-and-indent)
          ("M-K"                . kill-current-buffer)
          ("M-o"                . other-window)
@@ -121,6 +118,7 @@
                      `(keymap-set minibuffer-local-map ,(car b) 'self-insert-dwim))
                    bindings))))
   (minibuffer-local-first-keys
+   ("0" . recursive-edit)
    (">" . execute-extended-command)
    ("@" . consult-imenu)
    (":" . consult-goto-line)
@@ -170,12 +168,6 @@
       (unwind-protect (funcall o)
         (and wc (set-window-configuration wc)))))
   (advice-add 'recursive-edit :around 'preseve-window-configuration-if-interactive)
-  (defun delete-other-windows-dwim (o &rest args)
-    (if (null current-prefix-arg)
-        (apply o args)
-      (run-at-time 0 nil (lambda () (apply o args)))
-      (call-interactively 'recursive-edit)))
-  (advice-add 'delete-other-windows :around 'delete-other-windows-dwim)
   (defun call-other-window-if-interactive (&rest _)
     (when (called-interactively-p 'any)
       (other-window 1)))
@@ -210,9 +202,10 @@
   :config
   (advice-add 'browse-url-default-browser :around 'browse-url-maybe-use-browser)
   (defun browse-url-maybe-use-browser (o &rest args)
-    (let ((url (car args)))
-      (if (getenv "BROWSER")
-          (call-process (getenv "BROWSER") nil nil nil url)
+    (let ((url (car args))
+          (browser (getenv "BROWSER")))
+      (if browser
+          (call-process browser nil nil nil url)
         (apply o args)))))
 (use-package cape
   :config
@@ -313,13 +306,14 @@
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-`" . eat) :map eat-mode-map ("C-]" . eat-toggle-char-mode))
+  :bind (("C-\\" . eat) :map eat-mode-map ("M-X" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
-    (define-key map (kbd "C-;") 'consult-register-load)
-    (define-key map (kbd "C-]") 'eat-toggle-char-mode)
+    (dolist (k '("C-;" "M-o"))
+      (define-key map (kbd k) nil))
+    (define-key map (kbd "M-X") 'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   (defun eat-dwim (o &rest args)
@@ -405,20 +399,24 @@
   :custom
   (ediff-window-setup-function 'ediff-setup-windows-plain)
   :bind (:map goto-map ("=" . ediff-current-file)))
+(use-package eglot
+  :defer t
+  :config
+  (add-to-list 'eglot-stay-out-of 'imenu))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
   :bind (("C-." . embark-act)
          ("M-." . embark-dwim)
          :map minibuffer-local-map
-             ("M-E" . embark-export)
-             :map embark-region-map
+         ("M-E" . embark-export)
+         :map embark-region-map
          ("x" . shell-command)
          ("C" . compile)
          :map help-map
          ("b" . embark-bindings)
-                 :map embark-file-map
-                 ("." . open-file-in-vscode))
+         :map embark-file-map
+         ("." . open-file-in-vscode))
   :custom
   (prefix-help-command 'embark-prefix-help-command)
   :config
@@ -440,11 +438,14 @@
   (setq eyebrowse-keymap-prefix (kbd "C-z"))
   :hook (after-init . eyebrowse-mode)
   :bind (:map eyebrowse-mode-prefix-map
+              ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
+              ("k"   . eyebrowse-close-window-config)
               ("n"   . eyebrowse-next-window-config)
               ("p"   . eyebrowse-prev-window-config)
-              ("C-n" . eyebrowse-next-window-config)
-              ("C-p" . eyebrowse-prev-window-config)
-              ("C-z" . eyebrowse-last-window-config)))
+              ("C-z" . eyebrowse-last-window-config))
+  :config
+  (dolist (c '(eyebrowse-next-window-config eyebrowse-prev-window-config))
+    (put c 'repeat-map 'eyebrowse-mode-prefix-map)))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
@@ -463,20 +464,18 @@
   (orderless-component-separator 'orderless-escapable-split-on-space)
   (orderless-matching-styles '(orderless-literal orderless-regexp orderless-initialism)))
 (use-package org
-  :bind (:map org-mode-map ("C-TAB" . nil) ("C-c ;" . nil))
+  :bind (:map org-mode-map ("C-TAB" . nil) ("C-c ;" . nil) ("C-," . nil))
   :custom
   (org-confirm-babel-evaluate nil)
-  (org-cycle-separator-lines 0)
   (org-hide-emphasis-markers t)
   (org-hide-leading-stars t)
   (org-modules nil)
   (org-return-follows-link t)
-  (org-src-window-setup 'current-window)
   (org-startup-indented t)
   (org-use-speed-commands t)
   :config
   (require 'org-tempo nil t)
-  (use-package ob-compile :ensure nil)
+  (require 'ob-compile nil)
   (defun lazy-load-org-babel-languages (o &rest args)
     (when-let* ((lang (org-element-property :language (org-element-at-point))))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
@@ -524,11 +523,10 @@
       `(conflict "hunk" ,(car d) . ,(cadr d))))
   (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point)
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
-(static-if (and (fboundp 'treesit-available-p) (treesit-available-p))
-    (use-package treesit-auto
-      :hook ((after-init . global-treesit-auto-mode))
-      :custom
-      (treesit-font-lock-level 4)))
+(use-package treesit-auto
+  :hook ((after-init . global-treesit-auto-mode))
+  :custom
+  (treesit-font-lock-level 4))
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
@@ -539,7 +537,7 @@
          ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
-         ("C-`"   . vertico-exit-and-run)
+         ("C-\\"  . vertico-exit-and-run)
          ("M-s g" . vertico-exit-and-run)
          ("M-s r" . vertico-exit-and-run))
   :custom
@@ -555,4 +553,3 @@
                  (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
     (abort-recursive-edit)))
 (use-package vundo :bind ("C-x u" . vundo))
-(use-package wgrep :custom (wgrep-auto-save-buffer t))
