@@ -306,13 +306,15 @@
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-\\" . eat) :map eat-mode-map ("M-X" . eat-toggle-char-mode))
+  :bind (("C-\\" . eat) :map eat-mode-map ("C-z" . nil)
+                                          ("M-X" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
-    (dolist (k '("C-;" "M-o"))
-      (define-key map (kbd k) nil))
+    (define-key map (kbd "C-;") nil)
+    (define-key map (kbd "C-z") nil)
+    (define-key map (kbd "M-o") nil)
     (define-key map (kbd "M-X") 'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
