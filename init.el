@@ -30,8 +30,7 @@
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
-  (display-buffer-alist '(("\\*\\(shell\\|eat\\)\\*" display-buffer-same-window)
-                          ("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+  (display-buffer-alist '(("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                            display-buffer-at-bottom
                            (window-parameters (mode-line-format . none)))
                           ("\\*hermes.*" display-buffer-same-window)))
@@ -306,8 +305,11 @@
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-\\" . eat) :map eat-mode-map ("C-z" . nil)
-                                          ("M-X" . eat-toggle-char-mode))
+  :bind (("C-\\" . eat)
+         :map ctl-x-4-map
+         ("C-\\" . eat-other-window)
+         :map eat-mode-map
+         ("M-X" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
