@@ -213,7 +213,7 @@
                '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package clipetty
   :ensure
-  :functions clipetty--emit
+  :hook (after-init . global-clipetty-mode)
   :preface
   (advice-add 'browse-url-default-browser :around 'browse-url-maybe-use-clipetty)
   (defun browse-url-maybe-use-clipetty (o &rest args)
