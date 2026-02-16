@@ -448,6 +448,8 @@
               ("n"   . eyebrowse-next-window-config)
               ("p"   . eyebrowse-prev-window-config)
               ("C-z" . eyebrowse-last-window-config))
+  :custom
+  (eyebrowse-new-workspace t)
   :config
   (dolist (c '(eyebrowse-next-window-config eyebrowse-prev-window-config))
     (put c 'repeat-map 'eyebrowse-mode-prefix-map)))
