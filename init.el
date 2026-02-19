@@ -83,6 +83,7 @@
   (shell-command-switch "-lc")
   (split-height-threshold nil)
   (tab-always-indent 'complete)
+  (truncate-lines t)
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
   (use-package-always-ensure t)
