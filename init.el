@@ -452,8 +452,19 @@
   :custom
   (eyebrowse-new-workspace t)
   :config
-  (dolist (c '(eyebrowse-next-window-config eyebrowse-prev-window-config))
-    (put c 'repeat-map 'eyebrowse-mode-prefix-map)))
+  (defvar eyebrowse-slot-to-register-function 'ignore)
+  (cl-loop for i from 0 to 9 do (define-key global-map (read-kbd-macro (format "C-%d" i)) 'eyebrowse-dwim))
+  (defun eyebrowse-dwim ()
+    (interactive)
+    (let* ((c (logand ?\xff last-command-event))
+           (slot (- c ?0))
+           (switch-only (eyebrowse--window-config-present-p slot))
+           (reg (funcall eyebrowse-slot-to-register-function
+                         (if (= slot 0) (eyebrowse--get 'current-slot) slot))))
+      (unless (= slot 0)
+        (eyebrowse-switch-to-window-config slot))
+      (when (and (not switch-only) reg (get-register reg))
+        (jump-to-register reg)))))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
