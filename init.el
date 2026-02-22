@@ -11,9 +11,14 @@
          ("RET"                . newline-and-indent)
          ("M-K"                . kill-current-buffer)
          ("M-o"                . other-window)
+         ("M-0"                . delete-window)
+         ("M-1"                . delete-other-windows)
+         ("M-2"                . split-window-below)
+         ("M-3"                . split-window-right)
+         ("M-9"                . quit-window)
+         ("C-M-9"              . quit-window-on)
          ("C-c c"              . calendar)
          ("C-c r"              . query-replace)
-         ("C-c q"              . quit-window)
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
@@ -307,19 +312,17 @@
   (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-\\" . eat)
-         :map ctl-x-4-map
-         ("C-\\" . eat-other-window)
+  :bind (:map ctl-x-4-map
+         ("C-z" . eat-other-window)
          :map eat-mode-map
-         ("M-X" . eat-toggle-char-mode))
+         ("C-z" . eat-toggle-char-mode))
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "C-;") nil)
-    (define-key map (kbd "C-z") nil)
+    (define-key map (kbd "C-z") 'eat-toggle-char-mode)
     (define-key map (kbd "M-o") nil)
-    (define-key map (kbd "M-X") 'eat-toggle-char-mode)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   (defun eat-dwim (o &rest args)
@@ -440,18 +443,36 @@
       :hook (after-init . exec-path-from-shell-initialize)))
 (use-package eyebrowse
   :ensure
-  :init
-  (setq eyebrowse-keymap-prefix (kbd "C-z"))
   :hook (after-init . eyebrowse-mode)
-  :bind (:map eyebrowse-mode-prefix-map
-              ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
-              ("k"   . eyebrowse-close-window-config)
-              ("n"   . eyebrowse-next-window-config)
-              ("p"   . eyebrowse-prev-window-config)
-              ("C-z" . eyebrowse-last-window-config))
+  :bind (("C-z" . C-z-dwim)
+         :map eyebrowse-mode-prefix-map
+         ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
+         ("k"   . eyebrowse-close-window-config)
+         ("n"   . eyebrowse-next-window-config)
+         ("p"   . eyebrowse-prev-window-config)
+         ("C-z" . eyebrowse-last-window-config))
   :custom
   (eyebrowse-new-workspace t)
   :config
+  (defvar C-z-dwim-timeout 0.5)
+  (defun C-z-dwim ()
+    (interactive)
+    (cond ((eq last-command this-command)
+           (call-interactively 'eyebrowse-last-window-config))
+          ((not (sit-for C-z-dwim-timeout))
+           (let ((keyseq (read-key-sequence ""))
+                 cmd)
+             (cond ((and (setq cmd (lookup-key eyebrowse-mode-prefix-map keyseq))
+                         (commandp cmd))
+                    (call-interactively (setq this-command cmd)))
+                   ((and (setq cmd (lookup-key (current-active-maps) keyseq))
+                         (memq cmd '(set-mark-command cua-set-mark)))
+                    (call-interactively set-mark-dwim-repeat-action))
+                   (t
+                    (call-interactively 'eat)
+                    (call-interactively cmd)))))
+          (t
+           (call-interactively 'eat))))
   (defvar eyebrowse-slot-to-register-function 'ignore)
   (cl-loop for i from 0 to 9 do (define-key global-map (read-kbd-macro (format "C-%d" i)) 'eyebrowse-dwim))
   (defun eyebrowse-dwim ()
