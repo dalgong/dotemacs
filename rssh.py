@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """rssh — SSH Multiplexer over a Single Connection.
 
-A single Python file that multiplexes multiple command/shell sessions and file
-transfers over one SSH or ET connection. Zero external dependencies (Python 3.8+
-stdlib only). Self-deploying.
+Session multiplexing modeled after OpenSSH's ControlMaster/ControlPath
+(see PROTOCOL.mux).  A single persistent SSH connection carries multiple
+concurrent sessions, file transfers, and port forwards.
+
+Architecture:
+  [rssh client] --mux protocol--> [rssh daemon] --transport--> [rssh server]
+       Unix socket                                SSH stdin/stdout
+       (SSH mux-style)                            (custom TLV)
+
+The mux protocol between client and daemon follows SSH PROTOCOL.mux
+conventions: hello exchange with version negotiation, request IDs for
+all client messages, standard response types (OK, FAILURE, etc.).
+
+The transport protocol between daemon and server uses a compact TLV
+binary format for channel multiplexing over a single SSH connection.
 
 Modes:
   --server            Run as server on remote host (binary protocol on stdio)
@@ -31,13 +43,12 @@ import time
 import tty
 
 # ---------------------------------------------------------------------------
-# Protocol layer — Binary TLV (Type-Length-Value)
+# Transport protocol layer — Binary TLV (Type-Length-Value)
 #
+# Used between daemon and remote server over SSH stdin/stdout.
 # Frame format: [1-byte type][4-byte big-endian payload length][payload]
-# Each message type defines its own binary payload layout.
 # ---------------------------------------------------------------------------
 
-# Message type IDs
 MSG_READY          = 0x01
 MSG_OPEN           = 0x02
 MSG_OPENED         = 0x03
@@ -54,10 +65,6 @@ MSG_FILE_DONE      = 0x0D
 MSG_FILE_ERROR     = 0x0E
 MSG_PING           = 0x0F
 MSG_PONG           = 0x10
-MSG_STATUS         = 0x11
-MSG_STATUS_RESP    = 0x12
-MSG_DISCONNECT     = 0x13
-MSG_DISCONNECT_ACK = 0x14
 
 _TYPE_TO_ID = {
     "ready": MSG_READY, "open": MSG_OPEN, "opened": MSG_OPENED,
@@ -67,13 +74,11 @@ _TYPE_TO_ID = {
     "file_data": MSG_FILE_DATA, "file_done": MSG_FILE_DONE,
     "file_error": MSG_FILE_ERROR,
     "ping": MSG_PING, "pong": MSG_PONG,
-    "status": MSG_STATUS, "status_response": MSG_STATUS_RESP,
-    "disconnect": MSG_DISCONNECT, "disconnect_ack": MSG_DISCONNECT_ACK,
 }
 _ID_TO_TYPE = {v: k for k, v in _TYPE_TO_ID.items()}
 
 
-# -- Binary helpers for variable-length fields --
+# -- Binary helpers for variable-length fields (transport protocol) --
 
 def _pack_str(s: str) -> bytes:
     b = s.encode("utf-8")
@@ -119,12 +124,12 @@ def _mode_to_int(mode) -> int:
     return mode
 
 
-# -- Payload encode / decode per message type --
+# -- Transport payload encode / decode --
 
 def _encode_payload(header: dict, data: bytes) -> bytes:
     t = header["type"]
 
-    if t in ("ready", "ping", "pong", "status", "disconnect", "disconnect_ack"):
+    if t in ("ready", "ping", "pong"):
         return b""
 
     if t == "open":
@@ -174,15 +179,6 @@ def _encode_payload(header: dict, data: bytes) -> bytes:
     if t == "file_error":
         return struct.pack("!I", header["req"]) + header.get("msg", "").encode("utf-8")
 
-    if t == "status_response":
-        return (struct.pack("!IIIIB",
-                            header.get("pid", 0),
-                            header.get("transport_pid") or 0,
-                            header.get("channels", 0),
-                            header.get("file_transfers", 0),
-                            1 if header.get("ready") else 0)
-                + _pack_str(header.get("host", "")))
-
     raise ValueError(f"Unknown message type: {t}")
 
 
@@ -190,7 +186,7 @@ def _decode_payload(msg_type: str, payload: bytes):
     header = {"type": msg_type}
     data = b""
 
-    if msg_type in ("ready", "ping", "pong", "status", "disconnect", "disconnect_ack"):
+    if msg_type in ("ready", "ping", "pong"):
         pass
 
     elif msg_type == "open":
@@ -258,29 +254,18 @@ def _decode_payload(msg_type: str, payload: bytes):
         header["req"] = req
         header["msg"] = payload[4:].decode("utf-8", errors="replace")
 
-    elif msg_type == "status_response":
-        off = 0
-        pid, transport_pid, channels, file_transfers, ready_flag = \
-            struct.unpack_from("!IIIIB", payload, off); off += 17
-        host, off = _unpack_str(payload, off)
-        header.update(pid=pid, transport_pid=transport_pid or None,
-                      channels=channels, file_transfers=file_transfers,
-                      ready=bool(ready_flag), host=host)
-
     return header, data
 
 
-# -- Frame encode / decode / read / write --
+# -- Transport frame encode / decode / read / write --
 
 def encode_frame(header: dict, data: bytes = b"") -> bytes:
-    """Serialize a frame: [1-byte type][4-byte big-endian payload length][payload]."""
     type_id = _TYPE_TO_ID[header["type"]]
     payload = _encode_payload(header, data)
     return struct.pack("!BI", type_id, len(payload)) + payload
 
 
 def decode_frame(type_id: int, payload: bytes):
-    """Decode a frame given its type ID and payload. Returns (header_dict, data_bytes)."""
     msg_type = _ID_TO_TYPE.get(type_id)
     if msg_type is None:
         raise ValueError(f"Unknown message type ID: {type_id}")
@@ -288,7 +273,6 @@ def decode_frame(type_id: int, payload: bytes):
 
 
 async def read_frame(reader: asyncio.StreamReader):
-    """Read one frame from an asyncio StreamReader. Returns (header, data)."""
     hdr = await reader.readexactly(5)
     type_id = hdr[0]
     (length,) = struct.unpack("!I", hdr[1:5])
@@ -297,7 +281,6 @@ async def read_frame(reader: asyncio.StreamReader):
 
 
 def read_frame_sync(fd) -> tuple:
-    """Read one frame synchronously. Returns (header, data) or raises EOFError."""
     hdr = _read_exactly(fd, 5)
     type_id = hdr[0]
     (length,) = struct.unpack("!I", hdr[1:5])
@@ -306,7 +289,6 @@ def read_frame_sync(fd) -> tuple:
 
 
 def _read_exactly(fd, n: int) -> bytes:
-    """Read exactly n bytes from fd (file-like with .read, raw fd int, or socket)."""
     buf = bytearray()
     while len(buf) < n:
         if isinstance(fd, int):
@@ -322,18 +304,185 @@ def _read_exactly(fd, n: int) -> bytes:
 
 
 def write_frame_sync(fd, header: dict, data: bytes = b""):
-    """Write one frame synchronously to a file-like binary object or socket."""
     frame = encode_frame(header, data)
+    _write_all(fd, frame)
+
+
+def _write_all(fd, data: bytes):
     if isinstance(fd, int):
-        mv = memoryview(frame)
+        mv = memoryview(data)
         written = 0
         while written < len(mv):
             written += os.write(fd, mv[written:])
     elif isinstance(fd, socket.socket):
-        fd.sendall(frame)
+        fd.sendall(data)
     else:
-        fd.write(frame)
+        fd.write(data)
         fd.flush()
+
+
+# ---------------------------------------------------------------------------
+# Mux protocol layer — SSH mux (Client <-> Daemon, over Unix socket)
+#
+# Modeled after OpenSSH PROTOCOL.mux.
+# Wire format: [uint32 packet_length][uint32 type][body]
+# String wire format: [uint32 length][data]
+# Bool wire format: uint32 (0 = false, nonzero = true)
+# ---------------------------------------------------------------------------
+
+# Protocol version (matches OpenSSH SSHMUX_VER)
+MUX_VERSION = 4
+
+# Standard SSH mux message types (from OpenSSH PROTOCOL.mux / mux.c)
+MUX_MSG_HELLO           = 0x00000001
+MUX_C_NEW_SESSION       = 0x10000002
+MUX_C_ALIVE_CHECK       = 0x10000004
+MUX_C_TERMINATE         = 0x10000005
+MUX_C_OPEN_FWD          = 0x10000006
+MUX_C_CLOSE_FWD         = 0x10000007
+MUX_C_NEW_STDIO_FWD     = 0x10000008
+MUX_C_STOP_LISTENING    = 0x10000009
+MUX_S_OK                = 0x80000001
+MUX_S_PERMISSION_DENIED = 0x80000002
+MUX_S_FAILURE           = 0x80000003
+MUX_S_EXIT_MESSAGE      = 0x80000004
+MUX_S_ALIVE             = 0x80000005
+MUX_S_SESSION_OPENED    = 0x80000006
+MUX_S_REMOTE_PORT       = 0x80000007
+MUX_S_TTY_ALLOC_FAIL    = 0x80000008
+
+# Forwarding types
+MUX_FWD_LOCAL   = 1
+MUX_FWD_REMOTE  = 2
+MUX_FWD_DYNAMIC = 3
+
+# rssh extension message types (session data relay — no fd passing)
+MUX_C_SESSION_DATA      = 0x20000001
+MUX_C_SESSION_RESIZE    = 0x20000002
+MUX_C_SESSION_EOF       = 0x20000003
+MUX_C_FILE_PUT          = 0x20000010
+MUX_C_FILE_GET          = 0x20000011
+MUX_C_FILE_DATA         = 0x20000012
+MUX_C_FILE_DONE         = 0x20000013
+MUX_S_SESSION_DATA      = 0xA0000001
+MUX_S_FILE_INFO         = 0xA0000010
+MUX_S_FILE_DATA         = 0xA0000011
+MUX_S_FILE_DONE         = 0xA0000012
+MUX_S_FILE_ERROR        = 0xA0000013
+
+
+# -- Mux wire format helpers --
+
+def mux_pack_u32(val: int) -> bytes:
+    return struct.pack("!I", val)
+
+def mux_pack_u64(val: int) -> bytes:
+    return struct.pack("!Q", val)
+
+def mux_pack_bool(val: bool) -> bytes:
+    return struct.pack("!I", 1 if val else 0)
+
+def mux_pack_string(s) -> bytes:
+    if isinstance(s, str):
+        b = s.encode("utf-8")
+    elif s is None:
+        b = b""
+    else:
+        b = s
+    return struct.pack("!I", len(b)) + b
+
+
+class MuxParser:
+    """Parses fields from an SSH mux packet body."""
+
+    def __init__(self, data: bytes):
+        self._data = data
+        self._off = 0
+
+    @property
+    def remaining(self) -> int:
+        return len(self._data) - self._off
+
+    def get_u32(self) -> int:
+        val, = struct.unpack_from("!I", self._data, self._off)
+        self._off += 4
+        return val
+
+    def get_u64(self) -> int:
+        val, = struct.unpack_from("!Q", self._data, self._off)
+        self._off += 8
+        return val
+
+    def get_bool(self) -> bool:
+        return self.get_u32() != 0
+
+    def get_string(self) -> bytes:
+        length = self.get_u32()
+        val = self._data[self._off:self._off + length]
+        self._off += length
+        return val
+
+    def get_cstring(self) -> str:
+        return self.get_string().decode("utf-8", errors="replace")
+
+
+# -- Mux packet read / write --
+
+def mux_encode_packet(msg_type: int, body: bytes = b"") -> bytes:
+    """Encode: [uint32 packet_length][uint32 type][body]."""
+    inner = struct.pack("!I", msg_type) + body
+    return struct.pack("!I", len(inner)) + inner
+
+
+async def mux_read_packet(reader: asyncio.StreamReader):
+    """Read one mux packet. Returns (msg_type, body_bytes)."""
+    hdr = await reader.readexactly(4)
+    length, = struct.unpack("!I", hdr)
+    if length < 4:
+        raise ValueError(f"Mux packet too short: {length}")
+    payload = await reader.readexactly(length)
+    msg_type, = struct.unpack_from("!I", payload, 0)
+    return msg_type, payload[4:]
+
+
+def mux_read_packet_sync(fd) -> tuple:
+    """Read one mux packet synchronously. Returns (msg_type, body_bytes)."""
+    hdr = _read_exactly(fd, 4)
+    length, = struct.unpack("!I", hdr)
+    if length < 4:
+        raise ValueError(f"Mux packet too short: {length}")
+    payload = _read_exactly(fd, length)
+    msg_type, = struct.unpack_from("!I", payload, 0)
+    return msg_type, payload[4:]
+
+
+def mux_write_packet_sync(fd, msg_type: int, body: bytes = b""):
+    """Write one mux packet synchronously."""
+    _write_all(fd, mux_encode_packet(msg_type, body))
+
+
+# -- Mux body builders --
+
+def _mux_hello_body(version: int = MUX_VERSION) -> bytes:
+    return mux_pack_u32(version)
+
+def _mux_ok_body(rid: int) -> bytes:
+    return mux_pack_u32(rid)
+
+def _mux_failure_body(rid: int, reason: str) -> bytes:
+    return mux_pack_u32(rid) + mux_pack_string(reason)
+
+def _mux_session_opened_body(rid: int, sid: int) -> bytes:
+    return mux_pack_u32(rid) + mux_pack_u32(sid)
+
+def _mux_alive_body(rid: int, pid: int) -> bytes:
+    return mux_pack_u32(rid) + mux_pack_u32(pid)
+
+def _mux_exit_message_body(sid: int, exitval: int) -> bytes:
+    return mux_pack_u32(sid) + mux_pack_u32(exitval & 0xFFFFFFFF)
+
+def _mux_session_data_body(sid: int, data: bytes) -> bytes:
+    return mux_pack_u32(sid) + mux_pack_string(data)
 
 
 # ---------------------------------------------------------------------------
@@ -341,39 +490,32 @@ def write_frame_sync(fd, header: dict, data: bytes = b""):
 # ---------------------------------------------------------------------------
 
 RSSH_DIR = os.path.expanduser("~/.rssh")
-CHUNK_SIZE = 65536  # 64KB for file transfers
+CHUNK_SIZE = 65536
 
 
 # ---------------------------------------------------------------------------
-# Server mode
+# Server mode  (runs on remote host — UNCHANGED)
 # ---------------------------------------------------------------------------
 
 class Server:
-    """Runs on remote host. Reads/writes binary frames on stdin/stdout."""
+    """Runs on remote host. Reads/writes binary TLV frames on stdin/stdout."""
 
     def __init__(self):
-        self.channels = {}       # ch_id -> channel info dict
-        self.write_queue = None  # asyncio.Queue for serialized output
+        self.channels = {}
+        self.write_queue = None
         self.loop = None
 
     async def run(self):
         self.loop = asyncio.get_event_loop()
         self.write_queue = asyncio.Queue()
-
-        # Writer task: serialize all output through one queue
         writer_task = asyncio.ensure_future(self._writer())
-
-        # Send ready signal
         await self.send({"type": "ready"})
-
-        # Read frames from stdin
         try:
             await self._reader()
         except (EOFError, ConnectionError, OSError):
             pass
         finally:
             writer_task.cancel()
-            # Clean up all channels
             for ch_id in list(self.channels):
                 await self._close_channel(ch_id, -1)
 
@@ -381,7 +523,6 @@ class Server:
         await self.write_queue.put(encode_frame(header, data))
 
     async def _writer(self):
-        """Single writer consuming from queue to stdout."""
         stdout_fd = sys.stdout.buffer.fileno()
         while True:
             frame = await self.write_queue.get()
@@ -391,7 +532,6 @@ class Server:
                 return
 
     async def _reader(self):
-        """Read frames from stdin."""
         stdin_fd = sys.stdin.buffer.fileno()
         while True:
             try:
@@ -422,10 +562,6 @@ class Server:
             await self._handle_file_done(header)
         elif msg_type == "ping":
             await self.send({"type": "pong"})
-        elif msg_type == "error":
-            pass  # Log and ignore
-
-    # -- Channel open --
 
     async def _handle_open(self, header: dict):
         ch_id = header["ch"]
@@ -434,11 +570,9 @@ class Server:
         env_vars = header.get("env", {})
         rows = header.get("rows", 24)
         cols = header.get("cols", 80)
-
         env = os.environ.copy()
         env.update(env_vars)
         env["TERM"] = env.get("TERM", "xterm-256color")
-
         if use_pty:
             await self._open_pty_channel(ch_id, cmd, env, rows, cols)
         else:
@@ -446,14 +580,10 @@ class Server:
 
     async def _open_pty_channel(self, ch_id, cmd, env, rows, cols):
         master_fd, slave_fd = pty.openpty()
-
-        # Set initial size
         winsize = struct.pack("HHHH", rows, cols, 0, 0)
         fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, winsize)
-
         pid = os.fork()
         if pid == 0:
-            # Child process
             os.close(master_fd)
             os.setsid()
             fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
@@ -464,29 +594,20 @@ class Server:
                 os.close(slave_fd)
             os.execvpe(cmd[0], cmd, env)
         else:
-            # Parent
             os.close(slave_fd)
             self.channels[ch_id] = {
-                "type": "pty",
-                "master_fd": master_fd,
-                "pid": pid,
-                "alive": True,
+                "type": "pty", "master_fd": master_fd,
+                "pid": pid, "alive": True,
             }
             await self.send({"type": "opened", "ch": ch_id, "pid": pid})
-
-            # Start reader thread for PTY
             thread = threading.Thread(
                 target=self._pty_reader_thread,
-                args=(ch_id, master_fd),
-                daemon=True,
+                args=(ch_id, master_fd), daemon=True,
             )
             thread.start()
-
-            # Start waiter for child process
             asyncio.ensure_future(self._wait_child(ch_id, pid))
 
     def _pty_reader_thread(self, ch_id, master_fd):
-        """Thread that reads from PTY master and enqueues data frames."""
         try:
             while True:
                 try:
@@ -496,7 +617,6 @@ class Server:
                 if not data:
                     break
                 frame = encode_frame({"type": "data", "ch": ch_id}, data)
-                # Thread-safe: put into asyncio queue from thread
                 asyncio.run_coroutine_threadsafe(
                     self.write_queue.put(frame), self.loop
                 )
@@ -504,7 +624,6 @@ class Server:
             pass
 
     async def _wait_child(self, ch_id, pid):
-        """Wait for child process to exit."""
         while True:
             try:
                 rpid, status = os.waitpid(pid, os.WNOHANG)
@@ -529,15 +648,8 @@ class Server:
         except Exception as e:
             await self.send({"type": "error", "ch": ch_id, "msg": str(e)})
             return
-
-        self.channels[ch_id] = {
-            "type": "pipe",
-            "proc": proc,
-            "alive": True,
-        }
+        self.channels[ch_id] = {"type": "pipe", "proc": proc, "alive": True}
         await self.send({"type": "opened", "ch": ch_id, "pid": proc.pid})
-
-        # Read stdout
         asyncio.ensure_future(self._pipe_reader(ch_id, proc))
 
     async def _pipe_reader(self, ch_id, proc):
@@ -576,11 +688,8 @@ class Server:
                 pass
         await self.send({"type": "close", "ch": ch_id, "exit_code": exit_code})
 
-    # -- Data/resize/eof --
-
     async def _handle_data(self, header: dict, data: bytes):
-        ch_id = header["ch"]
-        ch = self.channels.get(ch_id)
+        ch = self.channels.get(header["ch"])
         if ch is None:
             return
         if ch["type"] == "pty":
@@ -589,57 +698,45 @@ class Server:
             except OSError:
                 pass
         elif ch["type"] == "pipe":
-            proc = ch["proc"]
-            if proc.stdin:
-                proc.stdin.write(data)
-                await proc.stdin.drain()
+            if ch["proc"].stdin:
+                ch["proc"].stdin.write(data)
+                await ch["proc"].stdin.drain()
 
     async def _handle_resize(self, header: dict):
-        ch_id = header["ch"]
-        ch = self.channels.get(ch_id)
+        ch = self.channels.get(header["ch"])
         if ch and ch["type"] == "pty":
-            rows = header.get("rows", 24)
-            cols = header.get("cols", 80)
-            winsize = struct.pack("HHHH", rows, cols, 0, 0)
+            winsize = struct.pack("HHHH", header.get("rows", 24),
+                                  header.get("cols", 80), 0, 0)
             try:
                 fcntl.ioctl(ch["master_fd"], termios.TIOCSWINSZ, winsize)
             except OSError:
                 pass
 
     async def _handle_eof(self, header: dict):
-        ch_id = header["ch"]
-        ch = self.channels.get(ch_id)
+        ch = self.channels.get(header["ch"])
         if ch is None:
             return
         if ch["type"] == "pty":
             try:
-                os.write(ch["master_fd"], b"\x04")  # Ctrl-D
+                os.write(ch["master_fd"], b"\x04")
             except OSError:
                 pass
-        elif ch["type"] == "pipe":
-            proc = ch["proc"]
-            if proc.stdin:
-                proc.stdin.close()
-
-    # -- File transfer --
+        elif ch["type"] == "pipe" and ch["proc"].stdin:
+            ch["proc"].stdin.close()
 
     async def _handle_put(self, header: dict):
         req = header["req"]
         path = header["path"]
-        mode = header.get("mode", "0644")
-        size = header.get("size", 0)
+        mode = header.get("mode", 0o644)
+        if isinstance(mode, str):
+            mode = int(mode, 8)
         self.channels[f"file_{req}"] = {
-            "type": "file_put",
-            "path": path,
-            "mode": int(mode, 8) if isinstance(mode, str) else mode,
-            "size": size,
-            "received": 0,
-            "fd": None,
+            "type": "file_put", "path": path, "mode": mode,
+            "size": header.get("size", 0), "received": 0, "fd": None,
         }
         try:
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-            fd = open(path, "wb")
-            self.channels[f"file_{req}"]["fd"] = fd
+            self.channels[f"file_{req}"]["fd"] = open(path, "wb")
         except Exception as e:
             await self.send({"type": "file_error", "req": req, "msg": str(e)})
             self.channels.pop(f"file_{req}", None)
@@ -663,17 +760,14 @@ class Server:
             await self.send({"type": "file_error", "req": req, "msg": str(e)})
 
     async def _handle_file_data(self, header: dict, data: bytes):
-        req = header["req"]
-        key = f"file_{req}"
-        ch = self.channels.get(key)
+        ch = self.channels.get(f"file_{header['req']}")
         if ch and ch["fd"]:
             ch["fd"].write(data)
             ch["received"] += len(data)
 
     async def _handle_file_done(self, header: dict):
         req = header["req"]
-        key = f"file_{req}"
-        ch = self.channels.pop(key, None)
+        ch = self.channels.pop(f"file_{req}", None)
         if ch and ch["fd"]:
             ch["fd"].close()
             try:
@@ -683,25 +777,23 @@ class Server:
             await self.send({"type": "file_done", "req": req})
 
 
-
 def run_server():
-    """Entry point for server mode."""
-    # Redirect stderr to log file
     os.makedirs(RSSH_DIR, exist_ok=True)
     log_path = os.path.join(RSSH_DIR, "server.log")
     log_fd = open(log_path, "a")
     os.dup2(log_fd.fileno(), 2)
-
     server = Server()
     asyncio.run(server.run())
 
 
 # ---------------------------------------------------------------------------
-# Client daemon
+# Client daemon  (ControlMaster — speaks mux protocol to clients)
 # ---------------------------------------------------------------------------
 
 class Daemon:
-    """Runs locally. Owns the ssh/et subprocess. Listens on Unix socket."""
+    """Runs locally. Owns the ssh/et subprocess. Listens on Unix socket.
+    Speaks mux protocol (PROTOCOL.mux style) to CLI clients, and
+    transport protocol (TLV) to the remote server."""
 
     def __init__(self, host: str, use_et: bool = False, notify_fd: int = -1):
         self.host = host
@@ -709,74 +801,72 @@ class Daemon:
         self.ssh_proc = None
         self.write_queue = None
         self.next_ch_id = 1
-        self.clients = {}       # ch_id -> (reader, writer) for unix socket clients
-        self.file_reqs = {}     # req_id -> (reader, writer) for file transfer clients
         self.loop = None
         self.sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
         self.pid_path = os.path.join(RSSH_DIR, f"{host}.pid")
         self.ready = False
-        self.notify_fd = notify_fd  # pipe fd to signal parent process
+        self.notify_fd = notify_fd
         self.start_error = ""
+        # Session tracking (mux sessions)
+        self.sessions = {}          # session_id -> {ch_id, writer, request_id}
+        self.ch_to_session = {}     # ch_id -> session_id
+        self.next_session_id = 1
+        # File transfer tracking
+        self.file_reqs = {}         # req_id -> writer
+        # Port forwarding
+        self.forwards = {}          # (ftype, lhost, lport) -> {server, chost, cport}
+        self.fwd_channels = {}      # ch_id -> {local_writer, ...}
+        # Unix socket listener ref for stop_listening
+        self._unix_server = None
 
     async def run(self):
         self.loop = asyncio.get_event_loop()
         self.write_queue = asyncio.Queue()
-
         os.makedirs(RSSH_DIR, exist_ok=True)
 
-        # Clean up stale socket
         if os.path.exists(self.sock_path):
             try:
                 os.unlink(self.sock_path)
             except OSError:
                 pass
 
-        # Start SSH/ET subprocess
         if not await self._start_transport():
             self._notify_parent(f"error:{self.start_error}")
             return
 
-        # Transport is up — notify parent and detach from terminal
         self._notify_parent("ok")
         self._daemonize()
 
-        # Write PID file
         with open(self.pid_path, "w") as f:
             f.write(str(os.getpid()))
 
-        # Start writer to ssh transport
         writer_task = asyncio.ensure_future(self._transport_writer())
-
-        # Start reader from ssh transport
         reader_task = asyncio.ensure_future(self._transport_reader())
 
-        # Start Unix socket server
-        server = await asyncio.start_unix_server(
+        self._unix_server = await asyncio.start_unix_server(
             self._handle_client, path=self.sock_path
         )
         os.chmod(self.sock_path, 0o600)
 
-        # Wait for completion (ssh death or explicit shutdown)
         try:
             await reader_task
         except Exception:
             pass
         finally:
-            server.close()
-            await server.wait_closed()
+            self._unix_server.close()
+            await self._unix_server.wait_closed()
             writer_task.cancel()
+            # Close forwarding listeners
+            for fwd in self.forwards.values():
+                fwd["server"].close()
             self._cleanup()
 
     async def _start_transport(self) -> bool:
-        """Start ssh/et subprocess and bootstrap server."""
-        # Read our own source for bootstrapping
         script_path = os.path.abspath(__file__)
         with open(script_path, "rb") as f:
             script_data = f.read()
-
         encoded = base64.b64encode(script_data).decode("ascii")
 
-        # Build bootstrap command
         bootstrap_cmd = (
             'python3 -c "'
             "import sys,base64;"
@@ -797,15 +887,12 @@ class Daemon:
                 *transport_cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=None,  # inherit — allows SSH auth prompts via /dev/tty
+                stderr=None,
             )
         except Exception as e:
             self.start_error = f"failed to start transport: {e}"
             return False
 
-        # Send bootstrap payload (the script itself, to be exec'd on remote)
-        # The remote python3 reads one line from stdin, base64 decodes it, exec's it
-        # We need to send a small launcher that will exec the full script in server mode
         launcher = (
             f"import sys,base64,os\n"
             f"script = base64.b64decode({repr(encoded)})\n"
@@ -816,7 +903,6 @@ class Daemon:
         self.ssh_proc.stdin.write(launcher_encoded.encode("ascii") + b"\n")
         await self.ssh_proc.stdin.drain()
 
-        # Wait for ready signal
         try:
             header, _ = await asyncio.wait_for(
                 read_frame(self.ssh_proc.stdout), timeout=30
@@ -838,7 +924,6 @@ class Daemon:
         return True
 
     async def _transport_writer(self):
-        """Write frames from queue to ssh stdin."""
         while True:
             frame = await self.write_queue.get()
             try:
@@ -848,7 +933,6 @@ class Daemon:
                 return
 
     async def _transport_reader(self):
-        """Read frames from ssh stdout and dispatch to clients."""
         try:
             while True:
                 header, data = await read_frame(self.ssh_proc.stdout)
@@ -856,8 +940,12 @@ class Daemon:
         except (EOFError, asyncio.IncompleteReadError, ConnectionError):
             pass
 
+    async def send_to_server(self, header: dict, data: bytes = b""):
+        await self.write_queue.put(encode_frame(header, data))
+
+    # -- Dispatch transport responses → mux clients --
+
     async def _dispatch_from_server(self, header: dict, data: bytes):
-        """Route server frames to the appropriate local client."""
         msg_type = header.get("type")
         ch_id = header.get("ch")
         req_id = header.get("req")
@@ -865,118 +953,437 @@ class Daemon:
         if msg_type == "pong":
             return
 
+        # File transfer responses → translate to mux extension
         if req_id is not None and req_id in self.file_reqs:
-            # File transfer response — forward to the requesting client
             writer = self.file_reqs[req_id]
             try:
-                frame = encode_frame(header, data)
-                writer.write(frame)
+                if msg_type == "file_info":
+                    body = (mux_pack_u32(req_id)
+                            + mux_pack_u64(header.get("size", 0))
+                            + mux_pack_u32(_mode_to_int(header.get("mode", 0o644))))
+                    writer.write(mux_encode_packet(MUX_S_FILE_INFO, body))
+                elif msg_type == "file_data":
+                    body = mux_pack_u32(req_id) + mux_pack_string(data)
+                    writer.write(mux_encode_packet(MUX_S_FILE_DATA, body))
+                elif msg_type == "file_done":
+                    body = mux_pack_u32(req_id)
+                    writer.write(mux_encode_packet(MUX_S_FILE_DONE, body))
+                elif msg_type == "file_error":
+                    body = mux_pack_u32(req_id) + mux_pack_string(header.get("msg", ""))
+                    writer.write(mux_encode_packet(MUX_S_FILE_ERROR, body))
                 await writer.drain()
             except (OSError, ConnectionError):
-                self.file_reqs.pop(req_id, None)
+                pass
             if msg_type in ("file_done", "file_error"):
                 self.file_reqs.pop(req_id, None)
             return
 
-        if ch_id is not None and ch_id in self.clients:
-            writer = self.clients[ch_id]
+        # Forwarding channel data
+        if ch_id is not None and ch_id in self.fwd_channels:
+            fwd = self.fwd_channels[ch_id]
             try:
-                frame = encode_frame(header, data)
-                writer.write(frame)
-                await writer.drain()
+                if msg_type == "opened":
+                    fwd["opened"].set()
+                elif msg_type == "data":
+                    fwd["local_writer"].write(data)
+                    await fwd["local_writer"].drain()
+                elif msg_type in ("close", "error"):
+                    fwd["local_writer"].close()
+                    self.fwd_channels.pop(ch_id, None)
             except (OSError, ConnectionError):
-                self.clients.pop(ch_id, None)
-            if msg_type == "close":
-                self.clients.pop(ch_id, None)
+                self.fwd_channels.pop(ch_id, None)
             return
 
-    async def send_to_server(self, header: dict, data: bytes = b""):
-        await self.write_queue.put(encode_frame(header, data))
+        # Session responses → translate to mux messages
+        if ch_id is not None and ch_id in self.ch_to_session:
+            session_id = self.ch_to_session[ch_id]
+            session = self.sessions.get(session_id)
+            if session is None:
+                return
+            writer = session["writer"]
+            try:
+                if msg_type == "opened":
+                    pkt = mux_encode_packet(
+                        MUX_S_SESSION_OPENED,
+                        _mux_session_opened_body(session["request_id"], session_id))
+                    writer.write(pkt)
+                    await writer.drain()
 
-    async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """Handle a connection from a CLI client on the Unix socket."""
+                elif msg_type == "data":
+                    pkt = mux_encode_packet(
+                        MUX_S_SESSION_DATA,
+                        _mux_session_data_body(session_id, data))
+                    writer.write(pkt)
+                    await writer.drain()
+
+                elif msg_type == "close":
+                    exit_code = header.get("exit_code", 0)
+                    if exit_code < 0:
+                        exit_code = 255
+                    pkt = mux_encode_packet(
+                        MUX_S_EXIT_MESSAGE,
+                        _mux_exit_message_body(session_id, exit_code))
+                    writer.write(pkt)
+                    await writer.drain()
+                    self.sessions.pop(session_id, None)
+                    self.ch_to_session.pop(ch_id, None)
+
+                elif msg_type == "error":
+                    pkt = mux_encode_packet(
+                        MUX_S_FAILURE,
+                        _mux_failure_body(session["request_id"],
+                                          header.get("msg", "error")))
+                    writer.write(pkt)
+                    await writer.drain()
+                    self.sessions.pop(session_id, None)
+                    self.ch_to_session.pop(ch_id, None)
+
+            except (OSError, ConnectionError):
+                self.sessions.pop(session_id, None)
+                self.ch_to_session.pop(ch_id, None)
+
+    # -- Unix socket client handler (mux protocol) --
+
+    async def _handle_client(self, reader: asyncio.StreamReader,
+                             writer: asyncio.StreamWriter):
+        """Handle a mux client connection. Performs hello exchange,
+        then dispatches mux commands."""
+        session_ids = set()
+        file_req_ids = set()
         try:
-            header, data = await read_frame(reader)
-        except (EOFError, asyncio.IncompleteReadError):
-            writer.close()
-            return
+            # Hello exchange — daemon sends first
+            writer.write(mux_encode_packet(MUX_MSG_HELLO, _mux_hello_body()))
+            await writer.drain()
 
-        msg_type = header.get("type")
+            msg_type, body = await mux_read_packet(reader)
+            if msg_type != MUX_MSG_HELLO:
+                return
+            p = MuxParser(body)
+            version = p.get_u32()
+            if version != MUX_VERSION:
+                return
+            # Skip extensions
+            while p.remaining >= 8:
+                try:
+                    p.get_cstring()
+                    p.get_cstring()
+                except (struct.error, IndexError):
+                    break
 
-        if msg_type == "status":
-            await self._handle_status(writer)
-            return
-
-        if msg_type == "disconnect":
-            await self._handle_disconnect(writer)
-            return
-
-        if msg_type in ("put", "get"):
-            req_id = header.get("req")
-            self.file_reqs[req_id] = writer
-            await self.send_to_server(header, data)
-            # Continue reading file data from client
+            # Dispatch loop
+            while True:
+                msg_type, body = await mux_read_packet(reader)
+                await self._dispatch_mux(msg_type, body, reader, writer,
+                                         session_ids, file_req_ids)
+        except (EOFError, asyncio.IncompleteReadError, ConnectionError,
+                struct.error, ValueError):
+            pass
+        finally:
+            for sid in list(session_ids):
+                session = self.sessions.pop(sid, None)
+                if session:
+                    self.ch_to_session.pop(session.get("ch_id"), None)
+            for rid in list(file_req_ids):
+                self.file_reqs.pop(rid, None)
             try:
-                while True:
-                    h, d = await read_frame(reader)
-                    await self.send_to_server(h, d)
-                    if h.get("type") in ("file_done", "file_error"):
-                        break
-            except (EOFError, asyncio.IncompleteReadError):
+                writer.close()
+            except Exception:
                 pass
-            return
 
-        if msg_type == "open":
-            ch_id = self.next_ch_id
-            self.next_ch_id += 1
-            header["ch"] = ch_id
-            self.clients[ch_id] = writer
-
-            # Forward open to server
-            await self.send_to_server(header, data)
-
-            # Relay client->server data
+    async def _dispatch_mux(self, msg_type, body, reader, writer,
+                            session_ids, file_req_ids):
+        if msg_type == MUX_C_NEW_SESSION:
+            await self._mux_new_session(body, writer, session_ids)
+        elif msg_type == MUX_C_ALIVE_CHECK:
+            await self._mux_alive_check(body, writer)
+        elif msg_type == MUX_C_TERMINATE:
+            await self._mux_terminate(body, writer)
+            raise ConnectionError("terminated")
+        elif msg_type == MUX_C_OPEN_FWD:
+            await self._mux_open_fwd(body, writer)
+        elif msg_type == MUX_C_CLOSE_FWD:
+            await self._mux_close_fwd(body, writer)
+        elif msg_type == MUX_C_STOP_LISTENING:
+            await self._mux_stop_listening(body, writer)
+        elif msg_type == MUX_C_SESSION_DATA:
+            await self._mux_session_data(body)
+        elif msg_type == MUX_C_SESSION_RESIZE:
+            await self._mux_session_resize(body)
+        elif msg_type == MUX_C_SESSION_EOF:
+            await self._mux_session_eof(body)
+        elif msg_type == MUX_C_FILE_PUT:
+            await self._mux_file_put(body, writer, file_req_ids)
+        elif msg_type == MUX_C_FILE_GET:
+            await self._mux_file_get(body, writer, file_req_ids)
+        elif msg_type == MUX_C_FILE_DATA:
+            await self._mux_file_data(body)
+        elif msg_type == MUX_C_FILE_DONE:
+            await self._mux_file_done(body)
+        else:
+            # Unknown — try to extract request_id and send failure
             try:
-                while True:
-                    h, d = await read_frame(reader)
-                    h["ch"] = ch_id
-                    await self.send_to_server(h, d)
-            except (EOFError, asyncio.IncompleteReadError):
+                p = MuxParser(body)
+                rid = p.get_u32()
+                writer.write(mux_encode_packet(
+                    MUX_S_FAILURE,
+                    _mux_failure_body(rid, f"unsupported request 0x{msg_type:08x}")))
+                await writer.drain()
+            except Exception:
                 pass
-            finally:
-                self.clients.pop(ch_id, None)
-            return
 
-        writer.close()
+    # -- Session management --
 
-    async def _handle_status(self, writer: asyncio.StreamWriter):
-        info = {
-            "type": "status_response",
-            "host": self.host,
-            "pid": os.getpid(),
-            "transport_pid": self.ssh_proc.pid if self.ssh_proc else None,
-            "channels": len(self.clients),
-            "file_transfers": len(self.file_reqs),
-            "ready": self.ready,
+    async def _mux_new_session(self, body, writer, session_ids):
+        p = MuxParser(body)
+        request_id = p.get_u32()
+        _reserved = p.get_string()
+        want_tty = p.get_bool()
+        _want_x11 = p.get_bool()
+        _want_agent = p.get_bool()
+        _want_subsystem = p.get_bool()
+        _escape_char = p.get_u32()
+        terminal_type = p.get_cstring()
+        command = p.get_cstring()
+
+        env_vars = {}
+        while p.remaining > 0:
+            try:
+                env_str = p.get_cstring()
+                if "=" in env_str:
+                    k, v = env_str.split("=", 1)
+                    env_vars[k] = v
+            except Exception:
+                break
+
+        ch_id = self.next_ch_id
+        self.next_ch_id += 1
+        session_id = self.next_session_id
+        self.next_session_id += 1
+
+        cmd = ["bash"] if not command else ["bash", "-c", command]
+        if want_tty and terminal_type:
+            env_vars.setdefault("TERM", terminal_type)
+
+        rows = int(env_vars.pop("RSSH_ROWS", "24"))
+        cols = int(env_vars.pop("RSSH_COLS", "80"))
+
+        transport_header = {
+            "type": "open", "ch": ch_id, "pty": want_tty,
+            "rows": rows, "cols": cols, "cmd": cmd,
         }
-        frame = encode_frame(info)
-        writer.write(frame)
-        await writer.drain()
-        writer.close()
+        if env_vars:
+            transport_header["env"] = env_vars
 
-    async def _handle_disconnect(self, writer: asyncio.StreamWriter):
-        frame = encode_frame({"type": "disconnect_ack"})
-        writer.write(frame)
+        self.sessions[session_id] = {
+            "ch_id": ch_id, "writer": writer, "request_id": request_id,
+        }
+        self.ch_to_session[ch_id] = session_id
+        session_ids.add(session_id)
+
+        await self.send_to_server(transport_header)
+
+    async def _mux_session_data(self, body):
+        p = MuxParser(body)
+        session_id = p.get_u32()
+        data = p.get_string()
+        session = self.sessions.get(session_id)
+        if session:
+            await self.send_to_server({"type": "data", "ch": session["ch_id"]}, data)
+
+    async def _mux_session_resize(self, body):
+        p = MuxParser(body)
+        session_id = p.get_u32()
+        rows = p.get_u32()
+        cols = p.get_u32()
+        session = self.sessions.get(session_id)
+        if session:
+            await self.send_to_server({
+                "type": "resize", "ch": session["ch_id"],
+                "rows": rows, "cols": cols,
+            })
+
+    async def _mux_session_eof(self, body):
+        p = MuxParser(body)
+        session_id = p.get_u32()
+        session = self.sessions.get(session_id)
+        if session:
+            await self.send_to_server({"type": "eof", "ch": session["ch_id"]})
+
+    # -- Management --
+
+    async def _mux_alive_check(self, body, writer):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        writer.write(mux_encode_packet(
+            MUX_S_ALIVE, _mux_alive_body(rid, os.getpid())))
         await writer.drain()
-        writer.close()
-        # Shutdown
+
+    async def _mux_terminate(self, body, writer):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        writer.write(mux_encode_packet(MUX_S_OK, _mux_ok_body(rid)))
+        await writer.drain()
         if self.ssh_proc:
             self.ssh_proc.terminate()
         self._cleanup()
         asyncio.get_event_loop().stop()
 
+    async def _mux_stop_listening(self, body, writer):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        if self._unix_server:
+            self._unix_server.close()
+            self._unix_server = None
+        writer.write(mux_encode_packet(MUX_S_OK, _mux_ok_body(rid)))
+        await writer.drain()
+
+    # -- File transfer --
+
+    async def _mux_file_put(self, body, writer, file_req_ids):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        path = p.get_cstring()
+        size = p.get_u64()
+        mode = p.get_u32()
+        self.file_reqs[rid] = writer
+        file_req_ids.add(rid)
+        await self.send_to_server({
+            "type": "put", "req": rid, "path": path,
+            "size": size, "mode": mode,
+        })
+
+    async def _mux_file_get(self, body, writer, file_req_ids):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        path = p.get_cstring()
+        self.file_reqs[rid] = writer
+        file_req_ids.add(rid)
+        await self.send_to_server({"type": "get", "req": rid, "path": path})
+
+    async def _mux_file_data(self, body):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        data = p.get_string()
+        await self.send_to_server({"type": "file_data", "req": rid}, data)
+
+    async def _mux_file_done(self, body):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        await self.send_to_server({"type": "file_done", "req": rid})
+
+    # -- Port forwarding --
+
+    async def _mux_open_fwd(self, body, writer):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        fwd_type = p.get_u32()
+        listen_host = p.get_cstring()
+        listen_port = p.get_u32()
+        connect_host = p.get_cstring()
+        connect_port = p.get_u32()
+
+        if fwd_type != MUX_FWD_LOCAL:
+            writer.write(mux_encode_packet(
+                MUX_S_FAILURE,
+                _mux_failure_body(rid, "only local forwarding is supported")))
+            await writer.drain()
+            return
+
+        fwd_key = (fwd_type, listen_host, listen_port)
+        if fwd_key in self.forwards:
+            writer.write(mux_encode_packet(
+                MUX_S_FAILURE,
+                _mux_failure_body(rid, "forwarding already active")))
+            await writer.drain()
+            return
+
+        try:
+            bind_host = listen_host or "127.0.0.1"
+            server = await asyncio.start_server(
+                lambda r, w: self._handle_fwd_connection(
+                    r, w, connect_host, connect_port),
+                host=bind_host, port=listen_port,
+            )
+        except Exception as e:
+            writer.write(mux_encode_packet(
+                MUX_S_FAILURE, _mux_failure_body(rid, str(e))))
+            await writer.drain()
+            return
+
+        self.forwards[fwd_key] = {
+            "server": server,
+            "connect_host": connect_host,
+            "connect_port": connect_port,
+        }
+
+        actual_port = listen_port
+        if listen_port == 0 and server.sockets:
+            actual_port = server.sockets[0].getsockname()[1]
+            resp_body = mux_pack_u32(rid) + mux_pack_u32(actual_port)
+            writer.write(mux_encode_packet(MUX_S_REMOTE_PORT, resp_body))
+        else:
+            writer.write(mux_encode_packet(MUX_S_OK, _mux_ok_body(rid)))
+        await writer.drain()
+
+    async def _mux_close_fwd(self, body, writer):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        fwd_type = p.get_u32()
+        listen_host = p.get_cstring()
+        listen_port = p.get_u32()
+        _connect_host = p.get_cstring()
+        _connect_port = p.get_u32()
+
+        fwd_key = (fwd_type, listen_host, listen_port)
+        fwd = self.forwards.pop(fwd_key, None)
+        if fwd:
+            fwd["server"].close()
+            writer.write(mux_encode_packet(MUX_S_OK, _mux_ok_body(rid)))
+        else:
+            writer.write(mux_encode_packet(
+                MUX_S_FAILURE, _mux_failure_body(rid, "no such forwarding")))
+        await writer.drain()
+
+    async def _handle_fwd_connection(self, local_reader, local_writer,
+                                     connect_host, connect_port):
+        ch_id = self.next_ch_id
+        self.next_ch_id += 1
+
+        opened_event = asyncio.Event()
+        self.fwd_channels[ch_id] = {
+            "local_writer": local_writer,
+            "opened": opened_event,
+        }
+
+        await self.send_to_server({
+            "type": "open", "ch": ch_id, "pty": False,
+            "rows": 24, "cols": 80,
+            "cmd": ["nc", connect_host, str(connect_port)],
+        })
+
+        try:
+            await asyncio.wait_for(opened_event.wait(), timeout=15)
+        except asyncio.TimeoutError:
+            self.fwd_channels.pop(ch_id, None)
+            local_writer.close()
+            return
+
+        # Relay local → remote
+        try:
+            while True:
+                data = await local_reader.read(4096)
+                if not data:
+                    await self.send_to_server({"type": "eof", "ch": ch_id})
+                    break
+                await self.send_to_server({"type": "data", "ch": ch_id}, data)
+        except (OSError, ConnectionError):
+            pass
+        finally:
+            self.fwd_channels.pop(ch_id, None)
+
+    # -- Daemon lifecycle --
+
     def _notify_parent(self, msg: str):
-        """Send status message to parent process via pipe, then close it."""
         if self.notify_fd >= 0:
             try:
                 os.write(self.notify_fd, msg.encode())
@@ -989,7 +1396,6 @@ class Daemon:
             self.notify_fd = -1
 
     def _daemonize(self):
-        """Detach from terminal after SSH auth is complete."""
         os.setsid()
         devnull = os.open(os.devnull, os.O_RDWR)
         os.dup2(devnull, 0)
@@ -1014,7 +1420,6 @@ class Daemon:
 
 
 def run_daemon(host: str, use_et: bool = False, foreground: bool = False):
-    """Start the client daemon."""
     os.makedirs(RSSH_DIR, exist_ok=True)
 
     if foreground:
@@ -1025,13 +1430,10 @@ def run_daemon(host: str, use_et: bool = False, foreground: bool = False):
             daemon._cleanup()
         return
 
-    # Fork to background, but keep the terminal for SSH authentication.
-    # The child delays setsid() until after the SSH connection is established.
     r_fd, w_fd = os.pipe()
     pid = os.fork()
 
     if pid > 0:
-        # Parent: wait for child to report connection status via pipe
         os.close(w_fd)
         data = b""
         while True:
@@ -1056,10 +1458,8 @@ def run_daemon(host: str, use_et: bool = False, foreground: bool = False):
             sys.exit(1)
         return
 
-    # Child: keep controlling terminal so SSH can authenticate via /dev/tty
     os.close(r_fd)
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
-
     daemon = Daemon(host, use_et, notify_fd=w_fd)
     try:
         asyncio.run(daemon.run())
@@ -1070,31 +1470,26 @@ def run_daemon(host: str, use_et: bool = False, foreground: bool = False):
 
 
 # ---------------------------------------------------------------------------
-# Client CLI — helper to connect to daemon
+# Client — mux protocol helpers
 # ---------------------------------------------------------------------------
 
 def ensure_daemon(host: str, use_et: bool = False) -> str:
-    """Ensure daemon is running for the given host. Returns socket path."""
     sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
     if os.path.exists(sock_path):
-        # Check if daemon is alive
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(sock_path)
             sock.close()
             return sock_path
         except (ConnectionRefusedError, OSError):
-            # Stale socket
             try:
                 os.unlink(sock_path)
             except OSError:
                 pass
 
-    # Start daemon
     print(f"rssh: connecting to {host}...", file=sys.stderr)
     run_daemon(host, use_et)
 
-    # Wait for socket
     for _ in range(60):
         time.sleep(0.5)
         if os.path.exists(sock_path):
@@ -1110,23 +1505,46 @@ def ensure_daemon(host: str, use_et: bool = False) -> str:
     sys.exit(1)
 
 
-def connect_to_daemon(sock_path: str) -> socket.socket:
-    """Connect to daemon Unix socket and return the socket."""
+def mux_connect(sock_path: str) -> socket.socket:
+    """Connect to daemon and perform mux hello exchange."""
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(sock_path)
+
+    # Read daemon's hello
+    msg_type, body = mux_read_packet_sync(sock)
+    if msg_type != MUX_MSG_HELLO:
+        sock.close()
+        raise ConnectionError("expected MUX_MSG_HELLO from daemon")
+    p = MuxParser(body)
+    version = p.get_u32()
+    if version != MUX_VERSION:
+        sock.close()
+        raise ConnectionError(f"unsupported mux version: {version}")
+
+    # Send our hello
+    mux_write_packet_sync(sock, MUX_MSG_HELLO, _mux_hello_body())
     return sock
 
 
+def _mux_request_alive(sock: socket.socket, rid: int = 1) -> int:
+    """Send alive check, return daemon PID."""
+    mux_write_packet_sync(sock, MUX_C_ALIVE_CHECK, mux_pack_u32(rid))
+    msg_type, body = mux_read_packet_sync(sock)
+    if msg_type == MUX_S_ALIVE:
+        p = MuxParser(body)
+        p.get_u32()  # rid
+        return p.get_u32()  # pid
+    return 0
+
+
 # ---------------------------------------------------------------------------
-# Client CLI mode — interactive shell / command execution
+# Client CLI — interactive shell / command execution
 # ---------------------------------------------------------------------------
 
 def run_cli(host: str, command=None, force_pty=None, env_vars=None, use_et=False):
-    """Run an interactive shell or command via the daemon."""
     sock_path = ensure_daemon(host, use_et)
-    sock = connect_to_daemon(sock_path)
+    sock = mux_connect(sock_path)
 
-    # Determine PTY usage
     is_tty = os.isatty(sys.stdin.fileno())
     if force_pty is True:
         use_pty = True
@@ -1135,64 +1553,84 @@ def run_cli(host: str, command=None, force_pty=None, env_vars=None, use_et=False
     elif command is None:
         use_pty = is_tty
     else:
-        use_pty = is_tty  # use pty if terminal is available
+        use_pty = is_tty
 
-    # Build open frame
-    open_header = {
-        "type": "open",
-        "ch": 0,  # daemon will reassign
-        "pty": use_pty,
-    }
-
+    # Build MUX_C_NEW_SESSION body (matching SSH PROTOCOL.mux)
+    request_id = 1
+    cmd_str = ""
     if command:
-        open_header["cmd"] = command if isinstance(command, list) else ["bash", "-c", command]
-    else:
+        cmd_str = " ".join(command) if isinstance(command, list) else command
+    term = os.environ.get("TERM", "xterm-256color") if use_pty else ""
+
+    if not cmd_str and not command:
         shell = os.environ.get("SHELL", "bash")
-        open_header["cmd"] = [os.path.basename(shell)]
+        cmd_str = os.path.basename(shell)
 
+    body = mux_pack_u32(request_id)
+    body += mux_pack_string(b"")          # reserved
+    body += mux_pack_bool(use_pty)        # want tty
+    body += mux_pack_bool(False)          # want X11
+    body += mux_pack_bool(False)          # want agent
+    body += mux_pack_bool(False)          # subsystem
+    body += mux_pack_u32(0xFFFFFFFF)      # no escape char
+    body += mux_pack_string(term)         # terminal type
+    body += mux_pack_string(cmd_str)      # command
+
+    # Environment strings (KEY=VAL)
+    env_list = []
     if env_vars:
-        open_header["env"] = dict(env_vars)
-
+        for k, v in env_vars:
+            env_list.append(f"{k}={v}")
     if use_pty and is_tty:
         rows, cols = _get_terminal_size()
-        open_header["rows"] = rows
-        open_header["cols"] = cols
+        env_list.append(f"RSSH_ROWS={rows}")
+        env_list.append(f"RSSH_COLS={cols}")
+    for env_str in env_list:
+        body += mux_pack_string(env_str)
 
-    # Send open request
-    write_frame_sync(sock, open_header)
+    mux_write_packet_sync(sock, MUX_C_NEW_SESSION, body)
 
-    # Wait for opened response
-    try:
-        header, _ = read_frame_sync(sock)
-    except EOFError:
-        print("rssh: connection lost", file=sys.stderr)
+    # Read response
+    msg_type, resp_body = mux_read_packet_sync(sock)
+    if msg_type == MUX_S_SESSION_OPENED:
+        p = MuxParser(resp_body)
+        p.get_u32()  # rid
+        session_id = p.get_u32()
+    elif msg_type == MUX_S_FAILURE:
+        p = MuxParser(resp_body)
+        p.get_u32()  # rid
+        reason = p.get_cstring()
+        print(f"rssh: {reason}", file=sys.stderr)
+        sock.close()
+        sys.exit(1)
+    else:
+        print(f"rssh: unexpected response: 0x{msg_type:08x}", file=sys.stderr)
+        sock.close()
         sys.exit(1)
 
-    if header.get("type") == "error":
-        print(f"rssh: {header.get('msg', 'unknown error')}", file=sys.stderr)
-        sys.exit(1)
+    # Send initial resize
+    if use_pty and is_tty:
+        rows, cols = _get_terminal_size()
+        resize_body = mux_pack_u32(session_id) + mux_pack_u32(rows) + mux_pack_u32(cols)
+        mux_write_packet_sync(sock, MUX_C_SESSION_RESIZE, resize_body)
 
-    if header.get("type") != "opened":
-        print(f"rssh: unexpected response: {header}", file=sys.stderr)
-        sys.exit(1)
-
-    # Terminal setup for PTY mode
+    # Terminal setup
     old_settings = None
     if use_pty and is_tty:
         old_settings = termios.tcgetattr(sys.stdin.fileno())
         tty.setraw(sys.stdin.fileno())
-        # Handle SIGWINCH
         def on_winch(signum, frame):
             rows, cols = _get_terminal_size()
             try:
-                write_frame_sync(sock, {"type": "resize", "ch": 0, "rows": rows, "cols": cols})
+                rb = mux_pack_u32(session_id) + mux_pack_u32(rows) + mux_pack_u32(cols)
+                mux_write_packet_sync(sock, MUX_C_SESSION_RESIZE, rb)
             except Exception:
                 pass
         signal.signal(signal.SIGWINCH, on_winch)
 
     exit_code = 0
     try:
-        exit_code = _relay_io(sock, use_pty and is_tty)
+        exit_code = _relay_io_mux(sock, session_id, use_pty and is_tty)
     finally:
         if old_settings is not None:
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
@@ -1201,8 +1639,54 @@ def run_cli(host: str, command=None, force_pty=None, env_vars=None, use_et=False
     sys.exit(exit_code)
 
 
-def _relay_io(sock: socket.socket, raw_mode: bool) -> int:
-    """Relay I/O between local terminal and daemon socket."""
+def _strip_osc(data: bytes, state: list) -> bytes:
+    """Strip OSC escape sequences from terminal output."""
+    if not state[0] and b'\x1b]' not in data:
+        return data
+    out = bytearray()
+    i = 0
+    in_osc = state[0]
+    prev_esc = state[1]
+    while i < len(data):
+        b = data[i]
+        if in_osc:
+            if b == 0x07:
+                in_osc = False
+            elif prev_esc and b == 0x5c:
+                in_osc = False
+                prev_esc = False
+            else:
+                prev_esc = (b == 0x1b)
+        else:
+            if b == 0x1b and i + 1 < len(data) and data[i + 1] == 0x5d:
+                in_osc = True
+                prev_esc = False
+                i += 2
+                continue
+            elif b == 0x1b and i + 1 == len(data):
+                state[0] = False
+                state[1] = True
+                i += 1
+                continue
+            elif state[1] and b == 0x5d:
+                in_osc = True
+                state[1] = False
+                i += 1
+                continue
+            else:
+                if state[1]:
+                    out.append(0x1b)
+                    state[1] = False
+                out.append(b)
+        i += 1
+    state[0] = in_osc
+    if not in_osc:
+        state[1] = prev_esc if not in_osc else False
+    return bytes(out)
+
+
+def _relay_io_mux(sock: socket.socket, session_id: int, raw_mode: bool) -> int:
+    """Relay I/O between local terminal and daemon using mux protocol."""
     exit_code = 0
     sock.setblocking(False)
 
@@ -1210,14 +1694,13 @@ def _relay_io(sock: socket.socket, raw_mode: bool) -> int:
     stdout_fd = sys.stdout.fileno()
     sock_fd = sock.fileno()
 
-    # Buffer for partial frame reads from socket
     sock_buf = bytearray()
+    osc_state = [False, False]
 
     running = True
     while running:
-        read_fds = [stdin_fd, sock_fd]
         try:
-            readable, _, _ = select.select(read_fds, [], [], 1.0)
+            readable, _, _ = select.select([stdin_fd, sock_fd], [], [], 1.0)
         except (InterruptedError, OSError):
             continue
 
@@ -1230,14 +1713,17 @@ def _relay_io(sock: socket.socket, raw_mode: bool) -> int:
                 if not data:
                     try:
                         sock.setblocking(True)
-                        write_frame_sync(sock, {"type": "eof", "ch": 0})
+                        mux_write_packet_sync(sock, MUX_C_SESSION_EOF,
+                                              mux_pack_u32(session_id))
                         sock.setblocking(False)
                     except Exception:
                         pass
                     continue
                 try:
                     sock.setblocking(True)
-                    write_frame_sync(sock, {"type": "data", "ch": 0}, data)
+                    mux_write_packet_sync(
+                        sock, MUX_C_SESSION_DATA,
+                        _mux_session_data_body(session_id, data))
                     sock.setblocking(False)
                 except Exception:
                     running = False
@@ -1256,29 +1742,44 @@ def _relay_io(sock: socket.socket, raw_mode: bool) -> int:
                     break
                 sock_buf.extend(chunk)
 
-                # Process complete frames
-                while len(sock_buf) >= 5:
-                    type_id = sock_buf[0]
-                    (length,) = struct.unpack("!I", sock_buf[1:5])
-                    if len(sock_buf) < 5 + length:
+                # Process complete mux packets
+                while len(sock_buf) >= 4:
+                    pkt_len, = struct.unpack("!I", sock_buf[:4])
+                    if len(sock_buf) < 4 + pkt_len:
                         break
-                    payload = bytes(sock_buf[5:5 + length])
-                    del sock_buf[:5 + length]
+                    payload = bytes(sock_buf[4:4 + pkt_len])
+                    del sock_buf[:4 + pkt_len]
 
-                    header, data = decode_frame(type_id, payload)
-                    msg_type = header.get("type")
+                    if len(payload) < 4:
+                        continue
+                    mt, = struct.unpack_from("!I", payload, 0)
+                    pkt_body = payload[4:]
 
-                    if msg_type == "data":
+                    if mt == MUX_S_SESSION_DATA:
+                        p = MuxParser(pkt_body)
+                        p.get_u32()  # sid
+                        data = p.get_string()
                         try:
-                            os.write(stdout_fd, data)
+                            out = data if raw_mode else _strip_osc(data, osc_state)
+                            if out:
+                                os.write(stdout_fd, out)
                         except OSError:
                             pass
-                    elif msg_type == "close":
-                        exit_code = header.get("exit_code", 0)
+
+                    elif mt == MUX_S_EXIT_MESSAGE:
+                        p = MuxParser(pkt_body)
+                        p.get_u32()  # sid
+                        exit_code = p.get_u32()
+                        if exit_code > 255:
+                            exit_code = 255
                         running = False
                         break
-                    elif msg_type == "error":
-                        sys.stderr.write(f"\rrssh: {header.get('msg', 'error')}\n")
+
+                    elif mt == MUX_S_FAILURE:
+                        p = MuxParser(pkt_body)
+                        p.get_u32()  # rid
+                        reason = p.get_cstring()
+                        sys.stderr.write(f"\rrssh: {reason}\n")
                         running = False
                         break
 
@@ -1288,7 +1789,7 @@ def _relay_io(sock: socket.socket, raw_mode: bool) -> int:
 def _get_terminal_size():
     try:
         size = os.get_terminal_size(sys.stdin.fileno())
-        return size.lines, size.columns  # rows, cols
+        return size.lines, size.columns
     except OSError:
         return 24, 80
 
@@ -1298,81 +1799,68 @@ def _get_terminal_size():
 # ---------------------------------------------------------------------------
 
 def run_pipe(host: str, command=None, env_vars=None, use_et: bool = False):
-    """Pipe mode: transparent relay without terminal manipulation.
-
-    Used by TRAMP and other programmatic callers. If a daemon is running,
-    connects through it (multiplexed). Otherwise, runs SSH inline.
-    No raw mode, no status messages, no SIGWINCH handling.
-    """
     sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
 
-    # Try daemon first
     if os.path.exists(sock_path):
         try:
-            sock = connect_to_daemon(sock_path)
+            sock = mux_connect(sock_path)
             exit_code = _pipe_via_daemon(sock, command, env_vars)
             sys.exit(exit_code)
         except (ConnectionRefusedError, OSError):
             pass
 
-    # No daemon — run SSH inline (no fork, no daemon creation)
     exit_code = asyncio.run(_pipe_inline(host, command, env_vars, use_et))
     sys.exit(exit_code)
 
 
 def _pipe_via_daemon(sock: socket.socket, command=None, env_vars=None) -> int:
-    """Open a channel through existing daemon and relay I/O."""
+    """Open a session through existing daemon using mux protocol."""
     env = {}
     if env_vars:
         env.update(dict(env_vars))
-    # Propagate the local connection type to the remote: if our stdin
-    # is a PTY (caller wants terminal semantics, e.g. eat), allocate a
-    # PTY on the remote.  If stdin is a pipe (caller wants clean
-    # output, e.g. hg), use a pipe on the remote.  The interactive
-    # shell always needs a PTY for prompt detection.
     use_pty = (not command) or os.isatty(sys.stdin.fileno())
-    open_header = {
-        "type": "open",
-        "ch": 0,  # daemon will reassign
-        "pty": use_pty,
-        "rows": 24,
-        "cols": 80,
-        "env": env,
-    }
+
+    request_id = 1
+    cmd_str = ""
     if command:
-        open_header["cmd"] = command if isinstance(command, list) else ["bash", "-c", command]
+        cmd_str = " ".join(command) if isinstance(command, list) else command
     else:
-        # TERM=dumb suppresses shell integration escape sequences (OSC 3008,
-        # bracketed paste, etc.) that break TRAMP's prompt detection.
-        # Only set for the interactive shell — commands (eat, hg, etc.)
-        # need a real TERM value.
         env["TERM"] = "dumb"
-        # --norc --noprofile prevents .bashrc from enabling shell integration
-        # escape sequences (OSC 3008, bracketed paste) that confuse TRAMP.
-        open_header["cmd"] = ["bash", "--norc", "--noprofile"]
+        cmd_str = "bash --norc --noprofile"
 
-    write_frame_sync(sock, open_header)
+    body = mux_pack_u32(request_id)
+    body += mux_pack_string(b"")
+    body += mux_pack_bool(use_pty)
+    body += mux_pack_bool(False)
+    body += mux_pack_bool(False)
+    body += mux_pack_bool(False)
+    body += mux_pack_u32(0xFFFFFFFF)
+    body += mux_pack_string(env.get("TERM", ""))
+    body += mux_pack_string(cmd_str)
+    for k, v in env.items():
+        body += mux_pack_string(f"{k}={v}")
 
-    try:
-        header, _ = read_frame_sync(sock)
-    except EOFError:
+    mux_write_packet_sync(sock, MUX_C_NEW_SESSION, body)
+
+    msg_type, resp_body = mux_read_packet_sync(sock)
+    if msg_type != MUX_S_SESSION_OPENED:
         sock.close()
         return 1
 
-    if header.get("type") != "opened":
-        sock.close()
-        return 1
+    p = MuxParser(resp_body)
+    p.get_u32()  # rid
+    session_id = p.get_u32()
 
-    exit_code = _relay_io(sock, False)
+    exit_code = _relay_io_mux(sock, session_id, False)
     sock.close()
     return exit_code
 
 
-async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = False) -> int:
-    """Direct SSH connection without daemon. Single session, no multiplexing."""
+async def _pipe_inline(host: str, command=None, env_vars=None,
+                       use_et: bool = False) -> int:
+    """Direct SSH connection without daemon. Uses transport protocol directly."""
     loop = asyncio.get_event_loop()
 
-    # Read our own source for bootstrapping
     script_path = os.path.abspath(__file__)
     with open(script_path, "rb") as f:
         script_data = f.read()
@@ -1395,12 +1883,11 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
             *transport_cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
-            stderr=None,  # inherit for SSH auth prompts
+            stderr=None,
         )
     except Exception:
         return 1
 
-    # Bootstrap
     launcher = (
         f"import sys,base64,os\n"
         f"script = base64.b64decode({repr(encoded)})\n"
@@ -1411,7 +1898,6 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
     proc.stdin.write(launcher_encoded.encode("ascii") + b"\n")
     await proc.stdin.drain()
 
-    # Wait for ready
     try:
         header, _ = await asyncio.wait_for(read_frame(proc.stdout), timeout=30)
         if header.get("type") != "ready":
@@ -1419,30 +1905,23 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
     except (asyncio.TimeoutError, asyncio.IncompleteReadError, EOFError):
         return 1
 
-    # Open channel
     env = {}
     if env_vars:
         env.update(dict(env_vars))
     use_pty = (not command) or os.isatty(sys.stdin.fileno())
     open_header = {
-        "type": "open",
-        "ch": 1,
-        "pty": use_pty,
-        "env": env,
-        "rows": 24,
-        "cols": 80,
+        "type": "open", "ch": 1, "pty": use_pty,
+        "env": env, "rows": 24, "cols": 80,
     }
     if command:
         open_header["cmd"] = command if isinstance(command, list) else ["bash", "-c", command]
     else:
-        # TERM=dumb only for the interactive TRAMP shell.
         env["TERM"] = "dumb"
         open_header["cmd"] = ["bash", "--norc", "--noprofile"]
 
     proc.stdin.write(encode_frame(open_header))
     await proc.stdin.drain()
 
-    # Wait for opened
     try:
         header, _ = await read_frame(proc.stdout)
         if header.get("type") != "opened":
@@ -1450,7 +1929,6 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
     except (asyncio.IncompleteReadError, EOFError):
         return 1
 
-    # Relay I/O: stdin → server, server → stdout
     stdin_fd = sys.stdin.fileno()
     stdout_fd = sys.stdout.fileno()
     exit_code = 0
@@ -1489,7 +1967,6 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
 
     stdout_task = asyncio.ensure_future(relay_stdout())
     stdin_task = asyncio.ensure_future(relay_stdin())
-
     await stdout_task
     stdin_task.cancel()
 
@@ -1497,16 +1974,14 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
         proc.terminate()
     except ProcessLookupError:
         pass
-
     return exit_code
 
 
 # ---------------------------------------------------------------------------
-# File transfer
+# File transfer (mux protocol)
 # ---------------------------------------------------------------------------
 
 def run_cp(args: list, use_et: bool = False):
-    """Handle cp subcommand: rssh cp host:path local OR rssh cp local host:path."""
     if len(args) != 2:
         print("Usage: rssh cp <src> <dst>", file=sys.stderr)
         print("  rssh cp host:/remote/path /local/path   (download)", file=sys.stderr)
@@ -1514,28 +1989,23 @@ def run_cp(args: list, use_et: bool = False):
         sys.exit(1)
 
     src, dst = args
-
     src_host, src_path = _parse_host_path(src)
     dst_host, dst_path = _parse_host_path(dst)
 
     if src_host and dst_host:
         print("rssh: cannot copy between two remote hosts", file=sys.stderr)
         sys.exit(1)
-
     if not src_host and not dst_host:
         print("rssh: at least one path must be remote (host:path)", file=sys.stderr)
         sys.exit(1)
 
     if src_host:
-        # Download
         _download(src_host, src_path, dst_path or dst, use_et)
     else:
-        # Upload
         _upload(dst_host, src_path or src, dst_path, use_et)
 
 
 def _parse_host_path(spec: str):
-    """Parse host:path notation. Returns (host, path) or (None, None)."""
     if ":" in spec and not spec.startswith("/"):
         parts = spec.split(":", 1)
         return parts[0], parts[1]
@@ -1543,13 +2013,12 @@ def _parse_host_path(spec: str):
 
 
 def _download(host: str, remote_path: str, local_path: str, use_et: bool):
-    """Download a file from remote host."""
     sock_path = ensure_daemon(host, use_et)
-    sock = connect_to_daemon(sock_path)
+    sock = mux_connect(sock_path)
 
     req_id = int(time.time() * 1000) % 1000000
-
-    write_frame_sync(sock, {"type": "get", "req": req_id, "path": remote_path})
+    body = mux_pack_u32(req_id) + mux_pack_string(remote_path)
+    mux_write_packet_sync(sock, MUX_C_FILE_GET, body)
 
     received = 0
     total_size = 0
@@ -1557,14 +2026,17 @@ def _download(host: str, remote_path: str, local_path: str, use_et: bool):
 
     try:
         while True:
-            header, data = read_frame_sync(sock)
-            msg_type = header.get("type")
+            msg_type, resp_body = mux_read_packet_sync(sock)
+            p = MuxParser(resp_body)
 
-            if msg_type == "file_info":
-                total_size = header.get("size", 0)
+            if msg_type == MUX_S_FILE_INFO:
+                p.get_u32()  # req
+                total_size = p.get_u64()
+                _mode = p.get_u32()
                 fd = open(local_path, "wb")
-                continue
-            elif msg_type == "file_data":
+            elif msg_type == MUX_S_FILE_DATA:
+                p.get_u32()  # req
+                data = p.get_string()
                 if fd is None:
                     fd = open(local_path, "wb")
                 fd.write(data)
@@ -1573,48 +2045,45 @@ def _download(host: str, remote_path: str, local_path: str, use_et: bool):
                     pct = received * 100 // total_size
                     sys.stderr.write(f"\rrssh: downloading {received}/{total_size} ({pct}%)")
                     sys.stderr.flush()
-                continue
-            elif msg_type == "file_done":
+            elif msg_type == MUX_S_FILE_DONE:
                 if fd:
                     fd.close()
                 sys.stderr.write(f"\rrssh: downloaded {received} bytes\n")
                 break
-            elif msg_type == "file_error":
+            elif msg_type == MUX_S_FILE_ERROR:
+                p.get_u32()  # req
+                reason = p.get_cstring()
                 if fd:
                     fd.close()
                     os.unlink(local_path)
-                print(f"\nrssh: {header.get('msg', 'download error')}", file=sys.stderr)
+                print(f"\nrssh: {reason}", file=sys.stderr)
                 sys.exit(1)
-                break
-            elif msg_type == "error":
-                print(f"\nrssh: {header.get('msg', 'error')}", file=sys.stderr)
+            elif msg_type == MUX_S_FAILURE:
+                p.get_u32()  # rid
+                reason = p.get_cstring()
+                print(f"\nrssh: {reason}", file=sys.stderr)
                 sys.exit(1)
     finally:
         sock.close()
 
 
 def _upload(host: str, local_path: str, remote_path: str, use_et: bool):
-    """Upload a file to remote host."""
     if not os.path.isfile(local_path):
         print(f"rssh: {local_path}: no such file", file=sys.stderr)
         sys.exit(1)
 
     stat = os.stat(local_path)
     size = stat.st_size
-    mode = oct(stat.st_mode & 0o7777)
+    mode = stat.st_mode & 0o7777
 
     sock_path = ensure_daemon(host, use_et)
-    sock = connect_to_daemon(sock_path)
+    sock = mux_connect(sock_path)
 
     req_id = int(time.time() * 1000) % 1000000
 
-    write_frame_sync(sock, {
-        "type": "put",
-        "req": req_id,
-        "path": remote_path,
-        "mode": mode,
-        "size": size,
-    })
+    body = (mux_pack_u32(req_id) + mux_pack_string(remote_path)
+            + mux_pack_u64(size) + mux_pack_u32(mode))
+    mux_write_packet_sync(sock, MUX_C_FILE_PUT, body)
 
     sent = 0
     with open(local_path, "rb") as f:
@@ -1622,19 +2091,22 @@ def _upload(host: str, local_path: str, remote_path: str, use_et: bool):
             chunk = f.read(CHUNK_SIZE)
             if not chunk:
                 break
-            write_frame_sync(sock, {"type": "file_data", "req": req_id}, chunk)
+            data_body = mux_pack_u32(req_id) + mux_pack_string(chunk)
+            mux_write_packet_sync(sock, MUX_C_FILE_DATA, data_body)
             sent += len(chunk)
             pct = sent * 100 // size if size > 0 else 100
             sys.stderr.write(f"\rrssh: uploading {sent}/{size} ({pct}%)")
             sys.stderr.flush()
 
-    write_frame_sync(sock, {"type": "file_done", "req": req_id})
+    mux_write_packet_sync(sock, MUX_C_FILE_DONE, mux_pack_u32(req_id))
 
-    # Wait for ack
     try:
-        header, _ = read_frame_sync(sock)
-        if header.get("type") == "file_error":
-            print(f"\nrssh: {header.get('msg', 'upload error')}", file=sys.stderr)
+        msg_type, resp_body = mux_read_packet_sync(sock)
+        if msg_type == MUX_S_FILE_ERROR:
+            p = MuxParser(resp_body)
+            p.get_u32()
+            reason = p.get_cstring()
+            print(f"\nrssh: {reason}", file=sys.stderr)
             sys.exit(1)
         sys.stderr.write(f"\rrssh: uploaded {sent} bytes\n")
     except EOFError:
@@ -1644,47 +2116,36 @@ def _upload(host: str, local_path: str, remote_path: str, use_et: bool):
 
 
 # ---------------------------------------------------------------------------
-# Management commands
+# Management commands (mux protocol)
 # ---------------------------------------------------------------------------
 
 def run_status(host: str = None):
-    """Show connection status."""
     if host:
         _status_one(host)
     else:
-        # Show all connections
         if not os.path.exists(RSSH_DIR):
             print("rssh: no connections")
             return
         found = False
         for f in os.listdir(RSSH_DIR):
             if f.endswith(".sock"):
-                h = f[:-5]
                 found = True
-                _status_one(h)
+                _status_one(f[:-5])
         if not found:
             print("rssh: no connections")
 
 
 def _status_one(host: str):
-    """Show status for one host."""
     sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
     if not os.path.exists(sock_path):
         print(f"{host}: not connected")
         return
-
     try:
-        sock = connect_to_daemon(sock_path)
-        write_frame_sync(sock, {"type": "status"})
-        header, _ = read_frame_sync(sock)
+        sock = mux_connect(sock_path)
+        pid = _mux_request_alive(sock)
         sock.close()
-
-        if header.get("type") == "status_response":
-            print(f"{host}: connected")
-            print(f"  daemon pid: {header.get('pid')}")
-            print(f"  transport pid: {header.get('transport_pid')}")
-            print(f"  active channels: {header.get('channels')}")
-            print(f"  file transfers: {header.get('file_transfers')}")
+        if pid:
+            print(f"{host}: connected (daemon pid {pid})")
         else:
             print(f"{host}: unknown status")
     except (ConnectionRefusedError, OSError, EOFError):
@@ -1696,7 +2157,6 @@ def _status_one(host: str):
 
 
 def run_list():
-    """List all active connections."""
     if not os.path.exists(RSSH_DIR):
         print("rssh: no connections")
         return
@@ -1707,12 +2167,10 @@ def run_list():
             found = True
             sock_path = os.path.join(RSSH_DIR, f)
             try:
-                sock = connect_to_daemon(sock_path)
-                write_frame_sync(sock, {"type": "status"})
-                header, _ = read_frame_sync(sock)
+                sock = mux_connect(sock_path)
+                pid = _mux_request_alive(sock)
                 sock.close()
-                channels = header.get("channels", 0)
-                print(f"{host}  ({channels} channel{'s' if channels != 1 else ''})")
+                print(f"{host}  (pid {pid})" if pid else f"{host}  (unknown)")
             except (ConnectionRefusedError, OSError, EOFError):
                 print(f"{host}  (stale)")
                 try:
@@ -1724,17 +2182,16 @@ def run_list():
 
 
 def run_disconnect(host: str):
-    """Disconnect from a host."""
     sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
     if not os.path.exists(sock_path):
         print(f"rssh: {host}: not connected")
         return
 
     try:
-        sock = connect_to_daemon(sock_path)
-        write_frame_sync(sock, {"type": "disconnect"})
+        sock = mux_connect(sock_path)
+        mux_write_packet_sync(sock, MUX_C_TERMINATE, mux_pack_u32(1))
         try:
-            header, _ = read_frame_sync(sock)
+            mux_read_packet_sync(sock)
         except EOFError:
             pass
         sock.close()
@@ -1746,12 +2203,106 @@ def run_disconnect(host: str):
         except OSError:
             pass
 
-    # Also clean up PID file
     pid_path = os.path.join(RSSH_DIR, f"{host}.pid")
     try:
         os.unlink(pid_path)
     except OSError:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Port forwarding
+# ---------------------------------------------------------------------------
+
+def run_forward(host: str, forward_specs: list, use_et: bool = False):
+    """Set up port forwarding through the daemon."""
+    sock_path = ensure_daemon(host, use_et)
+    sock = mux_connect(sock_path)
+    request_id = 1
+
+    for fwd_type_str, spec in forward_specs:
+        parts = spec.split(":")
+        if len(parts) == 3:
+            listen_host = "127.0.0.1"
+            listen_port = int(parts[0])
+            connect_host = parts[1]
+            connect_port = int(parts[2])
+        elif len(parts) == 4:
+            listen_host = parts[0]
+            listen_port = int(parts[1])
+            connect_host = parts[2]
+            connect_port = int(parts[3])
+        else:
+            print(f"rssh: invalid forward spec: {spec}", file=sys.stderr)
+            sys.exit(1)
+
+        body = (mux_pack_u32(request_id) + mux_pack_u32(MUX_FWD_LOCAL)
+                + mux_pack_string(listen_host) + mux_pack_u32(listen_port)
+                + mux_pack_string(connect_host) + mux_pack_u32(connect_port))
+        mux_write_packet_sync(sock, MUX_C_OPEN_FWD, body)
+
+        msg_type, resp = mux_read_packet_sync(sock)
+        p = MuxParser(resp)
+        p.get_u32()  # rid
+
+        if msg_type == MUX_S_OK:
+            print(f"rssh: forwarding {listen_host}:{listen_port} -> "
+                  f"{connect_host}:{connect_port}", file=sys.stderr)
+        elif msg_type == MUX_S_REMOTE_PORT:
+            actual_port = p.get_u32()
+            print(f"rssh: forwarding {listen_host}:{actual_port} -> "
+                  f"{connect_host}:{connect_port}", file=sys.stderr)
+        elif msg_type == MUX_S_FAILURE:
+            reason = p.get_cstring()
+            print(f"rssh: forwarding failed: {reason}", file=sys.stderr)
+            sys.exit(1)
+
+        request_id += 1
+    sock.close()
+
+
+# ---------------------------------------------------------------------------
+# Mux control (-O) commands
+# ---------------------------------------------------------------------------
+
+def run_mux_control(host: str, ctl_cmd: str, use_et: bool = False):
+    """Handle -O check|stop|exit."""
+    sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
+    if not os.path.exists(sock_path):
+        print(f"rssh: {host}: not connected", file=sys.stderr)
+        sys.exit(255)
+
+    if ctl_cmd == "check":
+        try:
+            sock = mux_connect(sock_path)
+            pid = _mux_request_alive(sock)
+            sock.close()
+            print(f"Master running (pid={pid})")
+            sys.exit(0)
+        except (ConnectionRefusedError, OSError, EOFError):
+            print(f"rssh: {host}: not connected", file=sys.stderr)
+            sys.exit(255)
+
+    elif ctl_cmd in ("stop", "exit"):
+        try:
+            sock = mux_connect(sock_path)
+            if ctl_cmd == "stop":
+                mux_write_packet_sync(sock, MUX_C_STOP_LISTENING, mux_pack_u32(1))
+            else:
+                mux_write_packet_sync(sock, MUX_C_TERMINATE, mux_pack_u32(1))
+            try:
+                mux_read_packet_sync(sock)
+            except EOFError:
+                pass
+            sock.close()
+            print(f"{'Stop listening' if ctl_cmd == 'stop' else 'Exit'} request sent.")
+        except (ConnectionRefusedError, OSError, EOFError):
+            print(f"rssh: {host}: not connected", file=sys.stderr)
+            sys.exit(255)
+
+    else:
+        print(f"rssh: unknown -O command: {ctl_cmd}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -1777,7 +2328,9 @@ Usage:
   rssh cp <host>:<path> <local>    Download
   rssh cp <local> <host>:<path>    Upload
 
-  rssh <host> -e KEY=VAL           Set env var""")
+  rssh -L [bind:]port:host:port <host>   Local port forwarding
+  rssh -O check|stop|exit <host>         Mux control commands
+  rssh <host> -e KEY=VAL                 Set env var""")
 
 
 def main():
@@ -1787,19 +2340,15 @@ def main():
         print_usage()
         sys.exit(0)
 
-    # Server mode (used internally)
     if args[0] == "--server":
         run_server()
         return
 
-    # Management commands
     if args[0] == "connect":
         if len(args) < 2:
             print("Usage: rssh connect <host> [--et]", file=sys.stderr)
             sys.exit(1)
-        host = args[1]
-        use_et = "--et" in args
-        run_daemon(host, use_et)
+        run_daemon(args[1], "--et" in args)
         return
 
     if args[0] == "disconnect":
@@ -1810,8 +2359,7 @@ def main():
         return
 
     if args[0] == "status":
-        host = args[1] if len(args) > 1 else None
-        run_status(host)
+        run_status(args[1] if len(args) > 1 else None)
         return
 
     if args[0] == "list":
@@ -1824,12 +2372,14 @@ def main():
         run_cp(cp_args, use_et)
         return
 
-    # CLI mode: rssh [-t|-T] [-l user] [-e KEY=VAL ...] [--et] [--pipe] <host> [command...]
+    # CLI mode
     force_pty = None
     use_et = False
     pipe_mode = False
     env_vars = []
     login_user = None
+    forward_specs = []
+    ctl_cmd = None
     remaining = []
     i = 0
     while i < len(args):
@@ -1852,6 +2402,12 @@ def main():
             else:
                 print(f"rssh: invalid env var: {kv} (expected KEY=VAL)", file=sys.stderr)
                 sys.exit(1)
+        elif args[i] == "-L" and i + 1 < len(args):
+            i += 1
+            forward_specs.append(("local", args[i]))
+        elif args[i] == "-O" and i + 1 < len(args):
+            i += 1
+            ctl_cmd = args[i]
         else:
             remaining.append(args[i])
         i += 1
@@ -1865,29 +2421,29 @@ def main():
         host = f"{login_user}@{host}"
     command = remaining[1:] if len(remaining) > 1 else None
 
-    # If command is a list, join for bash -c execution
     if command:
         if len(command) == 1:
             command = command[0]
-        else:
-            # Pass as a list to be executed directly
-            command = command
+
+    # -O control command
+    if ctl_cmd:
+        run_mux_control(host, ctl_cmd, use_et)
+        return
+
+    # -L forwarding only (no session)
+    if forward_specs and not command and pipe_mode is False:
+        run_forward(host, forward_specs, use_et)
+        return
 
     if pipe_mode:
-        run_pipe(
-            host,
-            command=command,
-            env_vars=env_vars if env_vars else None,
-            use_et=use_et,
-        )
+        run_pipe(host, command=command,
+                 env_vars=env_vars if env_vars else None, use_et=use_et)
     else:
-        run_cli(
-            host,
-            command=command,
-            force_pty=force_pty,
-            env_vars=env_vars if env_vars else None,
-            use_et=use_et,
-        )
+        # Set up forwarding before session if both specified
+        if forward_specs:
+            run_forward(host, forward_specs, use_et)
+        run_cli(host, command=command, force_pty=force_pty,
+                env_vars=env_vars if env_vars else None, use_et=use_et)
 
 
 if __name__ == "__main__":

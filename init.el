@@ -304,12 +304,13 @@
   :config
   (defun embark-target-easy-kill-region ()
     "Target the region if active. easy-kill region."
-    (let ((r (ignore-errors (easy-kill-get bounds))))
+    (let ((r (ignore-errors (with-no-warnings (easy-kill-get bounds)))))
       (when (and r (car r))
         (let ((start (car r))
             (end (cdr r)))
         `(region ,(buffer-substring start end) . ,r)))))
-  (add-to-list 'embark-target-finders 'embark-target-easy-kill-region))
+  (with-no-warnings
+    (add-to-list 'embark-target-finders 'embark-target-easy-kill-region)))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
   :bind (:map ctl-x-4-map
@@ -517,7 +518,8 @@
   (require 'org-tempo nil t)
   (require 'ob-compile nil)
   (defun lazy-load-org-babel-languages (o &rest args)
-    (when-let* ((lang (org-element-property :language (org-element-at-point))))
+    (when-let* ((lang (with-no-warnings
+                        (org-element-property :language (org-element-at-point)))))
       (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
       (unless (cdr (assoc (intern lang) org-babel-load-languages))
         (add-to-list 'org-babel-load-languages (cons (intern lang) t))
@@ -559,9 +561,10 @@
   (defvar embark-vc-conflict-map (make-composed-keymap smerge-basic-map embark-general-map))
   (defun embark-vc-target-conflict-at-point ()
     "Target a Merge Conflict at point."
-    (when-let* ((d (save-match-data (and smerge-mode (smerge-match-conflict) (match-data 0)))))
+    (when-let* ((d (save-match-data (with-no-warnings (and smerge-mode (smerge-match-conflict) (match-data 0))))))
       `(conflict "hunk" ,(car d) . ,(cadr d))))
-  (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point)
+  (with-no-warnings
+    (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point))
   (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
 (use-package treesit-auto
   :hook ((after-init . global-treesit-auto-mode))
