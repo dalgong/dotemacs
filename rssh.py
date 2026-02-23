@@ -18,7 +18,6 @@ Modes:
 import asyncio
 import base64
 import fcntl
-import json
 import os
 import pty
 import select
@@ -32,44 +31,278 @@ import time
 import tty
 
 # ---------------------------------------------------------------------------
-# Protocol layer
+# Protocol layer — Binary TLV (Type-Length-Value)
+#
+# Frame format: [1-byte type][4-byte big-endian payload length][payload]
+# Each message type defines its own binary payload layout.
 # ---------------------------------------------------------------------------
 
+# Message type IDs
+MSG_READY          = 0x01
+MSG_OPEN           = 0x02
+MSG_OPENED         = 0x03
+MSG_DATA           = 0x04
+MSG_RESIZE         = 0x05
+MSG_EOF            = 0x06
+MSG_CLOSE          = 0x07
+MSG_ERROR          = 0x08
+MSG_PUT            = 0x09
+MSG_GET            = 0x0A
+MSG_FILE_INFO      = 0x0B
+MSG_FILE_DATA      = 0x0C
+MSG_FILE_DONE      = 0x0D
+MSG_FILE_ERROR     = 0x0E
+MSG_PING           = 0x0F
+MSG_PONG           = 0x10
+MSG_STATUS         = 0x11
+MSG_STATUS_RESP    = 0x12
+MSG_DISCONNECT     = 0x13
+MSG_DISCONNECT_ACK = 0x14
+
+_TYPE_TO_ID = {
+    "ready": MSG_READY, "open": MSG_OPEN, "opened": MSG_OPENED,
+    "data": MSG_DATA, "resize": MSG_RESIZE, "eof": MSG_EOF,
+    "close": MSG_CLOSE, "error": MSG_ERROR,
+    "put": MSG_PUT, "get": MSG_GET, "file_info": MSG_FILE_INFO,
+    "file_data": MSG_FILE_DATA, "file_done": MSG_FILE_DONE,
+    "file_error": MSG_FILE_ERROR,
+    "ping": MSG_PING, "pong": MSG_PONG,
+    "status": MSG_STATUS, "status_response": MSG_STATUS_RESP,
+    "disconnect": MSG_DISCONNECT, "disconnect_ack": MSG_DISCONNECT_ACK,
+}
+_ID_TO_TYPE = {v: k for k, v in _TYPE_TO_ID.items()}
+
+
+# -- Binary helpers for variable-length fields --
+
+def _pack_str(s: str) -> bytes:
+    b = s.encode("utf-8")
+    return struct.pack("!H", len(b)) + b
+
+def _unpack_str(buf, off):
+    (n,) = struct.unpack_from("!H", buf, off)
+    return buf[off + 2:off + 2 + n].decode("utf-8"), off + 2 + n
+
+def _pack_str_list(lst) -> bytes:
+    parts = [struct.pack("!H", len(lst))]
+    for s in lst:
+        parts.append(_pack_str(s))
+    return b"".join(parts)
+
+def _unpack_str_list(buf, off):
+    (count,) = struct.unpack_from("!H", buf, off); off += 2
+    result = []
+    for _ in range(count):
+        s, off = _unpack_str(buf, off)
+        result.append(s)
+    return result, off
+
+def _pack_str_dict(d) -> bytes:
+    parts = [struct.pack("!H", len(d))]
+    for k, v in d.items():
+        parts.append(_pack_str(str(k)))
+        parts.append(_pack_str(str(v)))
+    return b"".join(parts)
+
+def _unpack_str_dict(buf, off):
+    (count,) = struct.unpack_from("!H", buf, off); off += 2
+    result = {}
+    for _ in range(count):
+        k, off = _unpack_str(buf, off)
+        v, off = _unpack_str(buf, off)
+        result[k] = v
+    return result, off
+
+def _mode_to_int(mode) -> int:
+    if isinstance(mode, str):
+        return int(mode, 0) if mode.startswith(("0o", "0O")) else int(mode, 8)
+    return mode
+
+
+# -- Payload encode / decode per message type --
+
+def _encode_payload(header: dict, data: bytes) -> bytes:
+    t = header["type"]
+
+    if t in ("ready", "ping", "pong", "status", "disconnect", "disconnect_ack"):
+        return b""
+
+    if t == "open":
+        return (struct.pack("!IBHH", header.get("ch", 0),
+                            1 if header.get("pty") else 0,
+                            header.get("rows", 24), header.get("cols", 80))
+                + _pack_str_list(header.get("cmd", ["bash"]))
+                + _pack_str_dict(header.get("env", {})))
+
+    if t == "opened":
+        return struct.pack("!II", header["ch"], header.get("pid", 0))
+
+    if t == "data":
+        return struct.pack("!I", header["ch"]) + data
+
+    if t == "resize":
+        return struct.pack("!IHH", header["ch"],
+                           header.get("rows", 24), header.get("cols", 80))
+
+    if t == "eof":
+        return struct.pack("!I", header["ch"])
+
+    if t == "close":
+        return struct.pack("!Ii", header["ch"], header.get("exit_code", 0))
+
+    if t == "error":
+        return struct.pack("!I", header.get("ch", 0)) + header.get("msg", "").encode("utf-8")
+
+    if t == "put":
+        return (struct.pack("!IQH", header["req"], header.get("size", 0),
+                            _mode_to_int(header.get("mode", 0o644)))
+                + _pack_str(header["path"]))
+
+    if t == "get":
+        return struct.pack("!I", header["req"]) + _pack_str(header["path"])
+
+    if t == "file_info":
+        return struct.pack("!IQH", header["req"], header.get("size", 0),
+                           _mode_to_int(header.get("mode", 0o644)))
+
+    if t == "file_data":
+        return struct.pack("!I", header["req"]) + data
+
+    if t == "file_done":
+        return struct.pack("!I", header["req"])
+
+    if t == "file_error":
+        return struct.pack("!I", header["req"]) + header.get("msg", "").encode("utf-8")
+
+    if t == "status_response":
+        return (struct.pack("!IIIIB",
+                            header.get("pid", 0),
+                            header.get("transport_pid") or 0,
+                            header.get("channels", 0),
+                            header.get("file_transfers", 0),
+                            1 if header.get("ready") else 0)
+                + _pack_str(header.get("host", "")))
+
+    raise ValueError(f"Unknown message type: {t}")
+
+
+def _decode_payload(msg_type: str, payload: bytes):
+    header = {"type": msg_type}
+    data = b""
+
+    if msg_type in ("ready", "ping", "pong", "status", "disconnect", "disconnect_ack"):
+        pass
+
+    elif msg_type == "open":
+        off = 0
+        ch, pty_flag, rows, cols = struct.unpack_from("!IBHH", payload, off); off += 9
+        cmd, off = _unpack_str_list(payload, off)
+        env, off = _unpack_str_dict(payload, off)
+        header.update(ch=ch, pty=bool(pty_flag), rows=rows, cols=cols, cmd=cmd)
+        if env:
+            header["env"] = env
+
+    elif msg_type == "opened":
+        ch, pid = struct.unpack_from("!II", payload, 0)
+        header.update(ch=ch, pid=pid)
+
+    elif msg_type == "data":
+        (ch,) = struct.unpack_from("!I", payload, 0)
+        header["ch"] = ch
+        data = payload[4:]
+
+    elif msg_type == "resize":
+        ch, rows, cols = struct.unpack_from("!IHH", payload, 0)
+        header.update(ch=ch, rows=rows, cols=cols)
+
+    elif msg_type == "eof":
+        (ch,) = struct.unpack_from("!I", payload, 0)
+        header["ch"] = ch
+
+    elif msg_type == "close":
+        ch, exit_code = struct.unpack_from("!Ii", payload, 0)
+        header.update(ch=ch, exit_code=exit_code)
+
+    elif msg_type == "error":
+        (ch,) = struct.unpack_from("!I", payload, 0)
+        header["ch"] = ch
+        header["msg"] = payload[4:].decode("utf-8", errors="replace")
+
+    elif msg_type == "put":
+        off = 0
+        req, size, mode_int = struct.unpack_from("!IQH", payload, off); off += 14
+        path, off = _unpack_str(payload, off)
+        header.update(req=req, size=size, mode=mode_int, path=path)
+
+    elif msg_type == "get":
+        off = 0
+        (req,) = struct.unpack_from("!I", payload, off); off += 4
+        path, off = _unpack_str(payload, off)
+        header.update(req=req, path=path)
+
+    elif msg_type == "file_info":
+        req, size, mode_int = struct.unpack_from("!IQH", payload, 0)
+        header.update(req=req, size=size, mode=mode_int)
+
+    elif msg_type == "file_data":
+        (req,) = struct.unpack_from("!I", payload, 0)
+        header["req"] = req
+        data = payload[4:]
+
+    elif msg_type == "file_done":
+        (req,) = struct.unpack_from("!I", payload, 0)
+        header["req"] = req
+
+    elif msg_type == "file_error":
+        (req,) = struct.unpack_from("!I", payload, 0)
+        header["req"] = req
+        header["msg"] = payload[4:].decode("utf-8", errors="replace")
+
+    elif msg_type == "status_response":
+        off = 0
+        pid, transport_pid, channels, file_transfers, ready_flag = \
+            struct.unpack_from("!IIIIB", payload, off); off += 17
+        host, off = _unpack_str(payload, off)
+        header.update(pid=pid, transport_pid=transport_pid or None,
+                      channels=channels, file_transfers=file_transfers,
+                      ready=bool(ready_flag), host=host)
+
+    return header, data
+
+
+# -- Frame encode / decode / read / write --
+
 def encode_frame(header: dict, data: bytes = b"") -> bytes:
-    """Serialize a frame: [4-byte big-endian length][JSON header \\x00 data]."""
-    header_bytes = json.dumps(header, separators=(",", ":")).encode("utf-8")
-    if data:
-        payload = header_bytes + b"\x00" + data
-    else:
-        payload = header_bytes
-    return struct.pack("!I", len(payload)) + payload
+    """Serialize a frame: [1-byte type][4-byte big-endian payload length][payload]."""
+    type_id = _TYPE_TO_ID[header["type"]]
+    payload = _encode_payload(header, data)
+    return struct.pack("!BI", type_id, len(payload)) + payload
 
 
-def decode_frame(payload: bytes):
-    """Decode a payload into (header_dict, data_bytes)."""
-    nul = payload.find(b"\x00")
-    if nul == -1:
-        return json.loads(payload), b""
-    return json.loads(payload[:nul]), payload[nul + 1 :]
+def decode_frame(type_id: int, payload: bytes):
+    """Decode a frame given its type ID and payload. Returns (header_dict, data_bytes)."""
+    msg_type = _ID_TO_TYPE.get(type_id)
+    if msg_type is None:
+        raise ValueError(f"Unknown message type ID: {type_id}")
+    return _decode_payload(msg_type, payload)
 
 
 async def read_frame(reader: asyncio.StreamReader):
-    """Read one frame from an asyncio StreamReader. Returns (header, data) or None on EOF."""
-    length_bytes = await reader.readexactly(4)
-    (length,) = struct.unpack("!I", length_bytes)
-    payload = await reader.readexactly(length)
-    return decode_frame(payload)
+    """Read one frame from an asyncio StreamReader. Returns (header, data)."""
+    hdr = await reader.readexactly(5)
+    type_id = hdr[0]
+    (length,) = struct.unpack("!I", hdr[1:5])
+    payload = await reader.readexactly(length) if length else b""
+    return decode_frame(type_id, payload)
 
 
 def read_frame_sync(fd) -> tuple:
-    """Read one frame synchronously from a file-like binary object.
-
-    Returns (header, data) or raises EOFError.
-    """
-    length_bytes = _read_exactly(fd, 4)
-    (length,) = struct.unpack("!I", length_bytes)
-    payload = _read_exactly(fd, length)
-    return decode_frame(payload)
+    """Read one frame synchronously. Returns (header, data) or raises EOFError."""
+    hdr = _read_exactly(fd, 5)
+    type_id = hdr[0]
+    (length,) = struct.unpack("!I", hdr[1:5])
+    payload = _read_exactly(fd, length) if length else b""
+    return decode_frame(type_id, payload)
 
 
 def _read_exactly(fd, n: int) -> bytes:
@@ -1024,14 +1257,15 @@ def _relay_io(sock: socket.socket, raw_mode: bool) -> int:
                 sock_buf.extend(chunk)
 
                 # Process complete frames
-                while len(sock_buf) >= 4:
-                    (length,) = struct.unpack("!I", sock_buf[:4])
-                    if len(sock_buf) < 4 + length:
+                while len(sock_buf) >= 5:
+                    type_id = sock_buf[0]
+                    (length,) = struct.unpack("!I", sock_buf[1:5])
+                    if len(sock_buf) < 5 + length:
                         break
-                    payload = bytes(sock_buf[4:4 + length])
-                    del sock_buf[:4 + length]
+                    payload = bytes(sock_buf[5:5 + length])
+                    del sock_buf[:5 + length]
 
-                    header, data = decode_frame(payload)
+                    header, data = decode_frame(type_id, payload)
                     msg_type = header.get("type")
 
                     if msg_type == "data":
@@ -1088,15 +1322,19 @@ def run_pipe(host: str, command=None, env_vars=None, use_et: bool = False):
 
 def _pipe_via_daemon(sock: socket.socket, command=None, env_vars=None) -> int:
     """Open a channel through existing daemon and relay I/O."""
-    # TERM=dumb suppresses shell integration escape sequences (OSC 3008,
-    # bracketed paste, etc.) that break TRAMP's prompt detection.
-    env = {"TERM": "dumb"}
+    env = {}
     if env_vars:
         env.update(dict(env_vars))
+    # Propagate the local connection type to the remote: if our stdin
+    # is a PTY (caller wants terminal semantics, e.g. eat), allocate a
+    # PTY on the remote.  If stdin is a pipe (caller wants clean
+    # output, e.g. hg), use a pipe on the remote.  The interactive
+    # shell always needs a PTY for prompt detection.
+    use_pty = (not command) or os.isatty(sys.stdin.fileno())
     open_header = {
         "type": "open",
         "ch": 0,  # daemon will reassign
-        "pty": True,
+        "pty": use_pty,
         "rows": 24,
         "cols": 80,
         "env": env,
@@ -1104,6 +1342,11 @@ def _pipe_via_daemon(sock: socket.socket, command=None, env_vars=None) -> int:
     if command:
         open_header["cmd"] = command if isinstance(command, list) else ["bash", "-c", command]
     else:
+        # TERM=dumb suppresses shell integration escape sequences (OSC 3008,
+        # bracketed paste, etc.) that break TRAMP's prompt detection.
+        # Only set for the interactive shell — commands (eat, hg, etc.)
+        # need a real TERM value.
+        env["TERM"] = "dumb"
         # --norc --noprofile prevents .bashrc from enabling shell integration
         # escape sequences (OSC 3008, bracketed paste) that confuse TRAMP.
         open_header["cmd"] = ["bash", "--norc", "--noprofile"]
@@ -1177,21 +1420,24 @@ async def _pipe_inline(host: str, command=None, env_vars=None, use_et: bool = Fa
         return 1
 
     # Open channel
-    # TERM=dumb suppresses shell integration escape sequences that break TRAMP.
-    env = {"TERM": "dumb"}
+    env = {}
     if env_vars:
         env.update(dict(env_vars))
+    use_pty = (not command) or os.isatty(sys.stdin.fileno())
     open_header = {
         "type": "open",
         "ch": 1,
-        "pty": True,
-        "cmd": ["bash", "--norc", "--noprofile"],
+        "pty": use_pty,
         "env": env,
         "rows": 24,
         "cols": 80,
     }
     if command:
         open_header["cmd"] = command if isinstance(command, list) else ["bash", "-c", command]
+    else:
+        # TERM=dumb only for the interactive TRAMP shell.
+        env["TERM"] = "dumb"
+        open_header["cmd"] = ["bash", "--norc", "--noprofile"]
 
     proc.stdin.write(encode_frame(open_header))
     await proc.stdin.drain()
