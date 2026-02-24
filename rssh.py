@@ -1697,8 +1697,46 @@ def _relay_io_mux(sock: socket.socket, session_id: int, raw_mode: bool) -> int:
     sock_buf = bytearray()
     osc_state = [False, False]
 
+    # In non-raw mode (pipe/TRAMP), intercept job-control signals and
+    # forward the corresponding control characters to the remote session
+    # instead of letting them kill the local rssh process.
+    pending_ctrl = []
+    old_handlers = {}
+    if not raw_mode:
+        _SIG_CTRL = {
+            signal.SIGINT: b'\x03',   # C-c
+            signal.SIGTSTP: b'\x1a',  # C-z
+            signal.SIGQUIT: b'\x1c',  # C-\
+            signal.SIGHUP: None,      # ignore — stdin close handles cleanup
+        }
+        for sig, ctrl in _SIG_CTRL.items():
+            try:
+                if ctrl is None:
+                    old_handlers[sig] = signal.signal(sig, signal.SIG_IGN)
+                else:
+                    def _handler(signum, frame, _c=ctrl):
+                        pending_ctrl.append(_c)
+                    old_handlers[sig] = signal.signal(sig, _handler)
+            except OSError:
+                pass
+
     running = True
     while running:
+        # Forward any pending control characters from intercepted signals
+        while pending_ctrl:
+            ctrl = pending_ctrl.pop(0)
+            try:
+                sock.setblocking(True)
+                mux_write_packet_sync(
+                    sock, MUX_C_SESSION_DATA,
+                    _mux_session_data_body(session_id, ctrl))
+                sock.setblocking(False)
+            except Exception:
+                running = False
+                break
+        if not running:
+            break
+
         try:
             readable, _, _ = select.select([stdin_fd, sock_fd], [], [], 1.0)
         except (InterruptedError, OSError):
@@ -1783,6 +1821,8 @@ def _relay_io_mux(sock: socket.socket, session_id: int, raw_mode: bool) -> int:
                         running = False
                         break
 
+    for sig, handler in old_handlers.items():
+        signal.signal(sig, handler)
     return exit_code
 
 
@@ -1851,7 +1891,22 @@ def _pipe_via_daemon(sock: socket.socket, command=None, env_vars=None) -> int:
     p.get_u32()  # rid
     session_id = p.get_u32()
 
-    exit_code = _relay_io_mux(sock, session_id, False)
+    # When running a command with a tty stdin (e.g. TRAMP direct-async for
+    # eat), put the local terminal into raw mode so characters are delivered
+    # immediately instead of being line-buffered by the PTY's canonical mode.
+    # Skip this for the control connection (no command) so TRAMP's shell
+    # interaction continues to work in cooked mode.
+    is_tty = os.isatty(sys.stdin.fileno())
+    raw_mode = bool(command) and use_pty and is_tty
+    old_settings = None
+    if raw_mode:
+        old_settings = termios.tcgetattr(sys.stdin.fileno())
+        tty.setraw(sys.stdin.fileno())
+    try:
+        exit_code = _relay_io_mux(sock, session_id, raw_mode)
+    finally:
+        if old_settings is not None:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
     sock.close()
     return exit_code
 
@@ -1934,6 +1989,15 @@ async def _pipe_inline(host: str, command=None, env_vars=None,
     exit_code = 0
     done = asyncio.Event()
 
+    # Same raw mode logic as _pipe_via_daemon: enter raw mode when running
+    # a command with a tty stdin (TRAMP direct-async for eat).
+    is_tty = os.isatty(stdin_fd)
+    raw_mode = bool(command) and use_pty and is_tty
+    old_settings = None
+    if raw_mode:
+        old_settings = termios.tcgetattr(stdin_fd)
+        tty.setraw(stdin_fd)
+
     async def relay_stdin():
         try:
             while not done.is_set():
@@ -1965,10 +2029,31 @@ async def _pipe_inline(host: str, command=None, env_vars=None,
             pass
         done.set()
 
+    # Intercept job-control signals: forward control chars to remote
+    _SIG_CTRL_INLINE = {
+        signal.SIGINT: b'\x03',
+        signal.SIGTSTP: b'\x1a',
+        signal.SIGQUIT: b'\x1c',
+    }
+    for sig, ctrl in _SIG_CTRL_INLINE.items():
+        try:
+            loop.add_signal_handler(
+                sig, lambda c=ctrl: proc.stdin.write(
+                    encode_frame({"type": "data", "ch": 1}, c)))
+        except (OSError, NotImplementedError):
+            pass
+    try:
+        loop.add_signal_handler(signal.SIGHUP, lambda: None)
+    except (OSError, NotImplementedError):
+        pass
+
     stdout_task = asyncio.ensure_future(relay_stdout())
     stdin_task = asyncio.ensure_future(relay_stdin())
     await stdout_task
     stdin_task.cancel()
+
+    if old_settings is not None:
+        termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_settings)
 
     try:
         proc.terminate()
