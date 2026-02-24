@@ -110,22 +110,5 @@
 (tramp-set-completion-function
  rssh-tramp-method tramp-completion-function-alist-ssh)
 
-;; Fix eat terminal on rssh remote connections.  With direct-async,
-;; eat's bash gets a real PTY and reads ~/.bashrc, which on Meta
-;; devservers sources shell integration that emits OSC escape sequences
-;; eat's terminal emulator can't parse, corrupting the display.
-;; Start bash with --norc --noprofile to prevent this.
-(with-eval-after-load 'eat
-  (advice-add 'eat-exec :around #'rssh-tramp--eat-exec))
-
-(defun rssh-tramp--eat-exec (orig-fun buffer name command startfile switches)
-  "Use --norc --noprofile for eat shells on rssh remote connections."
-  (if (and (file-remote-p default-directory)
-           (string= (file-remote-p default-directory 'method)
-                    rssh-tramp-method))
-      (funcall orig-fun buffer name command startfile
-               (append switches '("--norc" "--noprofile")))
-    (funcall orig-fun buffer name command startfile switches)))
-
 (provide 'rssh-tramp)
 ;;; rssh-tramp.el ends here
