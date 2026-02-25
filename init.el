@@ -138,7 +138,8 @@
   (defvar-keymap set-mark-dwim-map
     :doc "An briefly active keymap after set-mark-command"
     :repeat t
-    "SPC" #'hippie-expand)
+    "SPC" #'hippie-expand
+    "RET" #'eat)
   (defun set-mark-dwim (o &rest args)
     (cond ((or (not (called-interactively-p 'interactive))
                current-prefix-arg
@@ -311,12 +312,17 @@
         `(region ,(buffer-substring start end) . ,r)))))
   (with-no-warnings
     (add-to-list 'embark-target-finders 'embark-target-easy-kill-region)))
+(defun make-buffer-fixed-pitch (&rest _)
+  (set (make-local-variable 'buffer-face-mode-face) 'fixed-pitch)
+  (buffer-face-mode t))
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (:map ctl-x-4-map
-         ("C-z" . eat-other-window)
+  :bind (("C-`" . eat)
+         :map ctl-x-4-map
+         ("C-`" . eat-other-window)
          :map eat-mode-map
-         ("C-z" . eat-toggle-char-mode))
+         ("C-`" . eat-toggle-char-mode))
+  :hook (eat-exec . make-buffer-fixed-pitch)
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
@@ -445,6 +451,8 @@
 (use-package eyebrowse
   :ensure
   :hook (after-init . eyebrowse-mode)
+  :init
+  (setq eyebrowse-keymap-prefix (kbd "C-z"))
   :bind (("C-z" . C-z-dwim)
          :map eyebrowse-mode-prefix-map
          ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
@@ -455,27 +463,8 @@
   :custom
   (eyebrowse-new-workspace t)
   :config
-  (defvar C-z-dwim-timeout 0.5)
-  (defun C-z-dwim ()
-    (interactive)
-    (cond ((eq last-command this-command)
-           (call-interactively 'eyebrowse-last-window-config))
-          ((not (sit-for C-z-dwim-timeout))
-           (let ((keyseq (read-key-sequence ""))
-                 cmd)
-             (cond ((and (setq cmd (lookup-key eyebrowse-mode-prefix-map keyseq))
-                         (commandp cmd))
-                    (call-interactively (setq this-command cmd)))
-                   ((and (setq cmd (lookup-key (current-active-maps) keyseq))
-                         (memq cmd '(set-mark-command cua-set-mark)))
-                    (call-interactively set-mark-dwim-repeat-action))
-                   (t
-                    (call-interactively 'eat)
-                    (call-interactively cmd)))))
-          (t
-           (call-interactively 'eat))))
   (defvar eyebrowse-slot-to-register-function 'ignore)
-  (cl-loop for i from 0 to 9 do (define-key global-map (read-kbd-macro (format "C-%d" i)) 'eyebrowse-dwim))
+  (cl-loop for i from 0 to 9 do (define-key global-map (read-kbd-macro (format "C-c %d" i)) 'eyebrowse-dwim))
   (defun eyebrowse-dwim ()
     (interactive)
     (let* ((c (logand ?\xff last-command-event))
@@ -595,4 +584,8 @@
                                (call-interactively (setq this-command cmd))))
                  (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
     (abort-recursive-edit)))
+(use-package vterm
+  :bind
+  (:map vterm-mode-map ("C-q" . vterm-send-next-key))
+  :hook (vterm-mode . make-buffer-fixed-pitch))
 (use-package vundo :bind ("C-x u" . vundo))
