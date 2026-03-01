@@ -30,11 +30,16 @@ Modes:
 import asyncio
 import base64
 import fcntl
+import grp
+import json
 import os
 import pty
+import pwd
 import select
+import shutil
 import signal
 import socket
+import stat as stat_mod
 import struct
 import sys
 import termios
@@ -65,6 +70,9 @@ MSG_FILE_DONE      = 0x0D
 MSG_FILE_ERROR     = 0x0E
 MSG_PING           = 0x0F
 MSG_PONG           = 0x10
+MSG_RPC            = 0x11
+MSG_RPC_RESULT     = 0x12
+MSG_NOTIFY         = 0x13
 
 _TYPE_TO_ID = {
     "ready": MSG_READY, "open": MSG_OPEN, "opened": MSG_OPENED,
@@ -74,6 +82,7 @@ _TYPE_TO_ID = {
     "file_data": MSG_FILE_DATA, "file_done": MSG_FILE_DONE,
     "file_error": MSG_FILE_ERROR,
     "ping": MSG_PING, "pong": MSG_PONG,
+    "rpc": MSG_RPC, "rpc_result": MSG_RPC_RESULT, "notify": MSG_NOTIFY,
 }
 _ID_TO_TYPE = {v: k for k, v in _TYPE_TO_ID.items()}
 
@@ -177,7 +186,20 @@ def _encode_payload(header: dict, data: bytes) -> bytes:
         return struct.pack("!I", header["req"])
 
     if t == "file_error":
-        return struct.pack("!I", header["req"]) + header.get("msg", "").encode("utf-8")
+        return struct.pack("!I", header.get("req", 0)) + header.get("msg", "").encode("utf-8")
+
+    if t == "rpc":
+        req_json = json.dumps({"method": header["method"],
+                                "params": header.get("params", {})}).encode("utf-8")
+        return struct.pack("!I", header["req"]) + req_json
+
+    if t == "rpc_result":
+        result_json = json.dumps(header.get("result")).encode("utf-8")
+        return struct.pack("!I", header["req"]) + result_json
+
+    if t == "notify":
+        return json.dumps({"method": header["method"],
+                           "params": header.get("params", {})}).encode("utf-8")
 
     raise ValueError(f"Unknown message type: {t}")
 
@@ -253,6 +275,23 @@ def _decode_payload(msg_type: str, payload: bytes):
         (req,) = struct.unpack_from("!I", payload, 0)
         header["req"] = req
         header["msg"] = payload[4:].decode("utf-8", errors="replace")
+
+    elif msg_type == "rpc":
+        (req,) = struct.unpack_from("!I", payload, 0)
+        header["req"] = req
+        rpc_obj = json.loads(payload[4:].decode("utf-8"))
+        header["method"] = rpc_obj["method"]
+        header["params"] = rpc_obj.get("params", {})
+
+    elif msg_type == "rpc_result":
+        (req,) = struct.unpack_from("!I", payload, 0)
+        header["req"] = req
+        header["result"] = json.loads(payload[4:].decode("utf-8"))
+
+    elif msg_type == "notify":
+        notify_obj = json.loads(payload.decode("utf-8"))
+        header["method"] = notify_obj["method"]
+        header["params"] = notify_obj.get("params", {})
 
     return header, data
 
@@ -369,6 +408,11 @@ MUX_S_FILE_INFO         = 0xA0000010
 MUX_S_FILE_DATA         = 0xA0000011
 MUX_S_FILE_DONE         = 0xA0000012
 MUX_S_FILE_ERROR        = 0xA0000013
+
+# rssh RPC extension message types
+MUX_C_RPC               = 0x20000020
+MUX_S_RPC_RESULT        = 0xA0000020
+MUX_S_NOTIFY            = 0xA0000022
 
 
 # -- Mux wire format helpers --
@@ -504,6 +548,8 @@ class Server:
         self.channels = {}
         self.write_queue = None
         self.loop = None
+        self.managed_procs = {}  # pid -> {proc, stdout_buf, stderr_buf, exited, exit_code}
+        self.watchers = {}       # path -> task
 
     async def run(self):
         self.loop = asyncio.get_event_loop()
@@ -562,6 +608,8 @@ class Server:
             await self._handle_file_done(header)
         elif msg_type == "ping":
             await self.send({"type": "pong"})
+        elif msg_type == "rpc":
+            await self._handle_rpc(header)
 
     async def _handle_open(self, header: dict):
         ch_id = header["ch"]
@@ -776,6 +824,465 @@ class Server:
                 pass
             await self.send({"type": "file_done", "req": req})
 
+    # -- RPC dispatch --
+
+    async def _handle_rpc(self, header: dict):
+        req = header["req"]
+        method = header["method"]
+        params = header.get("params", {})
+        try:
+            result = await self._dispatch_rpc(method, params)
+            await self.send({"type": "rpc_result", "req": req,
+                             "result": {"ok": result}})
+        except Exception as e:
+            await self.send({"type": "rpc_result", "req": req,
+                             "result": {"error": {"message": str(e)}}})
+
+    async def _dispatch_rpc(self, method, params):
+        dispatch = {
+            "run": self._rpc_run,
+            "stat": self._rpc_stat,
+            "exists": self._rpc_exists,
+            "truename": self._rpc_truename,
+            "dir.list": self._rpc_dir_list,
+            "read": self._rpc_read,
+            "write": self._rpc_write,
+            "copy": self._rpc_copy,
+            "rename": self._rpc_rename,
+            "delete": self._rpc_delete,
+            "mkdir": self._rpc_mkdir,
+            "rmdir": self._rpc_rmdir,
+            "symlink": self._rpc_symlink,
+            "chmod": self._rpc_chmod,
+            "chown": self._rpc_chown,
+            "system.info": self._rpc_system_info,
+            "system.getenv": self._rpc_system_getenv,
+            "batch": self._rpc_batch,
+            "run_parallel": self._rpc_run_parallel,
+            "watch.add": self._rpc_watch_add,
+            "watch.remove": self._rpc_watch_remove,
+            "watch.list": self._rpc_watch_list,
+            "process.start": self._rpc_process_start,
+            "process.read": self._rpc_process_read,
+            "process.write": self._rpc_process_write,
+            "process.kill": self._rpc_process_kill,
+            "process.close_stdin": self._rpc_process_close_stdin,
+            "process.list": self._rpc_process_list,
+        }
+        handler = dispatch.get(method)
+        if handler is None:
+            raise ValueError(f"Unknown RPC method: {method}")
+        return await handler(params)
+
+    # -- RPC: run (sync command execution) --
+
+    async def _rpc_run(self, params):
+        cmd = params.get("cmd", "/bin/sh")
+        args = params.get("args", [])
+        if isinstance(cmd, str):
+            full_cmd = [cmd] + args
+        else:
+            full_cmd = list(cmd) + args
+        cwd = params.get("cwd", os.path.expanduser("~"))
+        if not os.path.isdir(cwd):
+            cwd = os.path.expanduser("~")
+        env = os.environ.copy()
+        env.update(params.get("env", {}))
+        stdin_data = params.get("stdin")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *full_cmd,
+                stdin=asyncio.subprocess.PIPE if stdin_data else asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd, env=env)
+            stdin_bytes = stdin_data.encode("utf-8") if isinstance(stdin_data, str) else stdin_data
+            stdout, stderr = await proc.communicate(input=stdin_bytes)
+        except FileNotFoundError:
+            return {"stdout": "", "stderr": f"{full_cmd[0]}: command not found\n",
+                    "exit_code": 127}
+        return {
+            "stdout": base64.b64encode(stdout).decode("ascii"),
+            "stderr": base64.b64encode(stderr).decode("ascii"),
+            "exit_code": proc.returncode,
+        }
+
+    # -- RPC: file operations --
+
+    async def _rpc_stat(self, params):
+        path = params["path"]
+        lstat = params.get("lstat", True)
+        try:
+            st = os.lstat(path) if lstat else os.stat(path)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"No such file: {path}")
+        except PermissionError:
+            raise PermissionError(f"Permission denied: {path}")
+        if stat_mod.S_ISDIR(st.st_mode):
+            ftype = "directory"
+        elif stat_mod.S_ISLNK(st.st_mode):
+            ftype = "symlink"
+        elif stat_mod.S_ISREG(st.st_mode):
+            ftype = "file"
+        elif stat_mod.S_ISCHR(st.st_mode):
+            ftype = "chardevice"
+        elif stat_mod.S_ISBLK(st.st_mode):
+            ftype = "blockdevice"
+        elif stat_mod.S_ISFIFO(st.st_mode):
+            ftype = "fifo"
+        elif stat_mod.S_ISSOCK(st.st_mode):
+            ftype = "socket"
+        else:
+            ftype = "unknown"
+        result = {
+            "type": ftype,
+            "mode": st.st_mode & 0o7777,
+            "size": st.st_size,
+            "mtime": int(st.st_mtime),
+            "atime": int(st.st_atime),
+            "ctime": int(st.st_ctime),
+            "uid": st.st_uid,
+            "gid": st.st_gid,
+            "nlinks": st.st_nlink,
+            "inode": st.st_ino,
+            "dev": st.st_dev,
+        }
+        if ftype == "symlink":
+            try:
+                result["link_target"] = os.readlink(path)
+            except OSError:
+                result["link_target"] = ""
+        try:
+            result["uname"] = pwd.getpwuid(st.st_uid).pw_name
+        except (KeyError, OSError):
+            result["uname"] = str(st.st_uid)
+        try:
+            result["gname"] = grp.getgrgid(st.st_gid).gr_name
+        except (KeyError, OSError):
+            result["gname"] = str(st.st_gid)
+        return result
+
+    async def _rpc_exists(self, params):
+        return {"exists": os.path.exists(params["path"])}
+
+    async def _rpc_truename(self, params):
+        return {"path": os.path.realpath(params["path"])}
+
+    async def _rpc_dir_list(self, params):
+        path = params["path"]
+        include_attrs = params.get("attrs", False)
+        include_hidden = params.get("hidden", True)
+        entries = []
+        try:
+            with os.scandir(path) as it:
+                for entry in it:
+                    if not include_hidden and entry.name.startswith("."):
+                        continue
+                    item = {"name": entry.name}
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            item["type"] = "directory"
+                        elif entry.is_symlink():
+                            item["type"] = "symlink"
+                        elif entry.is_file(follow_symlinks=False):
+                            item["type"] = "file"
+                        else:
+                            item["type"] = "other"
+                    except OSError:
+                        item["type"] = "unknown"
+                    if include_attrs:
+                        try:
+                            st = entry.stat(follow_symlinks=False)
+                            item["attrs"] = {
+                                "mode": st.st_mode & 0o7777,
+                                "size": st.st_size,
+                                "mtime": int(st.st_mtime),
+                                "atime": int(st.st_atime),
+                                "ctime": int(st.st_ctime),
+                                "uid": st.st_uid,
+                                "gid": st.st_gid,
+                                "nlinks": st.st_nlink,
+                                "inode": st.st_ino,
+                                "dev": st.st_dev,
+                            }
+                            if item["type"] == "symlink":
+                                try:
+                                    item["attrs"]["link_target"] = os.readlink(entry.path)
+                                except OSError:
+                                    item["attrs"]["link_target"] = ""
+                            try:
+                                item["attrs"]["uname"] = pwd.getpwuid(st.st_uid).pw_name
+                            except (KeyError, OSError):
+                                item["attrs"]["uname"] = str(st.st_uid)
+                            try:
+                                item["attrs"]["gname"] = grp.getgrgid(st.st_gid).gr_name
+                            except (KeyError, OSError):
+                                item["attrs"]["gname"] = str(st.st_gid)
+                        except OSError:
+                            pass
+                    entries.append(item)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"No such directory: {path}")
+        except PermissionError:
+            raise PermissionError(f"Permission denied: {path}")
+        return entries
+
+    async def _rpc_read(self, params):
+        path = params["path"]
+        offset = params.get("offset", 0)
+        length = params.get("length")
+        st = os.stat(path)
+        with open(path, "rb") as f:
+            if offset:
+                f.seek(offset)
+            data = f.read(length) if length else f.read()
+        return {
+            "content": base64.b64encode(data).decode("ascii"),
+            "size": st.st_size,
+            "mode": st.st_mode & 0o7777,
+        }
+
+    async def _rpc_write(self, params):
+        path = params["path"]
+        content = base64.b64decode(params["content"])
+        append = params.get("append", False)
+        if params.get("create_parents", False):
+            d = os.path.dirname(path)
+            if d:
+                os.makedirs(d, exist_ok=True)
+        with open(path, "ab" if append else "wb") as f:
+            f.write(content)
+        if "mode" in params:
+            os.chmod(path, params["mode"])
+        return {"size": len(content)}
+
+    async def _rpc_copy(self, params):
+        src, dest = params["src"], params["dest"]
+        if os.path.isdir(src):
+            shutil.copytree(src, dest, symlinks=True)
+        elif params.get("preserve", True):
+            shutil.copy2(src, dest)
+        else:
+            shutil.copy(src, dest)
+        return {}
+
+    async def _rpc_rename(self, params):
+        os.rename(params["src"], params["dest"])
+        return {}
+
+    async def _rpc_delete(self, params):
+        os.unlink(params["path"])
+        return {}
+
+    async def _rpc_mkdir(self, params):
+        path = params["path"]
+        mode = params.get("mode", 0o755)
+        if params.get("parents", True):
+            os.makedirs(path, mode=mode, exist_ok=True)
+        else:
+            os.mkdir(path, mode)
+        return {}
+
+    async def _rpc_rmdir(self, params):
+        path = params["path"]
+        if params.get("recursive", False):
+            shutil.rmtree(path)
+        else:
+            os.rmdir(path)
+        return {}
+
+    async def _rpc_symlink(self, params):
+        os.symlink(params["target"], params["link_path"])
+        return {}
+
+    async def _rpc_chmod(self, params):
+        os.chmod(params["path"], params["mode"])
+        return {}
+
+    async def _rpc_chown(self, params):
+        os.chown(params["path"], params.get("uid", -1), params.get("gid", -1))
+        return {}
+
+    async def _rpc_system_info(self, _params):
+        u = os.uname()
+        return {"hostname": u.nodename, "sysname": u.sysname,
+                "release": u.release, "machine": u.machine,
+                "uid": os.getuid(), "gid": os.getgid(),
+                "home": os.path.expanduser("~"), "pid": os.getpid()}
+
+    async def _rpc_system_getenv(self, params):
+        return {"value": os.environ.get(params["name"])}
+
+    # -- RPC: batch --
+
+    async def _rpc_batch(self, params):
+        results = []
+        for req in params["requests"]:
+            try:
+                r = await self._dispatch_rpc(req["method"], req.get("params", {}))
+                results.append({"result": r})
+            except Exception as e:
+                results.append({"error": {"message": str(e)}})
+        return {"results": results}
+
+    # -- RPC: run_parallel --
+
+    async def _rpc_run_parallel(self, params):
+        tasks = [self._rpc_run(cmd) for cmd in params["commands"]]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return {"results": [r if not isinstance(r, Exception)
+                            else {"error": str(r)} for r in results]}
+
+    # -- RPC: filesystem watching --
+
+    async def _rpc_watch_add(self, params):
+        path = params["path"]
+        if path in self.watchers:
+            return {"status": "already_watching"}
+        task = asyncio.ensure_future(
+            self._watch_loop(path, params.get("recursive", False)))
+        self.watchers[path] = task
+        return {"status": "ok"}
+
+    async def _rpc_watch_remove(self, params):
+        task = self.watchers.pop(params["path"], None)
+        if task:
+            task.cancel()
+            return {"status": "ok"}
+        return {"status": "not_watching"}
+
+    async def _rpc_watch_list(self, _params):
+        return {"paths": list(self.watchers.keys())}
+
+    async def _watch_loop(self, path, recursive):
+        snapshot = self._scan_dir(path, recursive)
+        try:
+            while True:
+                await asyncio.sleep(2)
+                new_snapshot = self._scan_dir(path, recursive)
+                changed = [p for p in set(snapshot) | set(new_snapshot)
+                           if snapshot.get(p) != new_snapshot.get(p)]
+                if changed:
+                    await self.send({"type": "notify", "method": "fs.changed",
+                                     "params": {"paths": changed}})
+                snapshot = new_snapshot
+        except asyncio.CancelledError:
+            pass
+
+    def _scan_dir(self, path, recursive):
+        result = {}
+        try:
+            with os.scandir(path) as it:
+                for entry in it:
+                    try:
+                        st = entry.stat(follow_symlinks=False)
+                        result[entry.path] = st.st_mtime
+                        if recursive and entry.is_dir(follow_symlinks=False):
+                            result.update(self._scan_dir(entry.path, True))
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+        return result
+
+    # -- RPC: process management --
+
+    async def _rpc_process_start(self, params):
+        cmd = params.get("cmd", "/bin/sh")
+        args = params.get("args", [])
+        full_cmd = ([cmd] + args) if isinstance(cmd, str) else (list(cmd) + args)
+        cwd = params.get("cwd", os.path.expanduser("~"))
+        if not os.path.isdir(cwd):
+            cwd = os.path.expanduser("~")
+        env = os.environ.copy()
+        env.update(params.get("env", {}))
+        proc = await asyncio.create_subprocess_exec(
+            *full_cmd, stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE, cwd=cwd, env=env)
+        self.managed_procs[proc.pid] = {
+            "proc": proc, "stdout_buf": bytearray(),
+            "stderr_buf": bytearray(), "exited": False, "exit_code": None,
+        }
+        asyncio.ensure_future(self._managed_proc_reader(proc.pid))
+        return {"pid": proc.pid}
+
+    async def _managed_proc_reader(self, pid):
+        info = self.managed_procs.get(pid)
+        if not info:
+            return
+        proc = info["proc"]
+        async def _read(stream, buf):
+            try:
+                while True:
+                    data = await stream.read(4096)
+                    if not data:
+                        break
+                    buf.extend(data)
+            except Exception:
+                pass
+        await asyncio.gather(_read(proc.stdout, info["stdout_buf"]),
+                             _read(proc.stderr, info["stderr_buf"]))
+        await proc.wait()
+        info["exited"] = True
+        info["exit_code"] = proc.returncode
+
+    async def _rpc_process_read(self, params):
+        pid = params["pid"]
+        info = self.managed_procs.get(pid)
+        if info is None:
+            raise ValueError(f"Process not found: {pid}")
+        timeout_ms = params.get("timeout_ms", 0)
+        if timeout_ms > 0 and not info["stdout_buf"] and not info["stderr_buf"] and not info["exited"]:
+            deadline = time.time() + timeout_ms / 1000.0
+            while time.time() < deadline and not info["stdout_buf"] and not info["stderr_buf"] and not info["exited"]:
+                await asyncio.sleep(0.01)
+        stdout, stderr = bytes(info["stdout_buf"]), bytes(info["stderr_buf"])
+        info["stdout_buf"].clear()
+        info["stderr_buf"].clear()
+        result = {
+            "stdout": base64.b64encode(stdout).decode("ascii") if stdout else "",
+            "stderr": base64.b64encode(stderr).decode("ascii") if stderr else "",
+            "exited": info["exited"],
+        }
+        if info["exited"]:
+            result["exit_code"] = info["exit_code"]
+            self.managed_procs.pop(pid, None)
+        return result
+
+    async def _rpc_process_write(self, params):
+        pid = params["pid"]
+        info = self.managed_procs.get(pid)
+        if info is None:
+            raise ValueError(f"Process not found: {pid}")
+        data = params.get("data", "")
+        if isinstance(data, str):
+            data = base64.b64decode(data)
+        info["proc"].stdin.write(data)
+        await info["proc"].stdin.drain()
+        return {}
+
+    async def _rpc_process_kill(self, params):
+        pid = params["pid"]
+        info = self.managed_procs.get(pid)
+        if info is None:
+            raise ValueError(f"Process not found: {pid}")
+        info["proc"].send_signal(params.get("signal", 15))
+        return {}
+
+    async def _rpc_process_close_stdin(self, params):
+        info = self.managed_procs.get(params["pid"])
+        if info is None:
+            raise ValueError(f"Process not found: {params['pid']}")
+        if info["proc"].stdin and not info["proc"].stdin.is_closing():
+            info["proc"].stdin.close()
+        return {}
+
+    async def _rpc_process_list(self, _params):
+        return {"processes": [{"pid": pid, "exited": i["exited"],
+                               "exit_code": i["exit_code"]}
+                              for pid, i in self.managed_procs.items()]}
+
 
 def run_server():
     os.makedirs(RSSH_DIR, exist_ok=True)
@@ -802,8 +1309,9 @@ class Daemon:
         self.write_queue = None
         self.next_ch_id = 1
         self.loop = None
-        self.sock_path = os.path.join(RSSH_DIR, f"{host}.sock")
-        self.pid_path = os.path.join(RSSH_DIR, f"{host}.pid")
+        safe_host = host.replace("/", "_").replace("..", "_")
+        self.sock_path = os.path.join(RSSH_DIR, f"{safe_host}.sock")
+        self.pid_path = os.path.join(RSSH_DIR, f"{safe_host}.pid")
         self.ready = False
         self.notify_fd = notify_fd
         self.start_error = ""
@@ -818,6 +1326,9 @@ class Daemon:
         self.fwd_channels = {}      # ch_id -> {local_writer, ...}
         # Unix socket listener ref for stop_listening
         self._unix_server = None
+        # RPC tracking
+        self.rpc_reqs = {}          # req_id -> writer
+        self.rpc_clients = set()    # all connected client writers (for notifications)
 
     async def run(self):
         self.loop = asyncio.get_event_loop()
@@ -953,6 +1464,34 @@ class Daemon:
         if msg_type == "pong":
             return
 
+        # RPC responses → translate to mux extension
+        if msg_type == "rpc_result" and req_id is not None and req_id in self.rpc_reqs:
+            writer = self.rpc_reqs.pop(req_id)
+            try:
+                result_json = json.dumps(header.get("result", {}))
+                body = mux_pack_u32(req_id) + mux_pack_string(result_json)
+                writer.write(mux_encode_packet(MUX_S_RPC_RESULT, body))
+                await writer.drain()
+            except (OSError, ConnectionError):
+                pass
+            return
+
+        # Server push notifications → broadcast to all connected clients
+        if msg_type == "notify":
+            method = header.get("method", "")
+            params_json = json.dumps(header.get("params", {}))
+            body = mux_pack_string(method) + mux_pack_string(params_json)
+            pkt = mux_encode_packet(MUX_S_NOTIFY, body)
+            dead = set()
+            for w in self.rpc_clients:
+                try:
+                    w.write(pkt)
+                    await w.drain()
+                except (OSError, ConnectionError):
+                    dead.add(w)
+            self.rpc_clients -= dead
+            return
+
         # File transfer responses → translate to mux extension
         if req_id is not None and req_id in self.file_reqs:
             writer = self.file_reqs[req_id]
@@ -1050,6 +1589,8 @@ class Daemon:
         then dispatches mux commands."""
         session_ids = set()
         file_req_ids = set()
+        rpc_req_ids = set()
+        self.rpc_clients.add(writer)
         try:
             # Hello exchange — daemon sends first
             writer.write(mux_encode_packet(MUX_MSG_HELLO, _mux_hello_body()))
@@ -1074,24 +1615,27 @@ class Daemon:
             while True:
                 msg_type, body = await mux_read_packet(reader)
                 await self._dispatch_mux(msg_type, body, reader, writer,
-                                         session_ids, file_req_ids)
+                                         session_ids, file_req_ids, rpc_req_ids)
         except (EOFError, asyncio.IncompleteReadError, ConnectionError,
                 struct.error, ValueError):
             pass
         finally:
+            self.rpc_clients.discard(writer)
             for sid in list(session_ids):
                 session = self.sessions.pop(sid, None)
                 if session:
                     self.ch_to_session.pop(session.get("ch_id"), None)
             for rid in list(file_req_ids):
                 self.file_reqs.pop(rid, None)
+            for rid in list(rpc_req_ids):
+                self.rpc_reqs.pop(rid, None)
             try:
                 writer.close()
             except Exception:
                 pass
 
     async def _dispatch_mux(self, msg_type, body, reader, writer,
-                            session_ids, file_req_ids):
+                            session_ids, file_req_ids, rpc_req_ids):
         if msg_type == MUX_C_NEW_SESSION:
             await self._mux_new_session(body, writer, session_ids)
         elif msg_type == MUX_C_ALIVE_CHECK:
@@ -1119,6 +1663,8 @@ class Daemon:
             await self._mux_file_data(body)
         elif msg_type == MUX_C_FILE_DONE:
             await self._mux_file_done(body)
+        elif msg_type == MUX_C_RPC:
+            await self._mux_rpc(body, writer, rpc_req_ids)
         else:
             # Unknown — try to extract request_id and send failure
             try:
@@ -1270,6 +1816,21 @@ class Daemon:
         p = MuxParser(body)
         rid = p.get_u32()
         await self.send_to_server({"type": "file_done", "req": rid})
+
+    # -- RPC relay --
+
+    async def _mux_rpc(self, body, writer, rpc_req_ids):
+        p = MuxParser(body)
+        rid = p.get_u32()
+        req_json = p.get_cstring()
+        req_obj = json.loads(req_json)
+        self.rpc_reqs[rid] = writer
+        rpc_req_ids.add(rid)
+        await self.send_to_server({
+            "type": "rpc", "req": rid,
+            "method": req_obj["method"],
+            "params": req_obj.get("params", {}),
+        })
 
     # -- Port forwarding --
 
@@ -2394,6 +2955,74 @@ def run_mux_control(host: str, ctl_cmd: str, use_et: bool = False):
 # Argument parsing
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# RPC mode — JSON-RPC over stdin/stdout via daemon
+# ---------------------------------------------------------------------------
+
+def run_rpc(host: str, use_et: bool = False):
+    """Read JSON-RPC requests from stdin (one per line), relay through
+    daemon, write JSON-RPC responses to stdout (one per line).
+    Includes request id in responses for correlation."""
+    sock_path = ensure_daemon(host, use_et)
+    sock = mux_connect(sock_path)
+    request_id = 0
+
+    try:
+        while True:
+            line = sys.stdin.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+            except json.JSONDecodeError as e:
+                print(json.dumps({"id": None,
+                                  "error": {"message": f"Invalid JSON: {e}"}}),
+                      flush=True)
+                continue
+
+            request_id += 1
+            req_json = json.dumps(req)
+            body = mux_pack_u32(request_id) + mux_pack_string(req_json)
+            mux_write_packet_sync(sock, MUX_C_RPC, body)
+
+            # Read response (may get notifications too)
+            while True:
+                msg_type, resp_body = mux_read_packet_sync(sock)
+                if msg_type == MUX_S_RPC_RESULT:
+                    p = MuxParser(resp_body)
+                    rid = p.get_u32()
+                    result_json = p.get_cstring()
+                    # Wrap with id for correlation
+                    result_obj = json.loads(result_json)
+                    result_obj["id"] = rid
+                    print(json.dumps(result_obj), flush=True)
+                    break
+                elif msg_type == MUX_S_NOTIFY:
+                    p = MuxParser(resp_body)
+                    method = p.get_cstring()
+                    params_json = p.get_cstring()
+                    notify = {"notification": method,
+                              "params": json.loads(params_json)}
+                    print(json.dumps(notify), flush=True)
+                elif msg_type == MUX_S_FAILURE:
+                    p = MuxParser(resp_body)
+                    p.get_u32()  # rid
+                    reason = p.get_cstring()
+                    print(json.dumps({"id": request_id,
+                                      "error": {"message": reason}}),
+                          flush=True)
+                    break
+                else:
+                    break
+    except (EOFError, KeyboardInterrupt):
+        pass
+    finally:
+        sock.close()
+
+
 def print_usage():
     print("""rssh — SSH Multiplexer over a Single Connection
 
@@ -2409,6 +3038,7 @@ Usage:
   rssh -T <host> <command>         Disable PTY
   rssh -l <user> <host>            Login as user
   rssh --pipe <host>               Pipe mode (for TRAMP/scripts)
+  rssh --rpc <host>                RPC mode (JSON-RPC over stdin/stdout)
 
   rssh cp <host>:<path> <local>    Download
   rssh cp <local> <host>:<path>    Upload
@@ -2461,6 +3091,7 @@ def main():
     force_pty = None
     use_et = False
     pipe_mode = False
+    rpc_mode = False
     env_vars = []
     login_user = None
     forward_specs = []
@@ -2476,6 +3107,8 @@ def main():
             use_et = True
         elif args[i] == "--pipe":
             pipe_mode = True
+        elif args[i] == "--rpc":
+            rpc_mode = True
         elif args[i] == "-l" and i + 1 < len(args):
             i += 1
             login_user = args[i]
@@ -2520,7 +3153,9 @@ def main():
         run_forward(host, forward_specs, use_et)
         return
 
-    if pipe_mode:
+    if rpc_mode:
+        run_rpc(host, use_et=use_et)
+    elif pipe_mode:
         run_pipe(host, command=command,
                  env_vars=env_vars if env_vars else None, use_et=use_et)
     else:
