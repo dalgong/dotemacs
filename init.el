@@ -321,7 +321,7 @@
          :map ctl-x-4-map
          ("C-`" . eat-other-window)
          :map eat-mode-map
-         ("C-`" . eat-toggle-char-mode))
+         ("C-z" . eat-toggle-char-mode))
   :hook (eat-exec . make-buffer-fixed-pitch)
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
