@@ -299,6 +299,7 @@
           ("M-p" . completion-preview-prev-candidate)))
 (use-package display-line-numbers
   :hook (prog-mode . display-line-numbers--turn-on))
+(use-package diffview :after diff-mode :bind (:map diff-mode-map ("|" . diffview-current)))
 (use-package easy-kill
   :after embark
   :bind ([remap kill-ring-save] . easy-kill)
