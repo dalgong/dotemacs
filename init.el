@@ -587,6 +587,8 @@
     (abort-recursive-edit)))
 (use-package vterm
   :bind
-  (:map vterm-mode-map ("C-q" . vterm-send-next-key))
+  ( :map vterm-mode-map
+    ("C-q" . vterm-send-next-key)
+    ("ESC ESC" . vterm-send-escape))
   :hook (vterm-mode . make-buffer-fixed-pitch))
 (use-package vundo :bind ("C-x u" . vundo))
