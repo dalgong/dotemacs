@@ -322,14 +322,14 @@
          :map ctl-x-4-map
          ("C-`" . eat-other-window)
          :map eat-mode-map
-         ("C-z" . eat-toggle-char-mode))
+         ("C-`" . eat-toggle-char-mode))
   :hook (eat-exec . make-buffer-fixed-pitch)
   :custom
   (eat-shell-prompt-annotation-position 'right-margin)
   :init
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "C-;") nil)
-    (define-key map (kbd "C-z") 'eat-toggle-char-mode)
+    (define-key map (kbd "C-`") 'eat-toggle-char-mode)
     (define-key map (kbd "M-o") nil)
     map)
   (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
@@ -454,13 +454,12 @@
   :hook (after-init . eyebrowse-mode)
   :init
   (setq eyebrowse-keymap-prefix (kbd "C-z"))
-  :bind (("C-z" . C-z-dwim)
-         :map eyebrowse-mode-prefix-map
-         ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
-         ("k"   . eyebrowse-close-window-config)
-         ("n"   . eyebrowse-next-window-config)
-         ("p"   . eyebrowse-prev-window-config)
-         ("C-z" . eyebrowse-last-window-config))
+  :bind ( :map eyebrowse-mode-prefix-map
+          ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
+          ("k"   . eyebrowse-close-window-config)
+          ("n"   . eyebrowse-next-window-config)
+          ("p"   . eyebrowse-prev-window-config)
+          ("C-z" . eyebrowse-last-window-config))
   :custom
   (eyebrowse-new-workspace t)
   :config
