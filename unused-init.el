@@ -171,24 +171,40 @@
       (apply o args))))
 (use-package icomplete
   :hook (after-init . icomplete-vertical-mode)
-  :bind ( :map icomplete-minibuffer-map
-          ("TAB" . icomplete-force-complete)
-          ("SPC" . self-insert-command)
-          ("C-j" . icomplete-fido-exit)
-          ("RET" . icomplete-force-complete-and-exit)
-          ("<remap> <minibuffer-complete-and-exit>" . icomplete-force-complete-and-exit))
   :custom
+  (icomplete-compute-delay 0)
+  (icomplete-hide-common-prefix nil)
+  (icomplete-in-buffer t)
   (icomplete-matches-format nil)
-  (icomplete-show-matches-on-no-input t))
-(use-package icomplete
-  :demand t
-  :bind ( :map icomplete-minibuffer-map
-          ("RET" . icomplete-force-complete-and-exit)
-          ("C-j" . exit-minibuffer))
-  :custom
+  (icomplete-prospects-height 10)
   (icomplete-show-matches-on-no-input t)
-  (icomplete-prospects-height 1)
-  (icomplete-hide-common-prefix nil))
+  (icomplete-tidy-shadowed-file-names t)
+  :bind ( :map icomplete-minibuffer-map
+          ("C-."    . embark-act)
+	  ("DEL"    . icomplete-fido-backward-updir)
+	  ("RET"    . icomplete-force-complete-and-exit)
+          ("C-j"    . icomplete-ret)
+          ("TAB"    . icomplete-force-complete)
+          ("<down>" . icomplete-forward-completions) ("C-n"    . icomplete-forward-completions)
+          ("<up>"   . icomplete-backward-completions)("C-p"    . icomplete-backward-completions)
+	  ("M-/"    . (lambda () (interactive) (command-here 'consult-find)))
+          ("C-`"    . command-here)
+          ("C-z"    . command-here)
+          ("M-s g"  . command-here)
+          ("M-s r"  . command-here))
+  :config
+  (setq icomplete-scroll t)
+  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
+  (defun command-here (&optional cmd)
+    (interactive)
+    (icomplete-force-complete)
+    (run-at-time
+     0 nil
+     (lambda (cmd dir) (let ((default-directory dir))
+                         (call-interactively cmd)))
+     (or cmd (lookup-key global-map (this-command-keys)))
+     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+    (abort-recursive-edit)))
 (use-package cua-base
   :hook (after-init . cua-mode)
   :custom
@@ -328,41 +344,6 @@
             ("C-s"     . helm-next-line)))
   (use-package-when helm-xref (eq j:completion-ui 'helm)
     :ensure))
-(use-package icomplete
-  :disabled
-  :hook (after-init . icomplete-vertical-mode)
-  :custom
-  (icomplete-hide-common-prefix nil)
-  (icomplete-in-buffer t)
-  (icomplete-matches-format nil)
-  (icomplete-prospects-height 10)
-  (icomplete-show-matches-on-no-input t)
-  (icomplete-tidy-shadowed-file-names t)
-  :bind ( :map icomplete-minibuffer-map
-          ("C-."    . embark-act)
-	  ("DEL"    . icomplete-fido-backward-updir)
-	  ("RET"    . icomplete-force-complete-and-exit)
-          ("C-j"    . icomplete-ret)
-          ("TAB"    . icomplete-force-complete)
-          ("<down>" . icomplete-forward-completions)
-          ("C-n"    . icomplete-forward-completions)
-          ("<up>"   . icomplete-backward-completions)
-          ("C-p"    . icomplete-backward-completions)
-	  ("M-/"   .  (lambda () (interactive) (command-here 'consult-find)))
-          ("C-z"    . command-here)
-          ("M-s g"  . command-here)
-          ("M-s r"  . command-here))
-  :config
-  (setq icomplete-scroll t)  
-  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
-  (defun command-here (&optional cmd)
-    (interactive)
-    (icomplete-force-complete)
-    (let ((dir (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-          (cmd (or cmd (lookup-key global-map (this-command-keys)))))
-      (run-at-time 0 nil (lambda () (let ((default-directory dir))
-                                      (call-interactively cmd))))
-      (abort-recursive-edit))))
 (when t
   (use-package ivy
     :ensure
@@ -1240,41 +1221,31 @@
     (unless (display-graphic-p)
       (corfu-terminal-mode +1))))
 (use-package vertico
-  :disabled
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
          (rfn-eshadow-update-overlay . vertico-directory-tidy))
   :bind (("C-c C-r" . vertico-repeat)
          :map vertico-map
          ("M-E"   . embark-export)
-	 ("C-j"   . vertico-exit-input)
+         ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
-         ("M-/"   . consult-find-dwim)
-         ("C-z"   . command-here)
-         ("M-s g" . command-here)
-         ("M-s r" . command-here))
+         ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
+         ("C-`"   . vertico-exit-and-run)
+         ("C-\\"  . vertico-exit-and-run)
+         ("M-s g" . vertico-exit-and-run)
+         ("M-s r" . vertico-exit-and-run))
   :custom
   (vertico-count-format nil)
   :config
-  (defun vertico-selected-directory ()
+  (defun vertico-exit-and-run (&optional cmd)
+    (interactive)
     (vertico-insert)
-    (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-  (defun command-here ()
-    (interactive)
-    (let ((dir (vertico-selected-directory))
-          (cmd (lookup-key global-map (this-command-keys))))
-      (run-at-time 0 nil (lambda () (let ((default-directory dir))
-                                      (call-interactively cmd))))
-      (abort-recursive-edit)))
-  (defun consult-find-dwim ()
-    (interactive)
-    (run-at-time 0 nil #'consult-find (vertico-selected-directory))
-    (abort-recursive-edit))
-  (use-package vertico-multiform
-    :ensure nil
-    :config
-    (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
-    (vertico-multiform-mode 1)))
+    (run-at-time
+     0 nil
+     (lambda (cmd d) (let ((default-directory d)) (call-interactively (setq this-command cmd))))
+     (setq cmd (or cmd (lookup-key global-map (this-command-keys))))
+     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+    (abort-recursive-edit)))
 (when nil
   (defun find-file--line-number (o filename &optional wildcards)
     "Turn files like file.cpp:14 into file.cpp and going to the 14-th line."
