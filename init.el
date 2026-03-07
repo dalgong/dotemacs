@@ -19,19 +19,14 @@
          ("C-M-9"              . quit-window-on)
          ("C-c c"              . calendar)
          ("C-c r"              . query-replace)
+         ("C-c ["              . backward-paragraph)
+         ("C-c ]"              . forward-paragraph)
          ("C-h C-o"            . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
-  (auto-save-default nil)
   (auto-save-interval 0)
-  (bidi-inhibit-bpa t)
-  (bidi-paragraph-direction t)
-  (completion-category-defaults nil)
   (completion-category-overrides '((file (styles partial-completion))))
-  (confirm-nonexistent-file-or-buffer nil)
   (create-lockfiles nil)
-  (cycle-spacing-actions '(delete-all-space just-one-space restore))
-  (delete-selection-mode t)
   (dired-no-confirm t)
   (dired-switches-in-mode-line 'as-is)
   (disabled-command-function nil)
@@ -41,25 +36,13 @@
                           ("\\*hermes.*" display-buffer-same-window)))
   (electric-pair-mode t)
   (enable-recursive-minibuffers t)
-  (global-auto-revert-mode t)
-  (global-reveal-mode t)
-  (history-length 1000)
   (ibuffer-expert t)
   (indent-tabs-mode nil)
-  (inhibit-startup-screen t)
-  (initial-scratch-message nil)
-  (inhibit-startup-echo-area-message (user-login-name))
   (isearch-yank-on-move 'shift)
   (isearch-lazy-count t)
-  (isearch-repeat-on-direction-change t)
-  (kill-ring-max 3000)
   (kill-whole-line t)
-  (lazy-highlight-buffer t)
-  (line-move-visual nil)
   (mac-option-key-is-meta t)
-  (mac-right-option-modifier nil)
   (make-backup-files nil)
-  (mark-even-if-inactive t)
   (minibuffer-depth-indicate-mode t)
   (mode-line-end-spaces nil)
   (mode-line-frame-identification nil)
@@ -69,12 +52,10 @@
   (mode-line-remote nil)
   (ns-alternate-modifier 'super)
   (ns-command-modifier 'meta)
-  (proced-enable-color-flag t)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
-  (read-process-output-max (* 1024 1024))
+  (read-process-output-max (* 4 1024 1024))
   (recentf-mode t)
-  (recentf-auto-cleanup (* 3 3600))
   (recentf-max-saved-items 1000)
   (remote-file-name-inhibit-locks t)
   (repeat-mode t)
@@ -454,11 +435,10 @@
   :hook (after-init . eyebrowse-mode)
   :init
   (setq eyebrowse-keymap-prefix (kbd "C-z"))
-  :bind ( :map eyebrowse-mode-prefix-map
-          ("<"   . nil) (">"   . nil) ("'"   . nil) ("\""  . nil)
-          ("k"   . eyebrowse-close-window-config)
-          ("n"   . eyebrowse-next-window-config)
-          ("p"   . eyebrowse-prev-window-config)
+  :bind ( :map eyebrowse-mode-map
+          ("M-}" . eyebrowse-next-window-config)
+          ("M-{" . eyebrowse-prev-window-config)
+          :map eyebrowse-mode-prefix-map
           ("C-z" . eyebrowse-last-window-config))
   :custom
   (eyebrowse-new-workspace t)
@@ -519,17 +499,11 @@
   :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
   :hook (prog-mode . outline-indent-minor-mode))
-(static-if window-system
-    (progn
-      (setq package-vc-allow-build-commands t)
-      (use-package reader
-        :disabled
-        :vc (:url "https://codeberg.org/divyaranjan/emacs-reader"
-                  :make "all"))
-      (use-package pdf-tools
-        :magic ("%PDF" . pdf-view-mode)
-        :config
-        (pdf-tools-install :no-query))))
+(use-package pdf-tools
+  :if window-system
+  :magic ("%PDF" . pdf-view-mode)
+  :config
+  (pdf-tools-install :no-query))
 (use-package python
   :ensure nil
   :hook
