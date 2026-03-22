@@ -190,99 +190,7 @@
                    when (and (string-match name-re (buffer-name b))
                              (not (process-live-p (get-buffer-process b))))
                    return (buffer-name b))
-          (generate-new-buffer-name name))))
-  (use-package eat
-    :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-    :bind (:map eat-mode-map ("C-`" . eat-toggle-char-mode))
-    :hook (eat-exec . make-buffer-fixed-pitch)
-    :custom
-    (eat-shell-prompt-annotation-position 'right-margin)
-    :init
-    (defun override-eat-term-keymap (map)
-      (define-key map (kbd "C-;") nil)
-      (define-key map (kbd "C-`") 'eat-toggle-char-mode)
-      (define-key map (kbd "M-o") nil)
-      map)
-    (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
-    (defun eat-dwim (o &rest args)
-      (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
-              (not (derived-mode-p 'eat-mode))
-              (not (process-live-p (get-buffer-process (current-buffer)))))
-          (apply o args)
-        (bury-buffer)))
-    (advice-add 'eat :around 'eat-dwim)
-    (defun eat-toggle-char-mode ()
-      (interactive)
-      (call-interactively
-       (cond ((or (null eat-terminal)
-                  current-prefix-arg)
-              'eat)
-             (eat--semi-char-mode
-              'eat-emacs-mode)
-             (t
-              'eat-semi-char-mode))))
-    (defun eat-insert-for-yank (o &rest args)
-      (if (null (ignore-errors eat-terminal))
-          (apply o args)
-        (funcall eat--synchronize-scroll-function
-                 (eat--synchronize-scroll-windows 'force-selected))
-        (eat-term-send-string-as-yank
-         eat-terminal
-         (let ((yank-hook (bound-and-true-p yank-transform-functions)))
-           (with-temp-buffer
-             (setq-local yank-transform-functions yank-hook)
-             (apply o args)
-             (buffer-string))))))
-    (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
-    (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
-    (defun eat-insert-invocation-time ()
-      (let* ((pos (pos-eol 0))
-             (text (format-time-string "%m/%d %H:%M:%S"))
-             (ov (make-overlay (1- pos) pos)))
-        (overlay-put ov 'evaporate t)
-        (overlay-put ov 'after-string
-                     (concat
-                      (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
-                      (propertize text 'face '(italic font-lock-comment-face))))))
-    (defun maybe-eat-compilation-start (o &rest args)
-      (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
-    (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
-    (defun eat-compilation-start (command &optional mode name-function _ _)
-      (let ((name-of-mode "compilation")
-            (dir default-directory)
-            outbuf)
-        (if (or (not mode) (eq mode t))
-            (setq mode 'compilation-minor-mode)
-          (setq name-of-mode (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
-        (with-current-buffer
-            (setq outbuf
-                  (get-buffer-create
-                   (compilation-buffer-name name-of-mode mode name-function)))
-          (setq default-directory dir)
-          (setq buffer-read-only nil)
-          (erase-buffer)
-          (compilation-insert-annotation
-           "-*- mode: " name-of-mode
-           "; default-directory: "
-           (prin1-to-string (abbreviate-file-name default-directory))
-           " -*-\n")
-          (compilation-insert-annotation
-           (format "%s started at %s\n\n"
-                   mode-name
-                   (substring (current-time-string) 0 19))
-           command "\n")
-          (eat-mode)
-          (eat-exec outbuf "*compile*" shell-file-name nil (list "-lc" command))
-          (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
-          (eat-emacs-mode)
-          (set (make-local-variable 'eat--synchronize-scroll-function)
-               'eat--eshell-synchronize-scroll)
-          (funcall mode)
-          (setq-local compilation-directory dir)
-          (setq-local compilation-arguments (list command (if (eq mode 'compilation-minor-mode) nil mode) name-function))
-          (setq-local revert-buffer-function 'compilation-revert-buffer)
-          (setq next-error-last-buffer outbuf)
-          (display-buffer outbuf '(nil (allow-no-window . t))))))))
+          (generate-new-buffer-name name)))))
 (use-package consult
   :bind (("C-;" . consult-register-load)
          ("C-:" . consult-register-store)
@@ -330,6 +238,56 @@
   :bind ( :map completion-preview-active-mode-map
           ("M-n" . completion-preview-next-candidate)
           ("M-p" . completion-preview-prev-candidate)))
+(use-package coterm
+  :hook (after-init . coterm-mode)
+  :config
+  (defvar-local bpo-queue nil)
+  (defvar-local bpo-queue-timer nil)
+  (defun bpo-flush (proc)
+    (when (buffer-live-p (process-buffer proc))
+      (with-current-buffer (process-buffer proc)
+        (when bpo-queue-timer
+          (cancel-timer bpo-queue-timer)
+          (setq bpo-queue-timer nil))
+        (let ((inhibit-quit t)
+              (inhibit-read-only t)
+              (inhibit-modification-hooks t)
+              (queue bpo-queue))
+          (setq bpo-queue nil)
+          ;; By the time delayed filter is called, process may be dead.
+          (cl-letf (((symbol-function 'get-buffer-process)
+                     (lambda (&rest _) proc)))
+            (dolist (p (nreverse queue))
+              (funcall (car p) proc (cdr p))))))))
+  (defun bpo-enqueue (ofun proc o)
+    (when (buffer-live-p (process-buffer proc))
+      (with-current-buffer (process-buffer proc)
+        (push (cons ofun o) bpo-queue)
+        (unless bpo-queue-timer
+          (setq bpo-queue-timer
+                (run-with-timer 0.2 nil 'bpo-flush proc))))))
+  (defun handle-process-buffered (proc)
+    (with-current-buffer (process-buffer proc)
+      (setq-local bpo-queue nil)
+      (setq-local bpo-queue-timer nil))
+    (add-function :around (process-filter proc) 'bpo-enqueue)
+    (add-function :around (process-sentinel proc) 'bpo-enqueue))  
+  (add-hook 'compilation-start-hook 'enable-coterm-on-compilation)
+  (defun enable-coterm-on-compilation (proc)
+    (with-current-buffer (process-buffer proc)
+      (buffer-disable-undo)
+      (coterm--init)
+      (coterm-auto-char-mode -1)
+      (coterm-auto-char-lighter-mode -1)
+      (handle-process-buffered proc)
+      (setq-local comint-input-ring compile-history)
+      (setq-local comint-output-filter-functions '(ansi-color-process-output))
+      (use-local-map compilation-mode-map)
+      (setq-local jit-lock-defer-time nil)
+      (setq buffer-read-only t)))
+  (advice-add 'compilation-start :filter-args 'use-comint-always)
+  (defun use-comint-always (args)
+    (cl-list* (car args) t (cddr args))))
 (use-package display-line-numbers
   :hook (prog-mode . display-line-numbers--turn-on))
 (use-package diffview :after diff-mode :bind (:map diff-mode-map ("|" . diffview-current)))
