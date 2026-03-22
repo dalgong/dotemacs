@@ -24,7 +24,10 @@
   :custom
   (async-shell-command-buffer 'rename-buffer)
   (auto-save-interval 0)
+  (completion-auto-select)
   (completion-category-overrides '((file (styles partial-completion))))
+  (completions-format 'vertical)
+  (completions-sort 'historical)
   (create-lockfiles nil)
   (disabled-command-function nil)
   (display-buffer-alist '(("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
@@ -368,6 +371,48 @@
   (use-package go-mode :functions (gofmt) :custom (gofmt-command "goimports"))
   (defun gofmt-before-save () (when (derived-mode-p 'go-mode) (gofmt))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
+(use-package icomplete
+  :hook (after-init . icomplete-vertical-mode)
+  :custom
+  (icomplete-compute-delay 0)
+  (icomplete-hide-common-prefix nil)
+  (icomplete-in-buffer t)
+  (icomplete-matches-format nil)
+  (icomplete-prospects-height 10)
+  (icomplete-show-matches-on-no-input t)
+  (icomplete-tidy-shadowed-file-names t)
+  :bind ( :map icomplete-minibuffer-map
+          ("C-."    . embark-act)
+	  ("DEL"    . icomplete-fido-backward-updir)
+	  ("RET"    . icomplete-force-complete-and-exit)
+          ("C-j"    . icomplete-ret)
+          ("TAB"    . icomplete-force-complete)
+          ("<down>" . icomplete-forward-completions) ("C-n"    . icomplete-forward-completions)
+          ("<up>"   . icomplete-backward-completions)("C-p"    . icomplete-backward-completions)
+	  ("M-/"    . (lambda () (interactive) (command-here 'consult-find)))
+          ("C-`"    . command-here)
+          ("C-z"    . command-here)
+          ("M-s g"  . command-here)
+          ("M-s r"  . command-here))
+  :config
+  (setq icomplete-scroll t)
+  (defun icomplete-ret-no-input (o &rest args)
+    (interactive)
+    (if (equal (icomplete--field-string) icomplete--initial-input)
+        (exit-minibuffer)
+      (apply o args)))
+  (advice-add 'icomplete-ret :around 'icomplete-ret-no-input)
+  (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
+  (defun command-here (&optional cmd)
+    (interactive)
+    (icomplete-force-complete)
+    (run-at-time
+     0 nil
+     (lambda (cmd dir) (let ((default-directory dir))
+                         (call-interactively cmd)))
+     (or cmd (lookup-key global-map (this-command-keys)))
+     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
+    (abort-recursive-edit)))
 (use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
@@ -465,32 +510,6 @@
   :hook ((after-init . global-treesit-auto-mode))
   :custom
   (treesit-font-lock-level 4))
-(use-package vertico
-  :hook ((after-init . vertico-mode)
-         (minibuffer-setup . vertico-repeat-save)
-         (rfn-eshadow-update-overlay . vertico-directory-tidy))
-  :bind (("C-c C-r" . vertico-repeat)
-         :map vertico-map
-         ("M-E"   . embark-export)
-         ("C-j"   . vertico-exit-input)
-         ("DEL"   . vertico-directory-delete-char)
-         ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
-         ("C-`"   . vertico-exit-and-run)
-         ("C-\\"  . vertico-exit-and-run)
-         ("M-s g" . vertico-exit-and-run)
-         ("M-s r" . vertico-exit-and-run))
-  :custom
-  (vertico-count-format nil)
-  :config
-  (defun vertico-exit-and-run (&optional cmd)
-    (interactive)
-    (vertico-insert)
-    (run-at-time
-     0 nil
-     (lambda (cmd d) (let ((default-directory d)) (call-interactively (setq this-command cmd))))
-     (setq cmd (or cmd (lookup-key global-map (this-command-keys))))
-     (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-    (abort-recursive-edit)))
 (use-package vterm
   :bind
   ( :map vterm-mode-map

@@ -282,6 +282,12 @@
           ("M-s r"  . command-here))
   :config
   (setq icomplete-scroll t)
+  (defun icomplete-ret-no-input (o &rest args)
+    (interactive)
+    (if (equal (icomplete--field-string) icomplete--initial-input)
+        (exit-minibuffer)
+      (apply o args)))
+  (advice-add 'icomplete-ret :around 'icomplete-ret-no-input)
   (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
   (defun command-here (&optional cmd)
     (interactive)
