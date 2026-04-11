@@ -8,28 +8,35 @@
 
 (use-package emacs
   :ensure nil
-  :bind (([remap list-buffers] . ibuffer)
-         ([rempa kill-buffer]  . kill-current-buffer)
-         ("RET"                . newline-and-indent)
-         ("M-K"                . kill-current-buffer)
-         ("M-o"                . other-window)
-         ("M-0"                . delete-window)
-         ("M-1"                . delete-other-windows)
-         ("M-2"                . split-window-below)
-         ("M-3"                . split-window-right)
-         ("M-9"                . quit-window)
-         ("C-c c"              . calendar)
-         ("C-c r"              . query-replace)
-         ("C-c C-r"            . query-replace-regexp)
-         ("C-h C-o"            . proced))
+  :bind (([remap list-buffers]   . ibuffer)
+         ([rempa kill-buffer]    . kill-current-buffer)
+         ([remap dabbrev-expand] . hippie-expand)
+         ("RET"                  . newline-and-indent)
+         ("M-K"                  . kill-current-buffer)
+         ("M-o"                  . other-window)
+         ("M-0"                  . delete-window)
+         ("M-1"                  . delete-other-windows)
+         ("M-2"                  . split-window-below)
+         ("M-3"                  . split-window-right)
+         ("M-9"                  . quit-window)
+         ("C-x \\"               . align-regexp)
+         ("C-c c"                . calendar)
+         ("C-c w"                . world-clock)
+         ("C-c r"                . query-replace)
+         ("C-c C-r"              . query-replace-regexp)
+         ("C-h C-o"              . proced))
   :custom
   (async-shell-command-buffer 'rename-buffer)
   (auto-save-interval 0)
+  (bidi-display-reordering 'left-to-right)
+  (bidi-inhibit-bpa t)
+  (bidi-paragraph-direction 'left-to-right)
   (completion-auto-select)
   (completion-category-overrides '((file (styles partial-completion))))
   (completions-format 'vertical)
   (completions-sort 'historical)
   (create-lockfiles nil)
+  (cursor-in-non-selected-windows nil)
   (disabled-command-function nil)
   (display-buffer-alist '(("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                            display-buffer-at-bottom
@@ -37,6 +44,18 @@
                           ("\\*hermes.*" display-buffer-same-window)))
   (electric-pair-mode t)
   (enable-recursive-minibuffers t)
+  (ffap-machine-p-known 'reject)
+  (help-window-select t)
+  (hippie-expand-try-functions-list '(try-expand-dabbrev
+                                      try-expand-dabbrev-all-buffers
+                                      try-expand-dabbrev-from-kill
+                                      try-complete-file-name-partially
+                                      try-complete-file-name
+                                      try-expand-all-abbrevs
+                                      try-expand-list
+                                      try-expand-line
+                                      try-complete-lisp-symbol-partially
+                                      try-complete-lisp-symbol))
   (ibuffer-expert t)
   (indent-tabs-mode nil)
   (inhibit-startup-screen t)
@@ -44,7 +63,9 @@
   (inhibit-startup-echo-area-message (user-login-name))
   (isearch-yank-on-move 'shift)
   (isearch-lazy-count t)
+  (kill-do-not-save-duplicates t)
   (kill-whole-line t)
+  (large-file-warning-threshold 100000000)
   (mac-option-key-is-meta t)
   (make-backup-files nil)
   (max-mini-window-height 0.2)
@@ -61,10 +82,13 @@
   (read-process-output-max (* 4 1024 1024))
   (recentf-mode t)
   (recentf-max-saved-items 1000)
+  (redisplay-skip-fontification-on-input t)
   (repeat-mode t)
   (require-final-newline t)
   (revert-without-query '(""))
   (ring-bell-function 'ignore)
+  (savehist-additional-variables '(search-ring regexp-search-ring kill-ring))
+  (save-interprogram-paste-before-kill t)
   (scroll-conservatively 5)
   (select-active-regions nil)
   (sentence-end-double-space nil)
@@ -79,13 +103,25 @@
   (use-short-answers t)
   (vc-follow-symlinks nil)
   (view-read-only t)
+  (window-combination-resize t)
   (xref-search-program 'ripgrep)
   :config
-  (setq after-init-hook (nconc after-init-hook '(savehist-mode save-place-mode delete-selection-mode)))
+  (dolist (m '(delete-selection-mode global-visual-wrap-prefix-mode minibuffer-regexp-mode
+               save-place-mode winner-mode savehist-mode))
+    (add-hook 'after-init-hook m))
+  (defun strip-string-properties ()
+    (setq kill-ring (mapcar #'substring-no-properties (cl-remove-if-not #'stringp kill-ring))))
+  (add-hook 'savehist-save-hook 'strip-string-properties)
   (windmove-default-keybindings 'control)
   (or standard-display-table (setq standard-display-table (make-display-table)))
   (set-display-table-slot standard-display-table 'vertical-border ?\u2502)
   (set-display-table-slot standard-display-table 'truncation ?\u2192)
+  (defun toggle-delete-other-windows ()
+    (interactive)
+    (if (and winner-mode (equal (selected-window) (next-window)))
+      (winner-undo)
+    (delete-other-windows)))
+  (define-key global-map [remap delete-other-windows] 'toggle-delete-other-windows)
   (defvar set-mark-dwim-timeout 0.5)
   (defvar set-mark-dwim-repeat-action 'embark-act)
   (defvar set-mark-dwim-timeout-action 'completion-at-point)
@@ -145,6 +181,8 @@
              (buffer-face-mode "" face-remap))))
 (use-package avy
   :bind (("C-'" . avy-goto-char-timer) :map isearch-mode-map ("C-'" . avy-isearch))
+  :custom
+  (avy-background t)
   :config
   (defun avy-pop-mark-if-prefix (o &rest args)
     (if current-prefix-arg
@@ -463,6 +501,9 @@
   :hook (after-init . marginalia-mode))
 (use-package markdown-indent-mode
   :hook (markdown-ts-mode . markdown-indent-mode)
+  :custom
+  (markdown-fontify-code-blocks-natively t)
+  (markdown-spaces-after-code-fence 0)
   :delight)
 (use-package orderless
   :custom
