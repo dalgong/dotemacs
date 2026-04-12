@@ -299,99 +299,6 @@
 (defun make-buffer-fixed-pitch (&rest _)
   (set (make-local-variable 'buffer-face-mode-face) 'fixed-pitch)
   (buffer-face-mode t))
-(use-package eat
-  :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-`" . eat) :map eat-mode-map ("C-." . eat-toggle-char-mode))
-  :commands eat-mode
-  :hook (eat-exec . make-buffer-fixed-pitch)
-  :custom
-  (eat-shell-prompt-annotation-position 'right-margin)
-  :init
-  (defun override-eat-term-keymap (map)
-    (define-key map (kbd "C-;") nil)
-    (define-key map (kbd "C-.") 'eat-toggle-char-mode)
-    (define-key map (kbd "M-o") nil)
-    map)
-  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
-  (defun eat-dwim (o &rest args)
-    (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
-            (not (derived-mode-p 'eat-mode))
-            (not (process-live-p (get-buffer-process (current-buffer)))))
-        (apply o args)
-      (bury-buffer)))
-  (advice-add 'eat :around 'eat-dwim)
-  (defun eat-toggle-char-mode ()
-    (interactive)
-    (call-interactively
-     (cond ((or (null eat-terminal)
-                current-prefix-arg)
-            'eat)
-           (eat--semi-char-mode
-            'eat-emacs-mode)
-           (t
-            'eat-semi-char-mode))))
-  (defun eat-insert-for-yank (o &rest args)
-    (if (null (ignore-errors eat-terminal))
-        (apply o args)
-      (funcall eat--synchronize-scroll-function
-               (eat--synchronize-scroll-windows 'force-selected))
-      (eat-term-send-string-as-yank
-       eat-terminal
-       (let ((yank-hook (bound-and-true-p yank-transform-functions)))
-         (with-temp-buffer
-           (setq-local yank-transform-functions yank-hook)
-           (apply o args)
-           (buffer-string))))))
-  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
-  (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
-  (defun eat-insert-invocation-time ()
-    (let* ((pos (pos-eol 0))
-           (text (format-time-string "%m/%d %H:%M:%S"))
-           (ov (make-overlay (1- pos) pos)))
-      (overlay-put ov 'evaporate t)
-      (overlay-put ov 'after-string
-                   (concat
-                    (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
-                    (propertize text 'face '(italic font-lock-comment-face))))))
-  (defun maybe-eat-compilation-start (o &rest args)
-    (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
-  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
-  (defun eat-compilation-start (command &optional mode name-function _ _)
-    (let ((name-of-mode "compilation")
-          (dir default-directory)
-          outbuf)
-      (if (or (not mode) (eq mode t))
-          (setq mode 'compilation-minor-mode)
-        (setq name-of-mode (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
-      (with-current-buffer
-          (setq outbuf
-                (get-buffer-create
-                 (compilation-buffer-name name-of-mode mode name-function)))
-        (setq default-directory dir)
-        (setq buffer-read-only nil)
-        (erase-buffer)
-        (compilation-insert-annotation
-         "-*- mode: " name-of-mode
-         "; default-directory: "
-         (prin1-to-string (abbreviate-file-name default-directory))
-         " -*-\n")
-        (compilation-insert-annotation
-         (format "%s started at %s\n\n"
-                 mode-name
-                 (substring (current-time-string) 0 19))
-         command "\n")
-        (eat-mode)
-        (eat-exec outbuf "*compile*" shell-file-name nil (list "-lc" command))
-        (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
-        (eat-emacs-mode)
-        (set (make-local-variable 'eat--synchronize-scroll-function)
-             'eat--eshell-synchronize-scroll)
-        (funcall mode)
-        (setq-local compilation-directory dir)
-        (setq-local compilation-arguments (list command (if (eq mode 'compilation-minor-mode) nil mode) name-function))
-        (setq-local revert-buffer-function 'compilation-revert-buffer)
-        (setq next-error-last-buffer outbuf)
-        (display-buffer outbuf '(nil (allow-no-window . t)))))))
 (use-package ediff
   :custom
   (ediff-window-setup-function 'ediff-setup-windows-plain)
@@ -446,13 +353,30 @@
         (eyebrowse-switch-to-window-config slot))
       (when (and (not switch-only) reg (get-register reg))
         (jump-to-register reg)))))
+(use-package ghostel
+  :bind (("C-`" . ghostel)
+         :map ghostel-mode-map
+         ("C-." . ghostel-copy-mode)
+         :map ghostel-copy-mode-map
+         ("M-w" . nil)
+         ("C-." . ghostel-copy-mode-exit))
+  :config
+  (require 'ghostel-fixes nil t))
+(use-package ghostel-compile
+  :ensure nil
+  :after ghostel
+  :bind
+  (([remap compile]   . ghostel-compile)
+   ([remap recompile] . ghostel-recompile))
+  :custom
+  (ghostel-compile-buffer-name *compilation*))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
   :config
   (use-package go-mode :functions (gofmt) :custom (gofmt-command "goimports"))
   (defun gofmt-before-save () (when (derived-mode-p 'go-mode) (gofmt))))
-(use-package hl-line :hook (prog-mode conf-mode compilation-mode eat-mode text-mode))
+(use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package icomplete
   :hook (after-init . icomplete-vertical-mode)
   :custom
