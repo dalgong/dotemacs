@@ -119,7 +119,7 @@
   (defun toggle-delete-other-windows ()
     (interactive)
     (if (and winner-mode (equal (selected-window) (next-window)))
-      (winner-undo)
+      (with-no-warnings (winner-undo))
     (delete-other-windows)))
   (define-key global-map [remap delete-other-windows] 'toggle-delete-other-windows)
   (defvar set-mark-dwim-timeout 0.5)
@@ -154,7 +154,8 @@
     (interactive)
     (if (sit-for 0.1)
         (call-interactively (setq this-command M-O-cmd))
-      (set-transient-map xterm-function-map)
+      (with-no-warnings
+        (set-transient-map xterm-function-map))
       (setq unread-command-events (append '(?\e ?O) unread-command-events))))
   (define-key global-map (kbd "M-O") 'M-O-dwim)
   (defun call-other-window-if-interactive (&rest _)
@@ -162,17 +163,16 @@
       (other-window 1)))
   (advice-add 'split-window-right :after 'call-other-window-if-interactive)
   (advice-add 'split-window-below :after 'call-other-window-if-interactive)
-  (defun switch-to-last-buffer-if-one-window (o &rest args)
-    (if (and (one-window-p 'nomini) (called-interactively-p 'interactive))
-        (if (or (not window-system) (= 1 (length (frame-list))))
-            (switch-to-buffer nil)
-          (other-frame 1))
-      (apply o args)))
-  (advice-add 'other-window :around 'switch-to-last-buffer-if-one-window)
-  (advice-add 'electric-pair-open-newline-between-pairs-psif
-              :after (lambda ()
-                       (when (eq last-command-event ?\n)
-                         (indent-according-to-mode)))))
+  (advice-add 'other-window :before
+              (lambda (&rest _)
+                (when (and (one-window-p 'nomini) (called-interactively-p 'interactive))
+                  (if (or (not window-system) (= 1 (length (frame-list))))
+                      (switch-to-buffer nil)
+                    (other-frame 1)))))
+  (advice-add 'electric-pair-open-newline-between-pairs-psif :after
+              (lambda ()
+                (when (eq last-command-event ?\n)
+                  (indent-according-to-mode)))))
 (use-package delight
   :config
   (delight '((auto-revert-mode "" autorevert)
@@ -184,21 +184,18 @@
   :custom
   (avy-background t)
   :config
-  (defun avy-pop-mark-if-prefix (o &rest args)
-    (if current-prefix-arg
-        (call-interactively 'avy-pop-mark)
-      (apply o args)))
-  (advice-add 'avy-goto-char-timer :around 'avy-pop-mark-if-prefix))
+  (advice-add 'avy-goto-char-timer :before-until
+              (lambda (&optional _)
+                (when current-prefix-arg
+                  (call-interactively 'avy-pop-mark)))))
 (use-package browse-url
   :defer t
   :config
-  (advice-add 'browse-url-default-browser :around 'browse-url-maybe-use-browser)
-  (defun browse-url-maybe-use-browser (o &rest args)
-    (let ((url (car args))
-          (browser (getenv "BROWSER")))
-      (if browser
-          (call-process browser nil nil nil url)
-        (apply o args)))))
+  (advice-add 'browse-url-default-browser :before-until
+              (lambda (url &rest _)
+                (when (getenv "BROWSER")
+                  (call-process (getenv "BROWSER") nil nil nil url)
+                  t))))
 (use-package cape
   :bind
   (:map set-mark-dwim-map ("/" . cape-dabbrev))
@@ -208,14 +205,7 @@
                '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package clipetty
   :delight
-  :hook (after-init . global-clipetty-mode)
-  :init
-  (advice-add 'browse-url-default-browser :around 'browse-url-maybe-use-clipetty)
-  (defun browse-url-maybe-use-clipetty (o &rest args)
-    (let ((url (car args)))
-      (if (getenv "SSH_CLIENT")
-          (clipetty--emit (concat "\e]1337;OpenURL=:" (base64-encode-string url) "\007"))
-        (apply o args)))))
+  :hook (after-init . global-clipetty-mode))
 (use-package compile
   :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
@@ -238,7 +228,6 @@
          ("C-:" . consult-register-store)
          ("M-T" . consult-imenu)
          ([remap yank-pop] . consult-yank-pop)
-         ("C-x M-:" . consult-complex-command)
          ("C-x b"   . consult-buffer)
          ("C-x C-r" . consult-recent-file)
          ("C-h C-i"   . consult-info)
@@ -268,11 +257,11 @@
   (xref-show-definitions-function 'consult-xref)
   :config
   (advice-add 'register-preview :override 'consult-register-window)
-  (defun consult-imenu-across-all-buffers (o &rest args)
-    (if current-prefix-arg
-        (call-interactively 'consult-imenu-multi)
-      (apply o args)))
-  (advice-add 'consult-imenu :around 'consult-imenu-across-all-buffers))
+  (advice-add 'consult-imenu :before-until
+              (lambda ()
+                (when current-prefix-arg
+                  (call-interactively 'consult-imenu-multi)
+                  t))))
 (use-package completion-preview
   :delight
   :ensure nil
@@ -296,13 +285,10 @@
         `(region ,(buffer-substring start end) . ,r)))))
   (with-no-warnings
     (add-to-list 'embark-target-finders 'embark-target-easy-kill-region)))
-(defun make-buffer-fixed-pitch (&rest _)
-  (set (make-local-variable 'buffer-face-mode-face) 'fixed-pitch)
-  (buffer-face-mode t))
 (use-package ediff
+  :bind (:map goto-map ("=" . ediff-current-file))
   :custom
-  (ediff-window-setup-function 'ediff-setup-windows-plain)
-  :bind (:map goto-map ("=" . ediff-current-file)))
+  (ediff-window-setup-function 'ediff-setup-windows-plain))
 (use-package eglot
   :defer t
   :config
@@ -315,10 +301,7 @@
          :map minibuffer-local-map
          ("M-E" . embark-export)
          :map embark-region-map
-         ("x" . shell-command)
-         ("C" . compile)
-         :map help-map
-         ("b" . embark-bindings))
+         ("x" . compile))
   :custom
   (prefix-help-command 'embark-prefix-help-command)
   :config
@@ -367,9 +350,8 @@
     (define-key global-map (kbd "C-c C-k") 'kill-compilation)
     (advice-add 'ghostel-compile--start :filter-args
                 (defun move-to-project-root (r)
-                  (setf (caddr r) (or (if (project-current)
-                                          (project-root (project-current))
-                                        (caddr r))))
+                  (when (project-current)
+                    (setf (caddr r) (project-root (project-current))))
                   r))))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
@@ -403,12 +385,10 @@
           ("M-s r"  . command-here))
   :config
   (setq icomplete-scroll t)
-  (defun icomplete-ret-no-input (o &rest args)
-    (interactive)
-    (if (equal (icomplete--field-string) icomplete--initial-input)
-        (exit-minibuffer)
-      (apply o args)))
-  (advice-add 'icomplete-ret :around 'icomplete-ret-no-input)
+  (advice-add 'icomplete-ret :before
+              (lambda ()
+                (when (equal (icomplete--field-string) icomplete--initial-input)
+                  (exit-minibuffer))))
   (advice-add 'completion-at-point :after 'minibuffer-hide-completions)
   (defun command-here (&optional cmd)
     (interactive)
@@ -448,15 +428,14 @@
   :config
   (require 'org-tempo nil t)
   (require 'ob-compile nil)
-  (defun lazy-load-org-babel-languages (o &rest args)
-    (when-let* ((lang (with-no-warnings
-                        (org-element-property :language (org-element-at-point)))))
-      (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
-      (unless (cdr (assoc (intern lang) org-babel-load-languages))
-        (add-to-list 'org-babel-load-languages (cons (intern lang) t))
-        (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages)))
-    (apply o args))
-  (advice-add 'org-babel-execute-src-block :around 'lazy-load-org-babel-languages))
+  (advice-add 'org-babel-execute-src-block :before
+              (lambda (&rest _)
+                (when-let* ((lang (with-no-warnings
+                                    (org-element-property :language (org-element-at-point)))))
+                  (when (or (string= lang "bash") (string= lang "sh")) (setq lang "shell"))
+                  (unless (cdr (assoc (intern lang) org-babel-load-languages))
+                    (add-to-list 'org-babel-load-languages (cons (intern lang) t))
+                    (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages))))))
 (use-package outline-indent
   :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
@@ -479,33 +458,8 @@
     (when-let* ((dir (and (null python-shell-virtualenv-root)
                           (locate-dominating-file default-directory ".venv/"))))
       (setq-local python-shell-virtualenv-root (expand-file-name ".venv/" dir)))))
-(use-package smerge-mode
-  :after embark
-  :hook (find-file . smerge-start-session)
-  :config
-  (defvar embark-vc-conflict-map (make-composed-keymap smerge-basic-map embark-general-map))
-  (defun embark-vc-target-conflict-at-point ()
-    "Target a Merge Conflict at point."
-    (when-let* ((d (save-match-data (with-no-warnings (and smerge-mode (smerge-match-conflict) (match-data 0))))))
-      `(conflict "hunk" ,(car d) . ,(cadr d))))
-  (with-no-warnings
-    (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point))
-  (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
 (use-package treesit-auto
   :hook ((after-init . global-treesit-auto-mode))
   :custom
   (treesit-font-lock-level 4))
-(use-package vterm
-  :bind
-  ( :map vterm-mode-map
-    ("M-o" . other-window)
-    ("M-0" . delete-window)
-    ("M-1" . delete-other-windows)
-    ("M-2" . split-window-below)
-    ("M-3" . split-window-right)
-    ("M-9" . quit-window)
-    ("C-;" . consult-register-load)
-    ("C-q" . vterm-send-next-key)
-    ("ESC ESC" . vterm-send-escape))
-  :hook (vterm-mode . make-buffer-fixed-pitch))
 (use-package vundo :bind ("C-x u" . vundo))

@@ -1212,7 +1212,18 @@
   ;; for eat
   ;; (advice-add 'eat--pre-cmd :after #'bash-show-time)
   )
-
+(use-package smerge-mode
+  :after embark
+  :hook (find-file . smerge-start-session)
+  :config
+  (defvar embark-vc-conflict-map (make-composed-keymap smerge-basic-map embark-general-map))
+  (defun embark-vc-target-conflict-at-point ()
+    "Target a Merge Conflict at point."
+    (when-let* ((d (save-match-data (with-no-warnings (and smerge-mode (smerge-match-conflict) (match-data 0))))))
+      `(conflict "hunk" ,(car d) . ,(cadr d))))
+  (with-no-warnings
+    (add-to-list 'embark-target-finders 'embark-vc-target-conflict-at-point))
+  (add-to-list 'embark-keymap-alist '(conflict . embark-vc-conflict-map)))
 (use-package tempel
   :ensure
   :hook ((prog-mode text-mode org-mode) . tempel-setup-capf)
@@ -1228,6 +1239,18 @@
          ((rustic-mode c-mode-common) . tree-sitter-mode))
   :config
   (use-package tree-sitter-langs :ensure))
+(use-package vterm
+  :bind
+  ( :map vterm-mode-map
+    ("M-o" . other-window)
+    ("M-0" . delete-window)
+    ("M-1" . delete-other-windows)
+    ("M-2" . split-window-below)
+    ("M-3" . split-window-right)
+    ("M-9" . quit-window)
+    ("C-;" . consult-register-load)
+    ("C-q" . vterm-send-next-key)
+    ("ESC ESC" . vterm-send-escape)))
 (when (file-directory-p "~/work/nano-emacs")
   ;; git clone https://github.com/rougier/nano-emacs.git
   (add-hook 'emacs-startup-hook
