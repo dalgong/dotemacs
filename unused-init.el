@@ -1376,4 +1376,12 @@
               (concat r (match-string 1 s))
             r))))
     (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
-
+(when (load-theme 'modus-operandi t)
+  (setopt modus-themes-italic-constructs        t
+          modus-themes-bold-constructs          t
+          modus-themes-mixed-fonts              t
+          modus-themes-common-palette-overrides
+          '((bg-mode-line-inactive bg-dim)
+            (bg-mode-line-active bg-blue-subtle)
+            (border-mode-line-active bg-mode-line-active)
+            (border-mode-line-inactive bg-mode-line-inactive))))
