@@ -22,3 +22,7 @@ anything-c-adaptive-history
 /eln-cache/
 /amx-items
 /var/
+/.agent-shell/
+/agent/
+/hackernews/
+/org-roam.db
