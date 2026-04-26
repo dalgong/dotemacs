@@ -179,6 +179,16 @@
              (eldoc-mode "" eldoc)
              (outline-minor-mode "" outline)
              (buffer-face-mode "" face-remap))))
+(use-package agent-shell
+  :bind (("C-c a" . agent-shell)
+         :map agent-shell-mode-map
+         ("C-c e" . agent-shell-prompt-compose)
+         ("C-c q" . agent-shell-queue-request)
+         ("C-c Q" . agent-shell-remove-pending-request))
+  :custom
+  (agent-shell-header-style nil)
+  (agent-shell-show-welcome-message nil)
+  (agent-shell-transcript-file-path-function nil))
 (use-package avy
   :bind (("C-'" . avy-goto-char-timer) :map isearch-mode-map ("C-'" . avy-isearch))
   :custom
@@ -309,6 +319,14 @@
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
+(use-package evil
+  :disabled
+  :hook (after-init . evil-mode)
+  :custom
+  (evil-echo-state nil)
+  (evil-default-state 'emacs)
+  (evil-want-C-u-scroll t)
+  (evil-search-module 'evil-search))
 (use-package exec-path-from-shell
   :hook (after-init . exec-path-from-shell-initialize))
 (use-package eyebrowse
@@ -410,6 +428,10 @@
   (markdown-fontify-code-blocks-natively t)
   (markdown-spaces-after-code-fence 0)
   :delight)
+(use-package opencode
+  :disabled
+  :vc (:url "https://codeberg.org/sczi/opencode.el.git" :rev :newest)
+  :bind (("C-c o" . opencode)))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -462,4 +484,3 @@
   :hook ((after-init . global-treesit-auto-mode))
   :custom
   (treesit-font-lock-level 4))
-(use-package vundo :bind ("C-x u" . vundo))
