@@ -70,6 +70,8 @@
   (make-backup-files nil)
   (max-mini-window-height 0.2)
   (minibuffer-depth-indicate-mode t)
+  (mode-line-collapse-minor-modes '( abbrev-mode auto-revert-mode buffer-face-mode clipetty-mode completion-preview-mode
+                                     eldoc-mode markdown-indent-mode outline-indent-minor-mode outline-minor-mode))
   (mode-line-end-spaces nil)
   (mode-line-frame-identification nil)
   (mode-line-position '((-3 "%p") " %l:%c"))
@@ -173,12 +175,6 @@
               (lambda ()
                 (when (eq last-command-event ?\n)
                   (indent-according-to-mode)))))
-(use-package delight
-  :config
-  (delight '((auto-revert-mode "" autorevert)
-             (eldoc-mode "" eldoc)
-             (outline-minor-mode "" outline)
-             (buffer-face-mode "" face-remap))))
 (use-package agent-shell
   :bind (("C-c a" . agent-shell)
          :map agent-shell-mode-map
@@ -213,9 +209,7 @@
   (setq completion-at-point-functions
         (nconc completion-at-point-functions
                '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
-(use-package clipetty
-  :delight
-  :hook (after-init . global-clipetty-mode))
+(use-package clipetty :hook (after-init . global-clipetty-mode))
 (use-package compile
   :bind (("M-C" . compile) ("M-R" . recompile))
   :custom
@@ -273,14 +267,12 @@
                   (call-interactively 'consult-imenu-multi)
                   t))))
 (use-package completion-preview
-  :delight
   :ensure nil
   :hook (prog-mode text-mode)
   :bind ( :map completion-preview-active-mode-map
           ("M-n" . completion-preview-next-candidate)
           ("M-p" . completion-preview-prev-candidate)))
-(use-package display-line-numbers
-  :hook (prog-mode . display-line-numbers--turn-on))
+(use-package display-line-numbers :hook (prog-mode . display-line-numbers--turn-on))
 (use-package diffview :after diff-mode :bind (:map diff-mode-map ("|" . diffview-current)))
 (use-package easy-kill
   :after embark
@@ -299,10 +291,7 @@
   :bind (:map goto-map ("=" . ediff-current-file))
   :custom
   (ediff-window-setup-function 'ediff-setup-windows-plain))
-(use-package eglot
-  :defer t
-  :config
-  (add-to-list 'eglot-stay-out-of 'imenu))
+(use-package eglot :defer t :config (add-to-list 'eglot-stay-out-of 'imenu))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
@@ -327,8 +316,7 @@
   (evil-default-state 'emacs)
   (evil-want-C-u-scroll t)
   (evil-search-module 'evil-search))
-(use-package exec-path-from-shell
-  :hook (after-init . exec-path-from-shell-initialize))
+(use-package exec-path-from-shell :hook (after-init . exec-path-from-shell-initialize))
 (use-package eyebrowse
   :hook (after-init . eyebrowse-mode)
   :init
@@ -418,7 +406,10 @@
      (or cmd (lookup-key global-map (this-command-keys)))
      (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
     (abort-recursive-edit)))
-(use-package iedit :bind (("C-c E" . iedit-mode) :map isearch-mode-map ("M-e" . iedit-mode-from-isearch)))
+(use-package iedit
+  :bind (("C-c E" . iedit-mode)
+         :map isearch-mode-map
+         ("M-e" . iedit-mode-from-isearch)))
 (use-package marginalia
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :hook (after-init . marginalia-mode))
@@ -426,8 +417,7 @@
   :hook (markdown-ts-mode . markdown-indent-mode)
   :custom
   (markdown-fontify-code-blocks-natively t)
-  (markdown-spaces-after-code-fence 0)
-  :delight)
+  (markdown-spaces-after-code-fence 0))
 (use-package opencode
   :disabled
   :vc (:url "https://codeberg.org/sczi/opencode.el.git" :rev :newest)
@@ -459,7 +449,6 @@
                     (add-to-list 'org-babel-load-languages (cons (intern lang) t))
                     (org-babel-do-load-languages 'org-babel-load-languages org-babel-load-languages))))))
 (use-package outline-indent
-  :delight outline-indent-minor-mode
   :bind (:map outline-indent-minor-mode-map ("S-<tab>" . outline-toggle-children))
   :hook (prog-mode . outline-indent-minor-mode))
 (use-package pdf-tools
