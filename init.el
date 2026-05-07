@@ -287,6 +287,58 @@
         `(region ,(buffer-substring start end) . ,r)))))
   (with-no-warnings
     (add-to-list 'embark-target-finders 'embark-target-easy-kill-region)))
+(use-package eat
+  :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
+  :bind (("C-`" . eat) :map eat-mode-map ("C-." . eat-toggle-char-mode))
+  :custom
+  (eat-shell-prompt-annotation-position 'right-margin)
+  :init
+  (defun override-eat-term-keymap (map)
+    (define-key map (kbd "C-;") nil)
+    (define-key map (kbd "C-.") 'eat-toggle-char-mode)
+    (define-key map (kbd "M-o") nil)
+    map)
+  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
+  (defun eat-dwim (o &rest args)
+    (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
+            (not (derived-mode-p 'eat-mode))
+            (not (process-live-p (get-buffer-process (current-buffer)))))
+        (apply o args)
+      (bury-buffer)))
+  (advice-add 'eat :around 'eat-dwim)
+  (defun eat-toggle-char-mode ()
+    (interactive)
+    (call-interactively
+     (cond ((or (null eat-terminal)
+                current-prefix-arg)
+            'eat)
+           (eat--semi-char-mode
+            'eat-emacs-mode)
+           (t
+            'eat-semi-char-mode))))
+  (defun eat-insert-for-yank (o &rest args)
+    (if (null (ignore-errors eat-terminal))
+        (apply o args)
+      (funcall eat--synchronize-scroll-function
+               (eat--synchronize-scroll-windows 'force-selected))
+      (eat-term-send-string-as-yank
+       eat-terminal
+       (let ((yank-hook (bound-and-true-p yank-transform-functions)))
+         (with-temp-buffer
+           (setq-local yank-transform-functions yank-hook)
+           (apply o args)
+           (buffer-string))))))
+  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
+  (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
+  (defun eat-insert-invocation-time ()
+    (let* ((pos (pos-eol 0))
+           (text (format-time-string "%m/%d %H:%M:%S"))
+           (ov (make-overlay (1- pos) pos)))
+      (overlay-put ov 'evaporate t)
+      (overlay-put ov 'after-string
+                   (concat
+                    (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
+                    (propertize text 'face '(italic font-lock-comment-face)))))))
 (use-package ediff
   :bind (:map goto-map ("=" . ediff-current-file))
   :custom
@@ -343,8 +395,7 @@
       (when (and (not switch-only) reg (get-register reg))
         (jump-to-register reg)))))
 (use-package ghostel
-  :bind (("C-`" . ghostel)
-         :map ghostel-mode-map
+  :bind (:map ghostel-mode-map
          ("C-." . ghostel-copy-mode)
          :map ghostel-copy-mode-map
          ("M-w" . nil)
