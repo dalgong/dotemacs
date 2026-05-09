@@ -70,8 +70,7 @@
   (make-backup-files nil)
   (max-mini-window-height 0.2)
   (minibuffer-depth-indicate-mode t)
-  (mode-line-collapse-minor-modes '( abbrev-mode auto-revert-mode buffer-face-mode clipetty-mode completion-preview-mode
-                                     eldoc-mode markdown-indent-mode outline-indent-minor-mode outline-minor-mode))
+  (mode-line-collapse-minor-modes '(not))
   (mode-line-end-spaces nil)
   (mode-line-frame-identification nil)
   (mode-line-position '((-3 "%p") " %l:%c"))
@@ -79,6 +78,7 @@
   (mode-line-mule-info nil)
   (mode-line-remote nil)
   (ns-command-modifier 'meta)
+  (process-adaptive-read-buffering t)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t)
   (read-process-output-max (* 4 1024 1024))
@@ -291,7 +291,13 @@
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
   :bind (("C-`" . eat) :map eat-mode-map ("C-." . eat-toggle-char-mode))
   :custom
-  (eat-shell-prompt-annotation-position 'right-margin)
+  (eat-minimum-latency 0.05)
+  (eat-maximum-latency 0.1)
+  (eat-kill-buffer-on-exit t)
+  (eat-term-name "xterm-256color")
+  (eat-very-visible-cursor-type '(box nil nil))
+  (eat-very-visible-vertical-bar-cursor-type '(bar nil nil))
+  (eat-very-visible-horizontal-bar-cursor-type '(hbar nil nil))
   :init
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "C-;") nil)
@@ -360,14 +366,6 @@
   (add-to-list 'embark-indicators 'embark-minimal-indicator)
   (add-to-list 'embark-post-action-hooks '(kill-current-buffer embark--restart))
   (push 'embark--xref-push-marker (alist-get 'find-file embark-pre-action-hooks)))
-(use-package evil
-  :disabled
-  :hook (after-init . evil-mode)
-  :custom
-  (evil-echo-state nil)
-  (evil-default-state 'emacs)
-  (evil-want-C-u-scroll t)
-  (evil-search-module 'evil-search))
 (use-package exec-path-from-shell :hook (after-init . exec-path-from-shell-initialize))
 (use-package eyebrowse
   :hook (after-init . eyebrowse-mode)
@@ -395,11 +393,8 @@
       (when (and (not switch-only) reg (get-register reg))
         (jump-to-register reg)))))
 (use-package ghostel
-  :bind (:map ghostel-mode-map
-         ("C-." . ghostel-copy-mode)
-         :map ghostel-copy-mode-map
-         ("M-w" . nil)
-         ("C-." . ghostel-copy-mode-exit))
+  :bind (:map ghostel-mode-map      ("C-." . ghostel-copy-mode)
+         :map ghostel-copy-mode-map ("C-." . ghostel-copy-mode-exit) ("M-w" . nil))
   :hook (after-init . ghostel-compile-global-mode)
   :config
   (require 'ghostel-fixes nil t)
@@ -524,3 +519,18 @@
   :hook ((after-init . global-treesit-auto-mode))
   :custom
   (treesit-font-lock-level 4))
+(use-package vterm
+  :hook (vterm-mode . (lambda () (setq-local buffer-face-mode-face 'fixed-pitch) (buffer-face-mode 1)))
+  :bind ( :map vterm-mode-map      ("C-."  . vterm-copy-mode) ("M-\"" . nil) ("M-:"  . nil)
+          :map vterm-copy-mode-map ("C-."  . vterm-copy-mode))
+  :config
+  (advice-add 'insert-for-yank :before 'vterm-insert-for-yank)
+  (defun vterm-insert-for-yank (str)
+    (when (equal major-mode 'vterm-mode)
+      (let ((inhibit-read-only t)
+            (yank-undo-function (lambda (_start _end) (vterm-undo))))
+        (vterm-send-string str t)))))
+(use-package vterm-editor
+  :after vterm
+  :vc (:url "https://git.andros.dev/andros/vterm-editor.el")
+  :bind (:map vterm-mode-map ("C-c e" . vterm-editor-open)))

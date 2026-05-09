@@ -237,13 +237,13 @@
         (apply o args)
       (bury-buffer)))
   (advice-add 'vterm :around 'vterm-dwim)
-  (advice-add 'insert-for-yank :around 'vterm-insert-for-yank)
-  (defun vterm-insert-for-yank (o &rest args)
-    (if (equal major-mode 'vterm-mode)
-        (let ((inhibit-read-only t)
-              (yank-undo-function (lambda (_start _end) (vterm-undo))))
-          (vterm-send-string (car args) t))
-      (apply o args))))
+  (advice-add 'insert-for-yank :before 'vterm-insert-for-yank)
+  (defun vterm-insert-for-yank (str)
+    (when (equal major-mode 'vterm-mode)
+      (let ((inhibit-read-only t)
+            (yank-undo-function (lambda (_start _end) (vterm-undo))))
+        (vterm-send-string str t)
+        t))))
 (use-package icomplete
   :hook (after-init . icomplete-vertical-mode)
   :custom
@@ -1376,4 +1376,11 @@
               (concat r (match-string 1 s))
             r))))
     (advice-add 'ffap-file-at-point :filter-return 'ffap-file-at-point-add-line-number)))
-
+(use-package evil
+  :disabled
+  :hook (after-init . evil-mode)
+  :custom
+  (evil-echo-state nil)
+  (evil-default-state 'emacs)
+  (evil-want-C-u-scroll t)
+  (evil-search-module 'evil-search))
