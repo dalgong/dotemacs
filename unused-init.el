@@ -137,9 +137,9 @@
                    (concat
                     (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
                     (propertize text 'face '(italic font-lock-comment-face))))))
+  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
   (defun maybe-eat-compilation-start (o &rest args)
     (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
-  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
   (defun eat-compilation-start (command &optional mode name-function _ _)
     (let ((name-of-mode "compilation")
           (dir default-directory)
@@ -1384,3 +1384,31 @@
   (evil-default-state 'emacs)
   (evil-want-C-u-scroll t)
   (evil-search-module 'evil-search))
+(use-package ghostel
+  :bind (:map ghostel-mode-map      ("C-." . ghostel-copy-mode)
+         :map ghostel-copy-mode-map ("C-." . ghostel-copy-mode-exit) ("M-w" . nil))
+  :hook (after-init . ghostel-compile-global-mode)
+  :config
+  (require 'ghostel-fixes nil t)
+  (when (require 'ghostel-compile nil t)
+    (define-key global-map (kbd "C-c C-k") 'kill-compilation)
+    (advice-add 'ghostel-compile--start :filter-args
+                (defun move-to-project-root (r)
+                  (when (project-current)
+                    (setf (caddr r) (project-root (project-current))))
+                  r))))
+(use-package vterm
+  :hook (vterm-mode . (lambda () (setq-local buffer-face-mode-face 'fixed-pitch) (buffer-face-mode 1)))
+  :bind ( :map vterm-mode-map      ("C-."  . vterm-copy-mode) ("M-\"" . nil) ("M-:"  . nil)
+          :map vterm-copy-mode-map ("C-."  . vterm-copy-mode))
+  :config
+  (advice-add 'insert-for-yank :before 'vterm-insert-for-yank)
+  (defun vterm-insert-for-yank (str)
+    (when (equal major-mode 'vterm-mode)
+      (let ((inhibit-read-only t)
+            (yank-undo-function (lambda (_start _end) (vterm-undo))))
+        (vterm-send-string str t)))))
+(use-package vterm-editor
+  :after vterm
+  :vc (:url "https://git.andros.dev/andros/vterm-editor.el")
+  :bind (:map vterm-mode-map ("C-c e" . vterm-editor-open)))

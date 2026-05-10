@@ -226,7 +226,12 @@
                    when (and (string-match name-re (buffer-name b))
                              (not (process-live-p (get-buffer-process b))))
                    return (buffer-name b))
-          (generate-new-buffer-name name)))))
+          (generate-new-buffer-name name))))
+  (advice-add 'compilation-start :filter-args 'move-to-project-root)
+  (defun move-to-project-root (r)
+    (when (project-current)
+      (setf (caddr r) (project-root (project-current))))
+    r))
 (use-package consult
   :bind (("C-;" . consult-register-load)
          ("C-:" . consult-register-store)
@@ -290,28 +295,29 @@
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
   :bind (("C-`" . eat) :map eat-mode-map ("C-." . eat-toggle-char-mode))
+  :hook (after-init . eat-compile-mode)
   :custom
   (eat-minimum-latency 0.05)
   (eat-maximum-latency 0.1)
-  (eat-kill-buffer-on-exit t)
   (eat-term-name "xterm-256color")
   (eat-very-visible-cursor-type '(box nil nil))
   (eat-very-visible-vertical-bar-cursor-type '(bar nil nil))
   (eat-very-visible-horizontal-bar-cursor-type '(hbar nil nil))
   :init
+  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "C-;") nil)
     (define-key map (kbd "C-.") 'eat-toggle-char-mode)
     (define-key map (kbd "M-o") nil)
     map)
-  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
+  :config
+  (advice-add 'eat :around 'eat-dwim)
   (defun eat-dwim (o &rest args)
     (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
             (not (derived-mode-p 'eat-mode))
             (not (process-live-p (get-buffer-process (current-buffer)))))
         (apply o args)
       (bury-buffer)))
-  (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively
@@ -322,6 +328,7 @@
             'eat-emacs-mode)
            (t
             'eat-semi-char-mode))))
+  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat-terminal))
         (apply o args)
@@ -334,7 +341,6 @@
            (setq-local yank-transform-functions yank-hook)
            (apply o args)
            (buffer-string))))))
-  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
   (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
   (defun eat-insert-invocation-time ()
     (let* ((pos (pos-eol 0))
@@ -344,7 +350,53 @@
       (overlay-put ov 'after-string
                    (concat
                     (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
-                    (propertize text 'face '(italic font-lock-comment-face)))))))
+                    (propertize text 'face '(italic font-lock-comment-face))))))
+  (defun maybe-eat-compilation-start (o &rest args)
+    (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
+  (defun eat-compilation-start (command &optional mode name-function _ _)
+    (let ((name-of-mode "compilation")
+          (dir default-directory)
+          outbuf)
+      (if (or (not mode) (eq mode t))
+          (setq mode 'compilation-minor-mode)
+        (setq name-of-mode (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
+      (with-current-buffer
+          (setq outbuf
+                (get-buffer-create
+                 (compilation-buffer-name name-of-mode mode name-function)))
+        (setq default-directory dir)
+        (setq buffer-read-only nil)
+        (erase-buffer)
+        (compilation-insert-annotation
+         "-*- mode: " name-of-mode
+         "; default-directory: "
+         (prin1-to-string (abbreviate-file-name default-directory))
+         " -*-\n")
+        (compilation-insert-annotation
+         (format "%s started at %s\n\n"
+                 mode-name
+                 (substring (current-time-string) 0 19))
+         command "\n")
+        (eat-mode)
+        (eat-exec outbuf "*compile*" shell-file-name nil (list "-lc" command))
+        (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
+        (eat-emacs-mode)
+        (set (make-local-variable 'eat--synchronize-scroll-function)
+             'eat--eshell-synchronize-scroll)
+        (set (make-local-variable 'eat-kill-buffer-on-exit) nil)
+        (funcall mode)
+        (setq-local compilation-directory dir)
+        (setq-local compilation-arguments (list command (if (eq mode 'compilation-minor-mode) nil mode) name-function))
+        (setq-local revert-buffer-function 'compilation-revert-buffer)
+        (setq next-error-last-buffer outbuf)
+        (display-buffer outbuf '(nil (allow-no-window . t))))))
+  (define-minor-mode eat-compile-mode
+    "Use eat for compile/recompile."
+    :global t
+    :group 'eat
+    (if eat-compile-mode
+        (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
+      (advice-remove 'compilation-start 'maybe-eat-compilation-start))))
 (use-package ediff
   :bind (:map goto-map ("=" . ediff-current-file))
   :custom
@@ -392,19 +444,6 @@
         (eyebrowse-switch-to-window-config slot))
       (when (and (not switch-only) reg (get-register reg))
         (jump-to-register reg)))))
-(use-package ghostel
-  :bind (:map ghostel-mode-map      ("C-." . ghostel-copy-mode)
-         :map ghostel-copy-mode-map ("C-." . ghostel-copy-mode-exit) ("M-w" . nil))
-  :hook (after-init . ghostel-compile-global-mode)
-  :config
-  (require 'ghostel-fixes nil t)
-  (when (require 'ghostel-compile nil t)
-    (define-key global-map (kbd "C-c C-k") 'kill-compilation)
-    (advice-add 'ghostel-compile--start :filter-args
-                (defun move-to-project-root (r)
-                  (when (project-current)
-                    (setf (caddr r) (project-root (project-current))))
-                  r))))
 (use-package go-ts-mode
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
@@ -519,18 +558,3 @@
   :hook ((after-init . global-treesit-auto-mode))
   :custom
   (treesit-font-lock-level 4))
-(use-package vterm
-  :hook (vterm-mode . (lambda () (setq-local buffer-face-mode-face 'fixed-pitch) (buffer-face-mode 1)))
-  :bind ( :map vterm-mode-map      ("C-."  . vterm-copy-mode) ("M-\"" . nil) ("M-:"  . nil)
-          :map vterm-copy-mode-map ("C-."  . vterm-copy-mode))
-  :config
-  (advice-add 'insert-for-yank :before 'vterm-insert-for-yank)
-  (defun vterm-insert-for-yank (str)
-    (when (equal major-mode 'vterm-mode)
-      (let ((inhibit-read-only t)
-            (yank-undo-function (lambda (_start _end) (vterm-undo))))
-        (vterm-send-string str t)))))
-(use-package vterm-editor
-  :after vterm
-  :vc (:url "https://git.andros.dev/andros/vterm-editor.el")
-  :bind (:map vterm-mode-map ("C-c e" . vterm-editor-open)))
