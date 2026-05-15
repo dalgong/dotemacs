@@ -165,7 +165,7 @@
                  (substring (current-time-string) 0 19))
          command "\n")
         (eat-mode)
-        (eat-exec outbuf "*compile*" shell-file-name nil (list "-lc" command))
+        (eat-exec outbuf "*compile*" (funcall eat-default-shell-function) nil (list "-lc" command))
         (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
         (eat-emacs-mode)
         (set (make-local-variable 'eat--synchronize-scroll-function)
