@@ -1,4 +1,7 @@
 ;; -*- lexical-binding: t -*-
+(setq native-comp-enable-subr-trampolines nil
+      native-comp-jit-compilation nil
+      package-native-compile nil)
 (unless noninteractive
   (setq gc-cons-threshold most-positive-fixnum)
   (setq default-frame-alist

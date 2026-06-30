@@ -33,6 +33,8 @@
   (bidi-paragraph-direction 'left-to-right)
   (completion-auto-select)
   (completion-category-overrides '((file (styles partial-completion))))
+  (completion-eager-update t)
+  (completion-eager-display 'auto)
   (completions-format 'vertical)
   (completions-sort 'historical)
   (create-lockfiles nil)
@@ -42,6 +44,8 @@
                            display-buffer-at-bottom
                            (window-parameters (mode-line-format . none)))
                           ("\\*hermes.*" display-buffer-same-window)))
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-help-at-pt t)
   (electric-pair-mode t)
   (enable-recursive-minibuffers t)
   (ffap-machine-p-known 'reject)
@@ -57,6 +61,7 @@
                                       try-complete-lisp-symbol-partially
                                       try-complete-lisp-symbol))
   (ibuffer-expert t)
+  (ibuffer-human-readable-size t)
   (indent-tabs-mode nil)
   (inhibit-startup-screen t)
   (initial-scratch-message nil)
@@ -64,12 +69,14 @@
   (isearch-yank-on-move 'shift)
   (isearch-lazy-count t)
   (kill-do-not-save-duplicates t)
+  (kill-region-dwim 'unix-word)
   (kill-whole-line t)
   (large-file-warning-threshold 100000000)
   (mac-option-key-is-meta t)
   (make-backup-files nil)
   (max-mini-window-height 0.2)
   (minibuffer-depth-indicate-mode t)
+  (minibuffer-visible-completions 'up-down)
   (mode-line-collapse-minor-modes '(not))
   (mode-line-end-spaces nil)
   (mode-line-frame-identification nil)
@@ -98,12 +105,18 @@
   (shell-command-switch "-lc")
   (split-height-threshold nil)
   (tab-always-indent 'complete)
+  (treesit-auto-install-grammar 'always)
+  (treesit-enabled-modes t)
+  (treesit-font-lock-level 4)
   (truncate-lines t)
   (use-dialog-box nil)
   (use-package-compute-statistics nil)
   (use-package-always-ensure t)
   (use-short-answers t)
   (vc-follow-symlinks nil)
+  (vc-auto-revert-mode t)
+  (vc-allow-rewriting-published-history t)
+  (vc-dir-auto-hide-up-to-date 'revert) 
   (view-read-only t)
   (window-combination-resize t)
   (xref-search-program 'ripgrep)
@@ -401,7 +414,13 @@
   :bind (:map goto-map ("=" . ediff-current-file))
   :custom
   (ediff-window-setup-function 'ediff-setup-windows-plain))
-(use-package eglot :defer t :config (add-to-list 'eglot-stay-out-of 'imenu))
+(use-package eglot
+  :defer t
+  :custom
+  (eglot-code-action-indications nil)
+  (eglot-documentation-renderer 'markdown-ts-view-mode)
+  (eglot-events-buffer-config '(:size 0 :format full))
+  (eglot-stay-out-of '(imenu)))
 (use-package embark
   :commands (embark-act embark-prefix-help-command)
   :functions embark--targets
@@ -459,11 +478,14 @@
 (use-package marginalia
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :hook (after-init . marginalia-mode))
-(use-package markdown-indent-mode
+(use-package markdown-ts-mode
   :hook (markdown-ts-mode . markdown-indent-mode)
-  :custom
-  (markdown-fontify-code-blocks-natively t)
-  (markdown-spaces-after-code-fence 0))
+  :config
+  (use-package markdown-indent-mode
+    :hook (markdown-ts-mode . markdown-indent-mode)
+    :custom
+    (markdown-fontify-code-blocks-natively t)
+    (markdown-spaces-after-code-fence 0)))
 (use-package opencode
   :disabled
   :vc (:url "https://codeberg.org/sczi/opencode.el.git" :rev :newest)
@@ -515,10 +537,6 @@
     (when-let* ((dir (and (null python-shell-virtualenv-root)
                           (locate-dominating-file default-directory ".venv/"))))
       (setq-local python-shell-virtualenv-root (expand-file-name ".venv/" dir)))))
-(use-package treesit-auto
-  :hook ((after-init . global-treesit-auto-mode))
-  :custom
-  (treesit-font-lock-level 4))
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
