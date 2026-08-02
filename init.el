@@ -121,6 +121,8 @@
   (window-combination-resize t)
   (xref-search-program 'ripgrep)
   :config
+  (when-let* ((creds (car (auth-source-search :host "openrouter.ai" :login "apikey"))))
+    (setenv "OPENROUTER_API_KEY" (funcall (plist-get creds :secret))))
   (dolist (m '(delete-selection-mode global-visual-wrap-prefix-mode minibuffer-regexp-mode
                save-place-mode winner-mode savehist-mode))
     (add-hook 'after-init-hook m))
