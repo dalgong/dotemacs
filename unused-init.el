@@ -86,24 +86,29 @@
 (use-package eat
   :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
   :bind (("C-`" . eat) :map eat-mode-map ("C-." . eat-toggle-char-mode))
-  :commands eat-mode
-  :hook (eat-exec . make-buffer-fixed-pitch)
+  :hook (after-init . eat-compile-mode)
   :custom
-  (eat-shell-prompt-annotation-position 'right-margin)
+  (eat-minimum-latency 0.05)
+  (eat-maximum-latency 0.1)
+  (eat-term-name "xterm-256color")
+  (eat-very-visible-cursor-type '(box nil nil))
+  (eat-very-visible-vertical-bar-cursor-type '(bar nil nil))
+  (eat-very-visible-horizontal-bar-cursor-type '(hbar nil nil))
   :init
+  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
   (defun override-eat-term-keymap (map)
     (define-key map (kbd "C-;") nil)
     (define-key map (kbd "C-.") 'eat-toggle-char-mode)
     (define-key map (kbd "M-o") nil)
     map)
-  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
+  :config
+  (advice-add 'eat :around 'eat-dwim)
   (defun eat-dwim (o &rest args)
     (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
             (not (derived-mode-p 'eat-mode))
             (not (process-live-p (get-buffer-process (current-buffer)))))
         (apply o args)
       (bury-buffer)))
-  (advice-add 'eat :around 'eat-dwim)
   (defun eat-toggle-char-mode ()
     (interactive)
     (call-interactively
@@ -114,6 +119,7 @@
             'eat-emacs-mode)
            (t
             'eat-semi-char-mode))))
+  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
   (defun eat-insert-for-yank (o &rest args)
     (if (null (ignore-errors eat-terminal))
         (apply o args)
@@ -126,7 +132,6 @@
            (setq-local yank-transform-functions yank-hook)
            (apply o args)
            (buffer-string))))))
-  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
   (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
   (defun eat-insert-invocation-time ()
     (let* ((pos (pos-eol 0))
@@ -137,7 +142,6 @@
                    (concat
                     (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
                     (propertize text 'face '(italic font-lock-comment-face))))))
-  (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
   (defun maybe-eat-compilation-start (o &rest args)
     (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
   (defun eat-compilation-start (command &optional mode name-function _ _)
@@ -170,12 +174,20 @@
         (eat-emacs-mode)
         (set (make-local-variable 'eat--synchronize-scroll-function)
              'eat--eshell-synchronize-scroll)
+        (set (make-local-variable 'eat-kill-buffer-on-exit) nil)
         (funcall mode)
         (setq-local compilation-directory dir)
         (setq-local compilation-arguments (list command (if (eq mode 'compilation-minor-mode) nil mode) name-function))
         (setq-local revert-buffer-function 'compilation-revert-buffer)
         (setq next-error-last-buffer outbuf)
-        (display-buffer outbuf '(nil (allow-no-window . t)))))))
+        (display-buffer outbuf '(nil (allow-no-window . t))))))
+  (define-minor-mode eat-compile-mode
+    "Use eat for compile/recompile."
+    :global t
+    :group 'eat
+    (if eat-compile-mode
+        (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
+      (advice-remove 'compilation-start 'maybe-eat-compilation-start))))
 (use-package indent-bars
   :disabled
   :custom

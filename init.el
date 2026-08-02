@@ -199,7 +199,8 @@
   :custom
   (agent-shell-header-style nil)
   (agent-shell-show-welcome-message nil)
-  (agent-shell-transcript-file-path-function nil))
+  (agent-shell-transcript-file-path-function nil)
+  (shell-maker-prompt-before-killing-buffer nil))
 (use-package avy
   :bind (("C-'" . avy-goto-char-timer) :map isearch-mode-map ("C-'" . avy-isearch))
   :custom
@@ -307,111 +308,6 @@
         `(region ,(buffer-substring start end) . ,r)))))
   (with-no-warnings
     (add-to-list 'embark-target-finders 'embark-target-easy-kill-region)))
-(use-package eat
-  :vc (:url "https://codeberg.org/akib/emacs-eat" :rev :newest)
-  :bind (("C-`" . eat) :map eat-mode-map ("C-." . eat-toggle-char-mode))
-  :hook (after-init . eat-compile-mode)
-  :custom
-  (eat-minimum-latency 0.05)
-  (eat-maximum-latency 0.1)
-  (eat-term-name "xterm-256color")
-  (eat-very-visible-cursor-type '(box nil nil))
-  (eat-very-visible-vertical-bar-cursor-type '(bar nil nil))
-  (eat-very-visible-horizontal-bar-cursor-type '(hbar nil nil))
-  :init
-  (advice-add 'eat-term-make-keymap :filter-return 'override-eat-term-keymap)
-  (defun override-eat-term-keymap (map)
-    (define-key map (kbd "C-;") nil)
-    (define-key map (kbd "C-.") 'eat-toggle-char-mode)
-    (define-key map (kbd "M-o") nil)
-    map)
-  :config
-  (advice-add 'eat :around 'eat-dwim)
-  (defun eat-dwim (o &rest args)
-    (if (or (not (called-interactively-p 'any)) (car args) (cadr args)
-            (not (derived-mode-p 'eat-mode))
-            (not (process-live-p (get-buffer-process (current-buffer)))))
-        (apply o args)
-      (bury-buffer)))
-  (defun eat-toggle-char-mode ()
-    (interactive)
-    (call-interactively
-     (cond ((or (null eat-terminal)
-                current-prefix-arg)
-            'eat)
-           (eat--semi-char-mode
-            'eat-emacs-mode)
-           (t
-            'eat-semi-char-mode))))
-  (advice-add 'insert-for-yank :around 'eat-insert-for-yank)
-  (defun eat-insert-for-yank (o &rest args)
-    (if (null (ignore-errors eat-terminal))
-        (apply o args)
-      (funcall eat--synchronize-scroll-function
-               (eat--synchronize-scroll-windows 'force-selected))
-      (eat-term-send-string-as-yank
-       eat-terminal
-       (let ((yank-hook (bound-and-true-p yank-transform-functions)))
-         (with-temp-buffer
-           (setq-local yank-transform-functions yank-hook)
-           (apply o args)
-           (buffer-string))))))
-  (advice-add 'eat--pre-cmd :after 'eat-insert-invocation-time)
-  (defun eat-insert-invocation-time ()
-    (let* ((pos (pos-eol 0))
-           (text (format-time-string "%m/%d %H:%M:%S"))
-           (ov (make-overlay (1- pos) pos)))
-      (overlay-put ov 'evaporate t)
-      (overlay-put ov 'after-string
-                   (concat
-                    (propertize " " 'display `(space :align-to (- right-fringe ,(1+ (length text)))))
-                    (propertize text 'face '(italic font-lock-comment-face))))))
-  (defun maybe-eat-compilation-start (o &rest args)
-    (apply (if (eq (cadr args) 'grep-mode) o 'eat-compilation-start) args))
-  (defun eat-compilation-start (command &optional mode name-function _ _)
-    (let ((name-of-mode "compilation")
-          (dir default-directory)
-          outbuf)
-      (if (or (not mode) (eq mode t))
-          (setq mode 'compilation-minor-mode)
-        (setq name-of-mode (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
-      (with-current-buffer
-          (setq outbuf
-                (get-buffer-create
-                 (compilation-buffer-name name-of-mode mode name-function)))
-        (setq default-directory dir)
-        (setq buffer-read-only nil)
-        (erase-buffer)
-        (compilation-insert-annotation
-         "-*- mode: " name-of-mode
-         "; default-directory: "
-         (prin1-to-string (abbreviate-file-name default-directory))
-         " -*-\n")
-        (compilation-insert-annotation
-         (format "%s started at %s\n\n"
-                 mode-name
-                 (substring (current-time-string) 0 19))
-         command "\n")
-        (eat-mode)
-        (eat-exec outbuf "*compile*" (funcall eat-default-shell-function) nil (list "-lc" command))
-        (run-hook-with-args 'compilation-start-hook (get-buffer-process outbuf))
-        (eat-emacs-mode)
-        (set (make-local-variable 'eat--synchronize-scroll-function)
-             'eat--eshell-synchronize-scroll)
-        (set (make-local-variable 'eat-kill-buffer-on-exit) nil)
-        (funcall mode)
-        (setq-local compilation-directory dir)
-        (setq-local compilation-arguments (list command (if (eq mode 'compilation-minor-mode) nil mode) name-function))
-        (setq-local revert-buffer-function 'compilation-revert-buffer)
-        (setq next-error-last-buffer outbuf)
-        (display-buffer outbuf '(nil (allow-no-window . t))))))
-  (define-minor-mode eat-compile-mode
-    "Use eat for compile/recompile."
-    :global t
-    :group 'eat
-    (if eat-compile-mode
-        (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
-      (advice-remove 'compilation-start 'maybe-eat-compilation-start))))
 (use-package ediff
   :bind (:map goto-map ("=" . ediff-current-file))
   :custom
@@ -466,7 +362,18 @@
         (eyebrowse-switch-to-window-config slot))
       (when (and (not switch-only) reg (get-register reg))
         (jump-to-register reg)))))
+(use-package ghostel
+  :bind (("C-`" . ghostel)
+         :map ghostel-mode-map
+         ("C-." . ghostel-copy-mode)
+         :map ghostel-readonly-mode-map
+         ("C-." . ghostel-readonly-exit)
+         ("M-w" . nil))
+  :hook (after-init . ghostel-compile-global-mode)
+  :config
+  (require 'ghostel-compile nil t))
 (use-package go-ts-mode
+  :ensure nil
   :hook ((go-ts-mode . eglot-ensure)
          (before-save . gofmt-before-save))
   :config
@@ -481,6 +388,7 @@
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :hook (after-init . marginalia-mode))
 (use-package markdown-ts-mode
+  :ensure nil
   :hook (markdown-ts-mode . markdown-indent-mode)
   :config
   (use-package markdown-indent-mode
@@ -550,6 +458,7 @@
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
          ("C-`"   . vertico-exit-and-run)
+         ("C-c a" . vertico-exit-and-run)
          ("M-s g" . vertico-exit-and-run)
          ("M-s r" . vertico-exit-and-run))
   :custom
