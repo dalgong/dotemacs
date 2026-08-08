@@ -316,7 +316,6 @@
   :defer t
   :custom
   (eglot-code-action-indications nil)
-  (eglot-documentation-renderer 'markdown-ts-view-mode)
   (eglot-events-buffer-config '(:size 0 :format full))
   (eglot-stay-out-of '(imenu)))
 (use-package embark
@@ -373,13 +372,6 @@
   :config
   (require 'ghostel-compile nil t)
   (advice-add 'ghostel-compile--compilation-start-advice :around 'move-to-project-root))
-(use-package go-ts-mode
-  :ensure nil
-  :hook ((go-ts-mode . eglot-ensure)
-         (before-save . gofmt-before-save))
-  :config
-  (use-package go-mode :functions (gofmt) :custom (gofmt-command "goimports"))
-  (defun gofmt-before-save () (when (derived-mode-p 'go-mode) (gofmt))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package iedit
   :bind (("C-c E" . iedit-mode)
@@ -388,19 +380,6 @@
 (use-package marginalia
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :hook (after-init . marginalia-mode))
-(use-package markdown-ts-mode
-  :ensure nil
-  :hook (markdown-ts-mode . markdown-indent-mode)
-  :config
-  (use-package markdown-indent-mode
-    :hook (markdown-ts-mode . markdown-indent-mode)
-    :custom
-    (markdown-fontify-code-blocks-natively t)
-    (markdown-spaces-after-code-fence 0)))
-(use-package opencode
-  :disabled
-  :vc (:url "https://codeberg.org/sczi/opencode.el.git" :rev :newest)
-  :bind (("C-c o" . opencode)))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -438,7 +417,7 @@
 (use-package python
   :ensure nil
   :hook
-  (python-ts-mode . maybe-set-python-shell-virtualenv-root)
+  (python-base-mode . maybe-set-python-shell-virtualenv-root)
   :custom
   (python-shell-interpreter "uv")
   (python-shell-interpreter-args "run ipython -i")
