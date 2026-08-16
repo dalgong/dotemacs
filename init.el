@@ -372,6 +372,23 @@
   :config
   (require 'ghostel-compile nil t)
   (advice-add 'ghostel-compile--compilation-start-advice :around 'move-to-project-root))
+(use-package gptel
+  :bind (("C-c RET"     . gptel-send)
+         ("C-c C-RET"   . gptel))
+  :config
+  (when-let* ((creds (car (auth-source-search :host "openrouter.ai" :login "apikey"))))
+    (setq gptel-model 'stealth/ox-alpha
+          gptel-backend (gptel-make-openai "OpenRouter"
+                                           :host "openrouter.ai"
+                                           :endpoint "/api/v1/chat/completions"
+                                           :stream t
+                                           :key (funcall (plist-get creds :secret))
+                                           :models '(stealth/ox-alpha
+                                                     google/gemma-4-26b-a4b-it:free
+                                                     nvidia/nemotron-nano-12b-v2-vl:free
+                                                     nvidia/nemotron-3-nano-30b-a3b:free
+                                                     nvidia/nemotron-3-ultra-550b-a55b:free
+                                                     openai/gpt-oss-20b:free)))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package iedit
   :bind (("C-c E" . iedit-mode)
