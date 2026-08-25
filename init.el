@@ -48,6 +48,7 @@
   (eldoc-help-at-pt t)
   (electric-pair-mode t)
   (enable-recursive-minibuffers t)
+  (exchange-point-and-mark-highlight-region nil)
   (ffap-machine-p-known 'reject)
   (help-window-select t)
   (hippie-expand-try-functions-list '(try-expand-dabbrev
@@ -289,7 +290,7 @@
                   t))))
 (use-package completion-preview
   :ensure nil
-  :hook (prog-mode text-mode)
+  :hook (after-init . global-completion-preview-mode)
   :bind ( :map completion-preview-active-mode-map
           ("M-n" . completion-preview-next-candidate)
           ("M-p" . completion-preview-prev-candidate)))
