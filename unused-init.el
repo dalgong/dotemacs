@@ -188,6 +188,19 @@
     (if eat-compile-mode
         (advice-add 'compilation-start :around 'maybe-eat-compilation-start)
       (advice-remove 'compilation-start 'maybe-eat-compilation-start))))
+(use-package ebb
+  :vc (:url "https://github.com/ArthurHeymans/el-be-back" :rev :newest)
+  :commands ebb
+  :bind ( :map ebb-char-mode-map      ("C-." . ebb-toggle-char-mode)
+          :map ebb-emacs-mode-map     ("C-." . ebb-toggle-char-mode)
+          :map ebb-semi-char-mode-map ("C-." . ebb-toggle-char-mode)
+          :map ebb-mode-map           ("C-." . ebb-toggle-char-mode))
+  :custom
+  (ebb-kill-buffer-on-exit nil)
+  :config
+  (defun ebb-toggle-char-mode ()
+    (interactive)
+    (call-interactively (if (eq ebb--input-mode 'emacs) 'ebb-semi-char-mode 'ebb-emacs-mode))))
 (use-package indent-bars
   :disabled
   :custom
