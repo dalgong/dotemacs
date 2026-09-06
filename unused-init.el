@@ -201,6 +201,10 @@
   (defun ebb-toggle-char-mode ()
     (interactive)
     (call-interactively (if (eq ebb--input-mode 'emacs) 'ebb-semi-char-mode 'ebb-emacs-mode))))
+(use-package ediff
+  :bind (:map goto-map ("=" . ediff-current-file))
+  :custom
+  (ediff-window-setup-function 'ediff-setup-windows-plain))
 (use-package indent-bars
   :disabled
   :custom

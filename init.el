@@ -19,6 +19,8 @@
          ("M-2"                  . split-window-below)
          ("M-3"                  . split-window-right)
          ("M-9"                  . quit-window)
+         ("M-n"                  . forward-paragraph)
+         ("M-p"                  . backward-paragraph)
          ("C-x \\"               . align-regexp)
          ("C-c c"                . calendar)
          ("C-c w"                . world-clock)
@@ -81,7 +83,7 @@
   (mode-line-collapse-minor-modes '(not))
   (mode-line-end-spaces nil)
   (mode-line-frame-identification nil)
-  (mode-line-position '((-3 "%p") " %l:%c"))
+  (mode-line-position '("%l:%c"))
   (mode-line-modified '("%* "))
   (mode-line-mule-info nil)
   (mode-line-remote nil)
@@ -252,21 +254,29 @@
 (use-package consult
   :bind (("C-;" . consult-register-load)
          ("C-:" . consult-register-store)
+         ("M-M" . consult-minor-mode-menu)
          ("M-T" . consult-imenu)
+         ("M-X" . consult-mode-command)
          ([remap yank-pop] . consult-yank-pop)
-         ("C-x b"   . consult-buffer)
-         ("C-x C-r" . consult-recent-file)
+         ("C-x b"     . consult-buffer)
+         ("C-x C-r"   . consult-recent-file)
          ("C-h C-i"   . consult-info)
          ("C-h SPC"   . consult-mark)
          ("C-h C-SPC" . consult-global-mark)
          :map minibuffer-local-map
          ("M-r"   . consult-history)
          :map goto-map
-         ("f" . consult-flymake)
-         ("o" . consult-outline)
+         ("F"   . consult-focus-lines)
+         ("M-f" . consult-focus-lines)
+         ("f"   . consult-flymake)
+         ("K"   . consult-keep-lines)
+         ("M-k" . consult-keep-lines)
+         ("g"   . consult-goto-line)
+         ("M-g" . consult-goto-line)
+         ("o"   . consult-outline)
          :map search-map
          ("e"    . consult-isearch-history)
-         ("g"    . grep)
+         ("g"    . consult-grep)
          ("G"    . consult-git-grep)
          ("r"    . consult-ripgrep)
          :map isearch-mode-map
@@ -275,12 +285,15 @@
          ("M-h"  . consult-isearch-history)
          ("M-q"  . isearch-query-replace))
   :custom
+  (completion-in-region-function 'consult-completion-in-region)
+  (consult-async-input-debounce 0.1)
+  (consult-async-input-throttle 0.15)
+  (consult-async-refresh-delay 0.05)
+  (consult-narrow-key "<")
   (register-preview-delay 0.5)
   (register-preview-function 'consult-register-format)
-  (completion-in-region-function 'consult-completion-in-region)
-  (consult-narrow-key "<")
-  (xref-show-xrefs-function 'consult-xref)
   (xref-show-definitions-function 'consult-xref)
+  (xref-show-xrefs-function 'consult-xref)
   :config
   (advice-add 'register-preview :override 'consult-register-window)
   (advice-add 'consult-imenu :before-until
@@ -294,7 +307,7 @@
   :bind ( :map completion-preview-active-mode-map
           ("M-n" . completion-preview-next-candidate)
           ("M-p" . completion-preview-prev-candidate)))
-(use-package display-line-numbers :hook (prog-mode . display-line-numbers--turn-on))
+(use-package display-line-numbers :hook ((text-mode prog-mode) . display-line-numbers--turn-on))
 (use-package diffview :after diff-mode :bind (:map diff-mode-map ("|" . diffview-current)))
 (use-package easy-kill
   :after embark
@@ -309,10 +322,6 @@
         `(region ,(buffer-substring start end) . ,r)))))
   (with-no-warnings
     (add-to-list 'embark-target-finders 'embark-target-easy-kill-region)))
-(use-package ediff
-  :bind (:map goto-map ("=" . ediff-current-file))
-  :custom
-  (ediff-window-setup-function 'ediff-setup-windows-plain))
 (use-package eglot
   :defer t
   :custom
@@ -398,6 +407,7 @@
 (use-package marginalia
   :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
   :hook (after-init . marginalia-mode))
+(use-package mlscroll :hook (after-init . mlscroll-mode))
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
@@ -445,6 +455,7 @@
     (when-let* ((dir (and (null python-shell-virtualenv-root)
                           (locate-dominating-file default-directory ".venv/"))))
       (setq-local python-shell-virtualenv-root (expand-file-name ".venv/" dir)))))
+(defvar-local consult-toggle-preview-orig nil)
 (use-package vertico
   :hook ((after-init . vertico-mode)
          (minibuffer-setup . vertico-repeat-save)
@@ -455,6 +466,7 @@
          ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
+         ("M-P"   . consult-toggle-preview)
          ("C-`"   . vertico-exit-and-run)
          ("C-c a" . vertico-exit-and-run)
          ("M-s g" . vertico-exit-and-run)
@@ -470,4 +482,13 @@
      (lambda (cmd d) (let ((default-directory d)) (call-interactively (setq this-command cmd))))
      (setq cmd (or cmd (lookup-key global-map (this-command-keys))))
      (file-name-directory (substitute-in-file-name (minibuffer-contents-no-properties))))
-    (abort-recursive-edit)))
+    (abort-recursive-edit))
+  (defun consult-toggle-preview ()
+    "Command to enable/disable preview."
+    (interactive)
+    (if consult-toggle-preview-orig
+        (setq consult--preview-function consult-toggle-preview-orig
+              consult-toggle-preview-orig nil)
+      (setq consult-toggle-preview-orig consult--preview-function
+            consult--preview-function #'ignore))))
+(use-package wgrep)
