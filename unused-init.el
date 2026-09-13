@@ -51,6 +51,17 @@
 
   ;; Manual preview key for `affe-grep'
   (consult-customize affe-grep :preview-key (kbd "M-.")))
+(use-package agent-shell
+  :bind (("C-c a" . agent-shell)
+         :map agent-shell-mode-map
+         ("C-c e" . agent-shell-prompt-compose)
+         ("C-c q" . agent-shell-queue-request)
+         ("C-c Q" . agent-shell-remove-pending-request))
+  :custom
+  (agent-shell-header-style nil)
+  (agent-shell-show-welcome-message nil)
+  (agent-shell-transcript-file-path-function nil)
+  (shell-maker-prompt-before-killing-buffer nil))
 (use-package bash-completion
   :unless (memq window-system '(mac ns))
   :hook (after-init . bash-completion-setup)
@@ -205,6 +216,23 @@
   :bind (:map goto-map ("=" . ediff-current-file))
   :custom
   (ediff-window-setup-function 'ediff-setup-windows-plain))
+(use-package gptel
+  :bind (("C-c RET"     . gptel-send)
+         ("C-c C-RET"   . gptel))
+  :config
+  (when-let* ((creds (car (auth-source-search :host "openrouter.ai" :login "apikey"))))
+    (setq gptel-model 'stealth/ox-alpha
+          gptel-backend (gptel-make-openai "OpenRouter"
+                                           :host "openrouter.ai"
+                                           :endpoint "/api/v1/chat/completions"
+                                           :stream t
+                                           :key (funcall (plist-get creds :secret))
+                                           :models '(stealth/ox-alpha
+                                                     google/gemma-4-26b-a4b-it:free
+                                                     nvidia/nemotron-nano-12b-v2-vl:free
+                                                     nvidia/nemotron-3-nano-30b-a3b:free
+                                                     nvidia/nemotron-3-ultra-550b-a55b:free
+                                                     openai/gpt-oss-20b:free)))))
 (use-package indent-bars
   :disabled
   :custom

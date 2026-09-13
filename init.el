@@ -193,17 +193,6 @@
               (lambda ()
                 (when (eq last-command-event ?\n)
                   (indent-according-to-mode)))))
-(use-package agent-shell
-  :bind (("C-c a" . agent-shell)
-         :map agent-shell-mode-map
-         ("C-c e" . agent-shell-prompt-compose)
-         ("C-c q" . agent-shell-queue-request)
-         ("C-c Q" . agent-shell-remove-pending-request))
-  :custom
-  (agent-shell-header-style nil)
-  (agent-shell-show-welcome-message nil)
-  (agent-shell-transcript-file-path-function nil)
-  (shell-maker-prompt-before-killing-buffer nil))
 (use-package avy
   :bind (("C-'" . avy-goto-char-timer) :map isearch-mode-map ("C-'" . avy-isearch))
   :custom
@@ -382,31 +371,12 @@
   :config
   (require 'ghostel-compile nil t)
   (advice-add 'ghostel-compile--compilation-start-advice :around 'move-to-project-root))
-(use-package gptel
-  :bind (("C-c RET"     . gptel-send)
-         ("C-c C-RET"   . gptel))
-  :config
-  (when-let* ((creds (car (auth-source-search :host "openrouter.ai" :login "apikey"))))
-    (setq gptel-model 'stealth/ox-alpha
-          gptel-backend (gptel-make-openai "OpenRouter"
-                                           :host "openrouter.ai"
-                                           :endpoint "/api/v1/chat/completions"
-                                           :stream t
-                                           :key (funcall (plist-get creds :secret))
-                                           :models '(stealth/ox-alpha
-                                                     google/gemma-4-26b-a4b-it:free
-                                                     nvidia/nemotron-nano-12b-v2-vl:free
-                                                     nvidia/nemotron-3-nano-30b-a3b:free
-                                                     nvidia/nemotron-3-ultra-550b-a55b:free
-                                                     openai/gpt-oss-20b:free)))))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package iedit
   :bind (("C-c E" . iedit-mode)
          :map isearch-mode-map
          ("M-e" . iedit-mode-from-isearch)))
-(use-package marginalia
-  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
-  :hook (after-init . marginalia-mode))
+(use-package marginalia :hook (after-init . marginalia-mode))
 (use-package mlscroll :hook (after-init . mlscroll-mode))
 (use-package orderless
   :custom
