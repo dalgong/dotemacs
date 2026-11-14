@@ -210,13 +210,6 @@
                 (when (getenv "BROWSER")
                   (call-process (getenv "BROWSER") nil nil nil url)
                   t))))
-(use-package cape
-  :bind
-  (:map set-mark-dwim-map ("/" . cape-dabbrev))
-  :config
-  (setq completion-at-point-functions
-        (nconc completion-at-point-functions
-               '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package clipetty :hook (after-init . global-clipetty-mode))
 (use-package compile
   :bind (("M-C" . compile) ("M-R" . recompile))
@@ -367,10 +360,15 @@
          :map ghostel-readonly-mode-map
          ("C-." . ghostel-readonly-exit)
          ("M-w" . nil))
-  :hook (after-init . ghostel-compile-global-mode)
+  :hook (after-init . (ghostel-comint-global-mode ghostel-compile-global-mode ghostel-shell-command-global-mode))
+  :custom
+  (ghostel-enable-osc52 t)
   :config
   (require 'ghostel-compile nil t)
   (advice-add 'ghostel-compile--compilation-start-advice :around 'move-to-project-root))
+(use-package hermit
+  :vc (:url "https://github.com/joaotavora/hermit.git" :rev :newest)
+  :hook (after-init . global-hermit-mode))
 (use-package hl-line :hook (prog-mode conf-mode compilation-mode text-mode))
 (use-package iedit
   :bind (("C-c E" . iedit-mode)
@@ -436,14 +434,12 @@
          ("C-j"   . vertico-exit-input)
          ("DEL"   . vertico-directory-delete-char)
          ("M-/"   . (lambda () (interactive) (vertico-exit-and-run #'consult-find)))
-         ("M-P"   . consult-toggle-preview)
-         ("C-`"   . vertico-exit-and-run)
-         ("C-c a" . vertico-exit-and-run)
-         ("M-s g" . vertico-exit-and-run)
-         ("M-s r" . vertico-exit-and-run))
+         ("M-P"   . consult-toggle-preview))
   :custom
   (vertico-count-format nil)
   :config
+  (dolist (k '("M-!" "M-&" "M-C" "C-`" "C-c a" "M-s g" "M-s r"))
+    (keymap-set vertico-map k 'vertico-exit-and-run))
   (defun vertico-exit-and-run (&optional cmd)
     (interactive)
     (vertico-insert)

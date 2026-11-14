@@ -67,6 +67,13 @@
   :hook (after-init . bash-completion-setup)
   :custom
   (bash-completion-use-separate-processes t))
+(use-package cape
+  :bind
+  (:map set-mark-dwim-map ("/" . cape-dabbrev))
+  :config
+  (setq completion-at-point-functions
+        (nconc completion-at-point-functions
+               '(cape-history cape-file cape-keyword cape-dabbrev cape-elisp-block))))
 (use-package cc-mode
   :custom
   (c-electric-flag nil)
